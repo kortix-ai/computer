@@ -45,6 +45,7 @@ import {
   KeyRound,
   Settings as SettingsIcon,
   Key,
+  Bot,
 
   // Preferences
   Palette,
@@ -295,6 +296,18 @@ export const menuRegistry: MenuItemDef[] = [
     tabId: 'settings:secrets',
     tabType: 'settings',
   },
+  {
+    id: 'providers-quick',
+    label: 'LLM Providers',
+    icon: Bot,
+    group: 'quickActions',
+    subGroup: 'security',
+    showIn: ['rightSidebar'],
+    kind: 'navigate',
+    href: '/settings/providers',
+    tabId: 'settings:providers',
+    tabType: 'settings',
+  },
 
   // ──────────────────────────────────────────────────────────────────────────
   // NAVIGATION — Main pages
@@ -463,6 +476,17 @@ export const menuRegistry: MenuItemDef[] = [
     kind: 'navigate',
     href: '/settings/api-keys',
     tabType: 'settings',
+  },
+  {
+    id: 'llm-providers',
+    label: 'LLM Providers',
+    icon: Bot,
+    group: 'settingsPages',
+    showIn: ['commandPalette'],
+    kind: 'navigate',
+    href: '/settings/providers',
+    tabType: 'settings',
+    keywords: 'llm providers models anthropic openai openrouter google groq xai',
   },
 
   // ──────────────────────────────────────────────────────────────────────────

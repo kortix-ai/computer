@@ -403,24 +403,33 @@ export default function DashboardLayoutContent({
 		}
 
 		const checkOnboarding = async () => {
+			const { authenticatedFetch } = await import("@/lib/auth-token");
+
+			// 1. Check onboarding first — if complete, setup is implicitly done too.
 			const instanceUrl = useServerStore.getState().getActiveServerUrl();
 
-			// Sandbox not registered yet (cloud mode race) — wait for the store
-			// to update (activeServerId/serverVersion change) before retrying.
-			if (!instanceUrl) return;
+			// Sandbox not registered yet, or platform/bootstrap requests failed.
+			// Do not deadlock the whole dashboard behind the skeleton while waiting
+			// for a server URL that may never arrive. Routes like Integrations and
+			// Settings should still render, and this effect will re-run if a sandbox
+			// is registered later.
+			if (!instanceUrl) {
+				setOnboardingChecked(true);
+				return;
+			}
 
 			try {
-				const { authenticatedFetch } = await import("@/lib/auth-token");
 				const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, undefined, { retryOnAuthError: false });
 
 				if (res.ok) {
 					const data = await res.json();
-					if (data.ONBOARDING_COMPLETE !== "true") {
-						setOnboardingRedirectPath("/onboarding");
+					if (data.ONBOARDING_COMPLETE === "true") {
+						// Onboarding complete — setup is implicitly done
+						sessionStorage.setItem("onboarding_complete", "true");
+						setOnboardingRedirectPath(null);
+						setOnboardingChecked(true);
 						return;
 					}
-					// Cache the successful result for this browser session
-					sessionStorage.setItem("onboarding_complete", "true");
 				} else if (res.status >= 500) {
 					// Server error — treat as not onboarded
 					setOnboardingRedirectPath("/onboarding");
@@ -431,8 +440,25 @@ export default function DashboardLayoutContent({
 				setOnboardingRedirectPath("/onboarding");
 				return;
 			}
-			setOnboardingRedirectPath(null);
-			setOnboardingChecked(true);
+
+			// 2. Onboarding NOT complete — check if setup wizard was done (DB).
+			//    If setup is also not done, redirect to /auth to show the wizard.
+			//    The auth page will fetch the wizard step from the backend directly.
+			try {
+				const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8008/v1";
+				const setupRes = await authenticatedFetch(`${backendUrl}/setup/setup-status`, undefined, { retryOnAuthError: false });
+				if (setupRes.ok) {
+					const setupData = await setupRes.json();
+					if (!setupData.complete) {
+						setOnboardingRedirectPath("/auth");
+						return;
+					}
+				}
+			} catch {
+				// Setup check failed — fall through to onboarding
+			}
+
+			setOnboardingRedirectPath("/onboarding");
 		};
 		checkOnboarding();
 	}, [activeServerId, serverVersion]);

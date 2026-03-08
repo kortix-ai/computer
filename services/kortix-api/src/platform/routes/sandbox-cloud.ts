@@ -122,17 +122,41 @@ export function createCloudSandboxRouter(
 
   router.post('/', async (c) => {
     const userId = c.get('userId');
+    let stripeSubscriptionItemId: string | null = null;
+    let createdSandboxId: string | null = null;
+    let createdExternalId: string | null = null;
+    let providerUsed: ProviderName | null = null;
 
     try {
       const body = await c.req.json().catch(() => ({}));
       const requestedProvider = (body?.provider as ProviderName) || undefined;
       const requestedHetznerServerType = (body?.hetznerServerType as string | undefined) || undefined;
       const requestedLocation = (body?.location as string | undefined) || undefined;
+      const backgroundProvisioning = Boolean(body?.backgroundProvisioning);
       const providerName = requestedProvider || getDefaultProviderName();
       const customName = body?.name as string | undefined;
       const isIncluded = Boolean(body?.isIncluded); // only set by setup flow
+      const requestedOrDefaultLocation = requestedLocation || config.HETZNER_DEFAULT_LOCATION;
+      const requestedOrDefaultServerType = requestedHetznerServerType || config.HETZNER_DEFAULT_SERVER_TYPE;
 
       const accountId = await resolveAccountId(userId);
+
+      // Validate Hetzner server type/location combo early so we return a clear
+      // 4xx error instead of failing inside provider create with a generic 500.
+      if (providerName === 'hetzner') {
+        const { listServerTypes: fetchServerTypes } = await import('../providers/hetzner');
+        const availableTypes = await fetchServerTypes(requestedOrDefaultLocation);
+        const selected = availableTypes.find((st) => st.name === requestedOrDefaultServerType);
+        if (!selected) {
+          return c.json(
+            {
+              success: false,
+              error: `Server type '${requestedOrDefaultServerType}' is not available in location '${requestedOrDefaultLocation}'`,
+            },
+            400,
+          );
+        }
+      }
 
       // Count existing sandboxes for naming
       const existingCount = await db
@@ -145,8 +169,6 @@ export function createCloudSandboxRouter(
 
       // For additional (non-included) Hetzner instances on paid plans,
       // create a Stripe subscription item with dynamic pricing.
-      let stripeSubscriptionItemId: string | null = null;
-
       if (!isIncluded && providerName === 'hetzner' && config.KORTIX_BILLING_INTERNAL_ENABLED) {
         const { getCreditAccount } = await import('../../billing/repositories/credit-accounts');
         const { getCustomerByAccountId } = await import('../../billing/repositories/customers');
@@ -166,9 +188,9 @@ export function createCloudSandboxRouter(
         }
 
         // Look up server type price from Hetzner
-        const loc = requestedLocation || config.HETZNER_DEFAULT_LOCATION;
+        const loc = requestedOrDefaultLocation;
         const serverTypes = await fetchServerTypes(loc);
-        const selectedType = serverTypes.find((st) => st.name === (requestedHetznerServerType || config.HETZNER_DEFAULT_SERVER_TYPE));
+        const selectedType = serverTypes.find((st) => st.name === requestedOrDefaultServerType);
 
         if (!selectedType) {
           return c.json({ success: false, error: `Server type not found: ${requestedHetznerServerType}` }, 400);
@@ -223,6 +245,7 @@ export function createCloudSandboxRouter(
           stripeSubscriptionItemId,
         })
         .returning();
+      createdSandboxId = sandbox.sandboxId;
 
       // Create a sandbox-managed API key (kortix_sb_)
       const sandboxKey = await createApiKey({
@@ -232,7 +255,7 @@ export function createCloudSandboxRouter(
         type: 'sandbox',
       });
 
-      const result = await provider.create({
+      const providerCreateInput = {
         accountId,
         userId,
         name: sandboxName,
@@ -241,7 +264,100 @@ export function createCloudSandboxRouter(
         envVars: {
           KORTIX_TOKEN: sandboxKey.secretKey,
         },
-      });
+      };
+
+      // Background provisioning mode (used by billing Add Instance flow)
+      // returns quickly and continues provisioning asynchronously.
+      if (backgroundProvisioning && providerName === 'hetzner') {
+        console.log(`[PLATFORM] Starting background provisioning for sandbox ${sandbox.sandboxId} (${providerName})`);
+
+        void (async () => {
+          let bgExternalId: string | null = null;
+          try {
+            const result = await provider.create(providerCreateInput);
+            bgExternalId = result.externalId;
+
+            await db
+              .update(sandboxes)
+              .set({
+                externalId: result.externalId,
+                status: 'active',
+                baseUrl: result.baseUrl,
+                metadata: result.metadata,
+                config: { serviceKey: sandboxKey.secretKey },
+                updatedAt: new Date(),
+              })
+              .where(eq(sandboxes.sandboxId, sandbox.sandboxId));
+
+            console.log(
+              `[PLATFORM] Background-provisioned sandbox ${sandbox.sandboxId} via ${providerName} ` +
+              `(external: ${result.externalId}) for account ${accountId}`,
+            );
+          } catch (bgErr) {
+            console.error(`[PLATFORM] Background provisioning failed for sandbox ${sandbox.sandboxId}:`, bgErr);
+            const bgMessage = bgErr instanceof Error ? bgErr.message : String(bgErr);
+
+            if (stripeSubscriptionItemId) {
+              try {
+                const { getStripe } = await import('../../shared/stripe');
+                const stripe = getStripe();
+                await stripe.subscriptionItems.del(stripeSubscriptionItemId);
+                console.log(`[PLATFORM] Rolled back Stripe sub item ${stripeSubscriptionItemId} after background provisioning failure`);
+
+                // Keep DB in sync with rollback
+                await db
+                  .update(sandboxes)
+                  .set({ stripeSubscriptionItemId: null, updatedAt: new Date() })
+                  .where(eq(sandboxes.sandboxId, sandbox.sandboxId));
+              } catch (rollbackErr) {
+                console.error(`[PLATFORM] Failed to roll back Stripe sub item ${stripeSubscriptionItemId}:`, rollbackErr);
+              }
+            }
+
+            if (bgExternalId) {
+              try {
+                await provider.remove(bgExternalId);
+                console.log(`[PLATFORM] Rolled back provider resource ${bgExternalId} after background provisioning failure`);
+              } catch (cleanupErr) {
+                console.error(`[PLATFORM] Failed to clean up provider resource ${bgExternalId}:`, cleanupErr);
+              }
+            }
+
+            try {
+              await db
+                .update(sandboxes)
+                .set({
+                  status: 'error',
+                  metadata: {
+                    ...(sandbox.metadata as Record<string, unknown> || {}),
+                    errorMessage: bgMessage.includes('server location disabled')
+                      ? 'Selected location is currently disabled by Hetzner. Choose another location.'
+                      : 'Provisioning failed. Please retry or choose a different server/location.',
+                    lastProvisioningError: bgMessage.slice(0, 500),
+                  },
+                  updatedAt: new Date(),
+                })
+                .where(eq(sandboxes.sandboxId, sandbox.sandboxId));
+            } catch (markErr) {
+              console.error(`[PLATFORM] Failed to mark sandbox ${sandbox.sandboxId} as error:`, markErr);
+            }
+          }
+        })();
+
+        return c.json(
+          {
+            success: true,
+            data: serializeSandbox(sandbox),
+            created: true,
+            provisioning: true,
+          },
+          202,
+        );
+      }
+
+      const result = await provider.create(providerCreateInput);
+      createdExternalId = result.externalId;
+      providerUsed = providerName;
 
       // Update sandbox row with provider details.
       const [updated] = await db
@@ -267,6 +383,55 @@ export function createCloudSandboxRouter(
         201,
       );
     } catch (err) {
+      // Best-effort rollback for additional-instance Stripe subscription item
+      if (stripeSubscriptionItemId) {
+        try {
+          const { getStripe } = await import('../../shared/stripe');
+          const stripe = getStripe();
+          await stripe.subscriptionItems.del(stripeSubscriptionItemId);
+          console.log(`[PLATFORM] Rolled back Stripe sub item ${stripeSubscriptionItemId} after sandbox create failure`);
+        } catch (rollbackErr) {
+          console.error(`[PLATFORM] Failed to roll back Stripe sub item ${stripeSubscriptionItemId}:`, rollbackErr);
+        }
+      }
+
+      // Best-effort cleanup for partially provisioned server
+      if (providerUsed && createdExternalId) {
+        try {
+          const provider = getProvider(providerUsed);
+          await provider.remove(createdExternalId);
+          console.log(`[PLATFORM] Rolled back provider resource ${createdExternalId} after sandbox create failure`);
+        } catch (cleanupErr) {
+          console.error(`[PLATFORM] Failed to clean up provider resource ${createdExternalId}:`, cleanupErr);
+        }
+      }
+
+      // Archive sandbox row if it was created but provisioning failed
+      if (createdSandboxId) {
+        try {
+          await db
+            .update(sandboxes)
+            .set({ status: 'archived', updatedAt: new Date() })
+            .where(eq(sandboxes.sandboxId, createdSandboxId));
+        } catch (archiveErr) {
+          console.error(`[PLATFORM] Failed to archive failed sandbox ${createdSandboxId}:`, archiveErr);
+        }
+      }
+
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('Hetzner API POST /servers returned 422')) {
+        console.error('[SANDBOX-CLOUD] create validation error:', err);
+        return c.json(
+          {
+            success: false,
+            error: message.includes('image disk is bigger than server type disk')
+              ? 'Selected server type is incompatible with the current snapshot size. Choose a larger instance.'
+              : 'Hetzner rejected server creation for this configuration.',
+          },
+          400,
+        );
+      }
+
       console.error('[SANDBOX-CLOUD] create error:', err);
       return c.json({ success: false, error: 'Failed to create sandbox' }, 500);
     }

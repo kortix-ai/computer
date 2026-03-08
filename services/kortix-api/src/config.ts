@@ -124,6 +124,7 @@ const envSchema = z.object({
   HETZNER_API_KEY:             optStr,
   HETZNER_DEFAULT_LOCATION:    optStrDefault('nbg1'),  // Nuremberg (cheapest EU)
   HETZNER_SNAPSHOT_ID:         optStr,                 // pre-built sandbox snapshot ID
+  HETZNER_SNAPSHOT_DESCRIPTION: optStr,                // fallback resolver by snapshot description
   HETZNER_SSH_KEY_ID:          optStr,                 // SSH key ID registered in Hetzner
   HETZNER_DEFAULT_SERVER_TYPE: optStrDefault('cpx22'),   // 2 vCPU / 4 GB shared (cx22 deprecated)
 
@@ -147,19 +148,6 @@ const envSchema = z.object({
   CHANNELS_ENABLED:            optBoolTrue,
   CHANNELS_PUBLIC_URL:         optStr,
   CHANNELS_CREDENTIAL_KEY:     optStr,
-
-  // ── Session Pruning (optional, all have sane defaults) ───────────────────
-  SESSION_PRUNING_ENABLED:     optBoolTrue,
-  SESSION_PRUNING_TTL_MS:      optInt(5 * 60 * 1000),
-  SESSION_PRUNING_KEEP_LAST:   optInt(3),
-  SESSION_PRUNING_SOFT_RATIO:  optFloat(0.3),
-  SESSION_PRUNING_HARD_RATIO:  optFloat(0.5),
-  SESSION_PRUNING_MIN_CHARS:   optInt(50_000),
-  SESSION_PRUNING_SOFT_MAX:    optInt(4_000),
-  SESSION_PRUNING_SOFT_HEAD:   optInt(1_500),
-  SESSION_PRUNING_SOFT_TAIL:   optInt(1_500),
-  SESSION_PRUNING_HARD_ENABLED: optBoolTrue,
-  SESSION_PRUNING_HARD_PLACEHOLDER: optStrDefault('[Old tool result content cleared]'),
 
   // ── Frontend (optional) ──────────────────────────────────────────────────
   FRONTEND_URL:                optUrl('http://localhost:3000'),
@@ -251,7 +239,13 @@ function validateEnv(): z.infer<typeof envSchema> {
   // ── Conditional: hetzner → need Hetzner keys ──────────────────────────
   if (providers.includes('hetzner')) {
     if (!raw.HETZNER_API_KEY)     issues.push({ var: 'HETZNER_API_KEY',     message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"', level: 'error' });
-    if (!raw.HETZNER_SNAPSHOT_ID) issues.push({ var: 'HETZNER_SNAPSHOT_ID', message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"', level: 'error' });
+    if (!raw.HETZNER_SNAPSHOT_ID && !raw.HETZNER_SNAPSHOT_DESCRIPTION) {
+      issues.push({
+        var: 'HETZNER_SNAPSHOT_ID/HETZNER_SNAPSHOT_DESCRIPTION',
+        message: 'Set HETZNER_SNAPSHOT_ID or HETZNER_SNAPSHOT_DESCRIPTION when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"',
+        level: 'error',
+      });
+    }
   }
 
   // ── Conditional: Pipedream integration → need credentials ──────────────
@@ -396,6 +390,7 @@ export const config = {
   HETZNER_API_KEY: env.HETZNER_API_KEY,
   HETZNER_DEFAULT_LOCATION: env.HETZNER_DEFAULT_LOCATION,
   HETZNER_SNAPSHOT_ID: env.HETZNER_SNAPSHOT_ID,
+  HETZNER_SNAPSHOT_DESCRIPTION: env.HETZNER_SNAPSHOT_DESCRIPTION || `kortix-sandbox-v${SANDBOX_VERSION}`,
   HETZNER_SSH_KEY_ID: env.HETZNER_SSH_KEY_ID,
   HETZNER_DEFAULT_SERVER_TYPE: env.HETZNER_DEFAULT_SERVER_TYPE,
 
@@ -470,19 +465,6 @@ export const config = {
   CHANNELS_ENABLED: env.CHANNELS_ENABLED,
   CHANNELS_PUBLIC_URL: env.CHANNELS_PUBLIC_URL,
   CHANNELS_CREDENTIAL_KEY: env.CHANNELS_CREDENTIAL_KEY,
-
-  // ─── Session Pruning (LLM Context) ───────────────────────────────────────
-  SESSION_PRUNING_ENABLED: env.SESSION_PRUNING_ENABLED,
-  SESSION_PRUNING_TTL_MS: env.SESSION_PRUNING_TTL_MS,
-  SESSION_PRUNING_KEEP_LAST: env.SESSION_PRUNING_KEEP_LAST,
-  SESSION_PRUNING_SOFT_RATIO: env.SESSION_PRUNING_SOFT_RATIO,
-  SESSION_PRUNING_HARD_RATIO: env.SESSION_PRUNING_HARD_RATIO,
-  SESSION_PRUNING_MIN_CHARS: env.SESSION_PRUNING_MIN_CHARS,
-  SESSION_PRUNING_SOFT_MAX: env.SESSION_PRUNING_SOFT_MAX,
-  SESSION_PRUNING_SOFT_HEAD: env.SESSION_PRUNING_SOFT_HEAD,
-  SESSION_PRUNING_SOFT_TAIL: env.SESSION_PRUNING_SOFT_TAIL,
-  SESSION_PRUNING_HARD_ENABLED: env.SESSION_PRUNING_HARD_ENABLED,
-  SESSION_PRUNING_HARD_PLACEHOLDER: env.SESSION_PRUNING_HARD_PLACEHOLDER,
 
   // ─── Frontend ────────────────────────────────────────────────────────────
   FRONTEND_URL: env.FRONTEND_URL,

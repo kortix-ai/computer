@@ -116,6 +116,13 @@ paymentsRouter.get('/auto-topup/settings', async (c) => {
   return c.json(settings);
 });
 
+paymentsRouter.get('/auto-topup/setup-status', async (c) => {
+  const accountId = await resolveAccountId(c.get('userId'));
+  const { getAutoTopupSetupStatus } = await import('../services/auto-topup');
+  const status = await getAutoTopupSetupStatus(accountId);
+  return c.json(status);
+});
+
 paymentsRouter.post('/auto-topup/configure', async (c) => {
   const accountId = await resolveAccountId(c.get('userId'));
   const body = await c.req.json();

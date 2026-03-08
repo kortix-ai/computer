@@ -30,6 +30,9 @@ import { ensureSchema } from './ensure-schema';
 import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
 import { tunnelApp, wsHandlers as tunnelWsHandlers, startTunnelService, stopTunnelService, getTunnelServiceStatus } from './tunnel';
 import { startSandboxHealthMonitor, stopSandboxHealthMonitor } from './platform/services/sandbox-health';
+import { accessControlApp } from './access-control';
+import { startAccessControlCache, stopAccessControlCache } from './shared/access-control-cache';
+import { legacyApp } from './legacy';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -229,6 +232,12 @@ if (config.KORTIX_DEPLOYMENTS_ENABLED) {
 app.route('/v1/integrations', integrationsApp); // /v1/integrations/*
 app.route('/', channelsApp);                 // /v1/channels/*, /webhooks/*
 
+// Access control — public endpoints for signup gating
+app.route('/v1/access', accessControlApp); // /v1/access/signup-status, /v1/access/check-email, /v1/access/request-access
+
+// Legacy thread migration — authenticated endpoints
+app.route('/v1/legacy', legacyApp); // /v1/legacy/threads, /v1/legacy/threads/:id/migrate
+
 // Setup — install-status is public (needed before any user exists), rest requires auth.
 app.route('/v1/setup', setupApp);          // /v1/setup/install-status (public), rest (auth inside router)
 
@@ -406,10 +415,16 @@ initModelPricing().catch((err) =>
   console.error('[startup] Model pricing init failed (will retry in 24h):', err),
 );
 
+// Schema readiness gate — blocks DB-dependent requests until push completes.
+let schemaReady = false;
+export function isSchemaReady() { return schemaReady; }
+
 // Ensure DB schema exists before starting services that depend on it.
 // This is idempotent — safe to run on every startup.
 ensureSchema()
   .then(async () => {
+    schemaReady = true;
+    startAccessControlCache();
     startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
     startChannelService();
     startDrainer();
@@ -427,6 +442,8 @@ ensureSchema()
   })
   .catch(async (err) => {
     console.error('[startup] ensureSchema failed, starting services anyway:', err);
+    schemaReady = true; // Tables may already exist — allow requests through
+    startAccessControlCache();
     startScheduler().catch((e) => console.error('[startup] Scheduler failed to start:', e));
     startChannelService();
     startDrainer();
@@ -450,6 +467,7 @@ function shutdown(signal: string) {
   stopModelPricing();
   stopTunnelService();
   stopSandboxHealthMonitor();
+  stopAccessControlCache();
   process.exit(0);
 }
 
@@ -684,6 +702,13 @@ export default {
     // NOTE: Query params are intentional here — the tunnel agent binary can't
     // set cookies, and WS upgrade doesn't support custom headers in all runtimes.
     if (isWsUpgrade && url.pathname === '/v1/tunnel/ws') {
+      if (!schemaReady) {
+        return new Response(JSON.stringify({ error: 'Service starting up, try again shortly' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': '5' },
+        });
+      }
+
       const queryToken = url.searchParams.get('token');
       const tunnelId = url.searchParams.get('tunnelId');
 

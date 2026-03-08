@@ -7,7 +7,6 @@ import {
   calculateAnthropicCost,
 } from '../services/anthropic';
 import { getModel } from '../config/models';
-import { applyAnthropicSessionPruning } from '../services/session-pruning';
 import { checkCredits, deductLLMCredits } from '../services/billing';
 
 const anthropic = new Hono<{ Variables: AppContext }>();
@@ -20,7 +19,6 @@ const anthropic = new Hono<{ Variables: AppContext }>();
  * Handles:
  * - Model resolution (Kortix model IDs → Anthropic native model IDs)
  * - Credit checking and cache-aware billing
- * - Session pruning (Anthropic format: tool_result content blocks)
  * - Streaming (SSE) and non-streaming responses
  *
  * Preserves cache_control fields injected by @ai-sdk/anthropic's setCacheKey.
@@ -71,9 +69,6 @@ anthropic.post('/messages', async (c) => {
 
   // Get model config for billing
   const modelConfig = getModel(modelId);
-
-  // Session pruning: trim stale tool results (Anthropic format)
-  applyAnthropicSessionPruning(body, sessionId, modelConfig.contextWindow);
 
   // Proxy to Anthropic
   const response = await proxyToAnthropic(body, isStreaming);

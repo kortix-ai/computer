@@ -134,7 +134,7 @@ const TOOL_SECRETS = [
 
 /* ─── Tool Secrets Step ───────────────────────────────────────────────────── */
 
-function ToolSecretsStep({ onContinue, onSkip }: { onContinue: () => void; onSkip: () => void }) {
+function ToolSecretsStep({ onContinue, onSkip, completing }: { onContinue: () => void; onSkip: () => void; completing?: boolean }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
@@ -221,19 +221,26 @@ function ToolSecretsStep({ onContinue, onSkip }: { onContinue: () => void; onSki
           variant="outline"
           onClick={onSkip}
           className="flex-1 h-10 text-[13px] rounded-xl shadow-none border-foreground/[0.08]"
-          disabled={saving}
+          disabled={saving || completing}
         >
-          Skip for now
+          {completing ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              Finishing…
+            </>
+          ) : (
+            'Skip for now'
+          )}
         </Button>
         <Button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || completing}
           className="flex-1 h-10 text-[13px] rounded-xl shadow-none"
         >
-          {saving ? (
+          {saving || completing ? (
             <>
               <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              Saving…
+              {saving ? 'Saving…' : 'Finishing setup…'}
             </>
           ) : filledCount > 0 ? (
             `Save & continue`
@@ -268,9 +275,12 @@ interface SelfHostedFormProps {
 export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxProviders = ['local_docker'], defaultProvider = 'local_docker', onWizardStepChange }: SelfHostedFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(initialStep);
   const [sandboxReady, setSandboxReady] = useState(false);
   const [pullProgress, setPullProgress] = useState<{ progress: number; message: string } | null>(null);
+  /** Error from sandbox provisioning — shown with a retry button. */
+  const [sandboxError, setSandboxError] = useState<string | null>(null);
   /** Which provider the user chose (or was auto-selected). null = not chosen yet. */
   const [chosenProvider, setChosenProvider] = useState<SandboxProviderName | null>(null);
   /** JWT stored after signup so we can provision later if user needs to pick a provider. */
@@ -340,6 +350,12 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
       return;
     }
 
+    if (data.status === 'error') {
+      setChosenProvider((prev) => prev ?? 'local_docker');
+      setSandboxError(data.message || 'Previous sandbox setup failed');
+      return;
+    }
+
     setChosenProvider((prev) => prev ?? 'local_docker');
     void provisionSandbox(jwt, backendUrl, 'local_docker');
   }, [wizardStep, sandboxReady, existingLocalSandboxQuery.data, registerSandbox, pollLocalStatus, provisionSandbox, backendUrl]);
@@ -390,7 +406,8 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
         }
 
         if (data.status === 'error') {
-          setPullProgress({ progress: 0, message: data.message || 'Failed to pull image' });
+          setSandboxError(data.message || 'Failed to set up sandbox');
+          setPullProgress(null);
           return; // stop polling
         }
 
@@ -441,6 +458,10 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
 
   // ── Provision sandbox via generic /platform/init (works for any provider) ──
   const provisionSandbox = useCallback(async (jwt: string, backendUrl: string, provider: SandboxProviderName) => {
+    // Clear any previous error before retrying
+    setSandboxError(null);
+    setPullProgress(null);
+
     if (provider === 'local_docker') {
       // Use the specialized local Docker init endpoint (supports async image pull)
       try {
@@ -469,12 +490,15 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
           registerSandbox(initData.data);
           setSandboxReady(true);
         } else {
-          console.warn('[Setup] Local init failed:', initData.error || initData.message);
-          setSandboxReady(false);
+          // Init returned a failure — surface the error to the user
+          const errMsg = initData.error || initData.message || 'Failed to initialize sandbox';
+          console.warn('[Setup] Local init failed:', errMsg);
+          setSandboxError(errMsg);
         }
-      } catch (err) {
+      } catch (err: any) {
+        const errMsg = err?.message || 'Network error while initializing sandbox';
         console.warn('[Setup] Local init error:', err);
-        setSandboxReady(false);
+        setSandboxError(errMsg);
       }
     } else {
       // Daytona (or any non-local provider) — uses generic init, synchronous
@@ -490,14 +514,34 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
           registerSandbox(initData.data);
           setSandboxReady(true);
         } else {
-          console.warn(`[Setup] ${provider} init failed:`, initData.error);
-          setSandboxReady(false);
+          const errMsg = initData.error || initData.message || `Failed to initialize ${provider} sandbox`;
+          console.warn(`[Setup] ${provider} init failed:`, errMsg);
+          setSandboxError(errMsg);
         }
-      } catch {
-        setSandboxReady(false);
+      } catch (err: any) {
+        setSandboxError(err?.message || `Network error while initializing ${provider} sandbox`);
       }
     }
   }, [registerSandbox, pollLocalStatus]);
+
+  // ── Retry sandbox provisioning after an error ──
+  const handleRetryProvision = useCallback(async () => {
+    const provider = chosenProvider || defaultProvider || 'local_docker';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+
+    // Get current JWT — prefer jwtRef (just signed up), fall back to Supabase session
+    let jwt = jwtRef.current;
+    if (!jwt) {
+      const supabase = createBrowserSupabaseClient();
+      const { data } = await supabase.auth.getSession();
+      jwt = data.session?.access_token ?? null;
+    }
+    if (!jwt) {
+      setSandboxError('Authentication expired. Please refresh and sign in again.');
+      return;
+    }
+    await provisionSandbox(jwt, backendUrl, provider);
+  }, [chosenProvider, defaultProvider, provisionSandbox]);
 
   // ── User picks a sandbox provider (multi-provider flow) ──
   const handleSandboxProviderSelect = useCallback(async (provider: SandboxProviderName) => {
@@ -516,7 +560,20 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   }, [onWizardStepChange]);
 
   // ── Tool keys done (step 3 → navigate to onboarding) ──
-  const handleToolKeysContinue = useCallback(() => {
+  const handleToolKeysContinue = useCallback(async () => {
+    setCompleting(true);
+    // Setup wizard complete — mark in DB
+    sessionStorage.setItem('setup_complete', 'true');
+
+    // Mark setup complete in the backend (fire-and-forget)
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    try {
+      const { authenticatedFetch: authFetch } = await import('@/lib/auth-token');
+      await authFetch(`${backendUrl}/setup/setup-complete`, { method: 'POST' });
+    } catch {
+      // Best effort — dashboard guard will catch incomplete state
+    }
+
     const target = returnUrl || '/onboarding';
 
     if (target.startsWith('/onboarding')) {
@@ -626,6 +683,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
       } else {
         // Returning user: prefer direct client sign-in so session state is
         // immediately available to middleware + AuthProvider.
+        let signedInJwt: string | null = null;
         try {
           const supabase = createBrowserSupabaseClient();
           await supabase.auth.signOut({ scope: 'local' });
@@ -637,49 +695,79 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
           if (!clientSignInError && clientSignInData.session) {
             invalidateTokenCache();
             setBootstrapAuthToken(clientSignInData.session.access_token);
-            window.location.href = returnUrl || '/dashboard';
-            return;
+            signedInJwt = clientSignInData.session.access_token;
           }
         } catch {
           // Best-effort cleanup of stale local auth state.
         }
 
         // Fallback: server action sign-in (runtime env on server)
-        invalidateTokenCache();
-        setBootstrapAuthToken(null);
+        if (!signedInJwt) {
+          invalidateTokenCache();
+          setBootstrapAuthToken(null);
 
-        const formData = new FormData();
-        formData.set('email', email);
-        formData.set('password', password);
-        if (returnUrl) formData.set('returnUrl', returnUrl);
+          const formData = new FormData();
+          formData.set('email', email);
+          formData.set('password', password);
+          if (returnUrl) formData.set('returnUrl', returnUrl);
 
-        const result = await selfHostedSignIn(null, formData);
+          const result = await selfHostedSignIn(null, formData);
 
-        if (result.message) {
-          setErrorMessage(result.message);
-          setPending(false);
-          return;
-        }
+          if (result.message) {
+            setErrorMessage(result.message);
+            setPending(false);
+            return;
+          }
 
-        // Ensure browser session is established immediately in addition to
-        // server-set cookies. This avoids rare cases where middleware doesn't
-        // see a fresh session on the first navigation after login.
-        if (result.accessToken && result.refreshToken) {
-          try {
-            const supabase = createBrowserSupabaseClient();
-            await supabase.auth.setSession({
-              access_token: result.accessToken,
-              refresh_token: result.refreshToken,
-            });
-          } catch {
-            // Fallback to server cookies + full reload below.
+          // Ensure browser session is established immediately in addition to
+          // server-set cookies. This avoids rare cases where middleware doesn't
+          // see a fresh session on the first navigation after login.
+          if (result.accessToken && result.refreshToken) {
+            try {
+              const supabase = createBrowserSupabaseClient();
+              await supabase.auth.setSession({
+                access_token: result.accessToken,
+                refresh_token: result.refreshToken,
+              });
+              signedInJwt = result.accessToken;
+            } catch {
+              // Fallback to server cookies + full reload below.
+            }
+          }
+
+          // If we still don't have a JWT, fall back to the original redirect
+          if (!signedInJwt) {
+            window.location.href = result.redirectTo || returnUrl || '/dashboard';
+            return;
           }
         }
 
-        // Hard redirect — router.push() does a soft navigation that doesn't
-        // re-run middleware, so the auth cookie set by the server action
-        // wouldn't be picked up. A full page load ensures middleware sees it.
-        window.location.href = result.redirectTo || returnUrl || '/dashboard';
+        // Check setup status BEFORE redirecting. If setup wizard is not
+        // complete, show the wizard directly — avoids the dashboard → /auth
+        // redirect loop that causes session loss.
+        try {
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+          const setupRes = await fetch(`${backendUrl}/setup/setup-status`, {
+            headers: { 'Authorization': `Bearer ${signedInJwt}` },
+          });
+          if (setupRes.ok) {
+            const setupData = await setupRes.json();
+            if (!setupData.complete) {
+              // Setup not complete — show wizard step 2 immediately.
+              // Also persist the step to the backend DB.
+              setWizardStep(2);
+              onWizardStepChange?.(2);
+              setPending(false);
+              return;
+            }
+          }
+        } catch {
+          // Setup check failed — fall through to normal redirect
+        }
+
+        // Setup complete (or check failed) — hard redirect to dashboard.
+        // Hard redirect ensures middleware picks up the auth cookie.
+        window.location.href = returnUrl || '/dashboard';
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'An unexpected error occurred');
@@ -688,7 +776,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   };
 
   // ── Step 3: Tool API keys ──
-   if (isInstaller && wizardStep === 3) {
+   if (wizardStep === 3) {
     return (
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-5">
@@ -705,13 +793,14 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
         <ToolSecretsStep
           onContinue={handleToolKeysContinue}
           onSkip={handleToolKeysContinue}
+          completing={completing}
         />
       </div>
     );
   }
 
   // ── Step 2: Provider setup ──
-  if (isInstaller && wizardStep === 2) {
+  if (wizardStep === 2) {
     // ── Sub-state: multiple providers, user hasn't chosen yet ──
     if (hasMultipleProviders && !chosenProvider) {
       return (
@@ -802,24 +891,44 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
         <StepIndicator currentStep={2} />
 
         {!sandboxReady ? (
-          <div className="flex flex-col items-center gap-3 py-8">
-            <KortixLoader size="medium" />
-            {pullProgress ? (
-              <div className="w-full max-w-xs flex flex-col items-center gap-2">
-                <div className="w-full bg-foreground/[0.06] rounded-full h-1 overflow-hidden">
-                  <div
-                    className="bg-foreground h-full rounded-full transition-all duration-500"
-                    style={{ width: `${Math.max(pullProgress.progress, 2)}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-foreground/35 text-center">
-                  {pullProgress.message}
+          sandboxError ? (
+            <div className="flex flex-col items-center gap-4 py-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+              </div>
+              <div className="w-full max-w-xs space-y-2 text-center">
+                <p className="text-[13px] font-medium text-foreground/80">Sandbox setup failed</p>
+                <p className="text-[11px] text-foreground/40 leading-relaxed break-words">
+                  {sandboxError}
                 </p>
               </div>
-            ) : (
-              <p className="text-[11px] text-foreground/35">Preparing sandbox…</p>
-            )}
-          </div>
+              <Button
+                onClick={handleRetryProvision}
+                className="h-9 px-5 text-[13px] rounded-xl shadow-none"
+              >
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <KortixLoader size="medium" />
+              {pullProgress ? (
+                <div className="w-full max-w-xs flex flex-col items-center gap-2">
+                  <div className="w-full bg-foreground/[0.06] rounded-full h-1 overflow-hidden">
+                    <div
+                      className="bg-foreground h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(pullProgress.progress, 2)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-foreground/35 text-center">
+                    {pullProgress.message}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[11px] text-foreground/35">Preparing sandbox…</p>
+              )}
+            </div>
+          )
         ) : (
           <div className="h-[400px]">
             <ProviderSettings

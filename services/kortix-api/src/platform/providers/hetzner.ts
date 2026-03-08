@@ -74,6 +74,88 @@ interface HetznerServer {
   labels: Record<string, string>;
 }
 
+interface HetznerImage {
+  id: number;
+  description: string | null;
+  created?: string;
+  architecture: 'x86' | 'arm' | string;
+  disk_size: number;
+}
+
+let snapshotRequirementsCache:
+  | {
+      snapshotId: string;
+      description: string | null;
+      diskSize: number;
+      architecture: string;
+      fetchedAt: number;
+    }
+  | null = null;
+const SNAPSHOT_REQUIREMENTS_TTL_MS = 5 * 60 * 1000;
+
+async function resolveSnapshot(): Promise<{ snapshotId: string; description: string | null; diskSize: number; architecture: string }> {
+  const configuredSnapshotId = config.HETZNER_SNAPSHOT_ID;
+  const configuredDescription = config.HETZNER_SNAPSHOT_DESCRIPTION;
+
+  const now = Date.now();
+  if (
+    snapshotRequirementsCache &&
+    (
+      (configuredSnapshotId && snapshotRequirementsCache.snapshotId === configuredSnapshotId) ||
+      (configuredDescription && snapshotRequirementsCache.description === configuredDescription)
+    ) &&
+    now - snapshotRequirementsCache.fetchedAt < SNAPSHOT_REQUIREMENTS_TTL_MS
+  ) {
+    return {
+      snapshotId: snapshotRequirementsCache.snapshotId,
+      description: snapshotRequirementsCache.description,
+      diskSize: snapshotRequirementsCache.diskSize,
+      architecture: snapshotRequirementsCache.architecture,
+    };
+  }
+
+  let image: HetznerImage | null = null;
+
+  // Preferred resolution path: by description (daytona-like by SANDBOX_VERSION)
+  if (configuredDescription) {
+    const data = await hetznerFetch<{ images: HetznerImage[] }>('/images?type=snapshot&per_page=50');
+    const exact = data.images
+      .filter((img) => img.description === configuredDescription)
+      .sort((a, b) => Date.parse(b.created || '') - Date.parse(a.created || ''));
+
+    if (exact.length > 0) {
+      image = exact[0];
+    }
+  }
+
+  // Fallback path: explicit snapshot ID
+  if (!image && configuredSnapshotId) {
+    const data = await hetznerFetch<{ image: HetznerImage }>(`/images/${configuredSnapshotId}`);
+    image = data.image;
+  }
+
+  if (!image) {
+    throw new Error(
+      `No Hetzner snapshot found. Checked description "${configuredDescription}" and ID "${configuredSnapshotId || ''}"`,
+    );
+  }
+
+  snapshotRequirementsCache = {
+    snapshotId: String(image.id),
+    description: image.description,
+    diskSize: image.disk_size,
+    architecture: image.architecture,
+    fetchedAt: now,
+  };
+
+  return {
+    snapshotId: String(image.id),
+    description: image.description,
+    diskSize: image.disk_size,
+    architecture: image.architecture,
+  };
+}
+
 // ─── API Helper ─────────────────────────────────────────────────────────────
 
 async function hetznerFetch<T = any>(
@@ -128,12 +210,20 @@ export async function listServerTypes(
   location?: string,
 ): Promise<ServerTypeWithPricing[]> {
   const loc = location || config.HETZNER_DEFAULT_LOCATION;
+  const { diskSize: minDiskSize, architecture: snapshotArchitecture } = await resolveSnapshot();
   const data = await hetznerFetch<{ server_types: HetznerServerType[] }>('/server_types?per_page=50');
 
   return data.server_types
     .filter((st) => ALLOWED_SERVER_TYPE_PREFIXES.some((p) => st.name.startsWith(p)))
+    .filter((st) => st.prices.some((p) => p.location === loc))
+    .filter((st) => st.disk >= minDiskSize)
+    .filter((st) => {
+      if (snapshotArchitecture === 'x86') return st.architecture === 'x86';
+      if (snapshotArchitecture === 'arm') return st.architecture === 'arm';
+      return true;
+    })
     .map((st) => {
-      const locPrice = st.prices.find((p) => p.location === loc) || st.prices[0];
+      const locPrice = st.prices.find((p) => p.location === loc)!;
       const monthly = parseFloat(locPrice?.price_monthly?.gross || '0');
       return {
         name: st.name,
@@ -158,10 +248,8 @@ export class HetznerProvider implements SandboxProvider {
   readonly name: ProviderName = 'hetzner';
 
   async create(opts: CreateSandboxOpts): Promise<ProvisionResult> {
-    const snapshotId = config.HETZNER_SNAPSHOT_ID;
-    if (!snapshotId) {
-      throw new Error('HETZNER_SNAPSHOT_ID is not configured — set it to the Hetzner snapshot ID');
-    }
+    const snapshot = await resolveSnapshot();
+    const snapshotId = snapshot.snapshotId;
 
     const requestedServerType = opts.hetznerServerType;
     const serverType = requestedServerType || config.HETZNER_DEFAULT_SERVER_TYPE;

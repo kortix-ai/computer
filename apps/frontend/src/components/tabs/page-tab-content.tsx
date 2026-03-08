@@ -24,6 +24,10 @@ const ApiKeysPage = lazy(() =>
 	import('@/app/(dashboard)/settings/api-keys/page'),
 );
 
+const ProvidersPage = lazy(() =>
+	import('@/app/(dashboard)/settings/providers/page'),
+);
+
 const CreditsPage = lazy(() =>
 	import('@/app/(dashboard)/credits-explained/page'),
 );
@@ -101,6 +105,10 @@ const AdminStressTestPage = lazy(() =>
 	import('@/app/(dashboard)/admin/stress-test/page'),
 );
 
+const LegacyThreadPage = lazy(() =>
+	import('@/app/(dashboard)/legacy/[threadId]/page'),
+);
+
 // ---------------------------------------------------------------------------
 // Route → Component mapping
 // ---------------------------------------------------------------------------
@@ -110,6 +118,7 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/configuration': WorkspacePage,
 	'/settings/credentials': SecretsPage,
 	'/settings/api-keys': ApiKeysPage,
+	'/settings/providers': ProvidersPage,
 	'/credits-explained': CreditsPage,
 	'/changelog': ChangelogPage,
 	'/workspace': WorkspacePage,
@@ -137,6 +146,18 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/admin/stress-test': AdminStressTestPage,
 };
 
+function resolveComponent(routeKey: string): { Component: ComponentType<any>; params?: Record<string, string> } | null {
+	const exact = PAGE_COMPONENTS[routeKey];
+	if (exact) return { Component: exact };
+
+	const legacyMatch = routeKey.match(/^\/legacy\/(.+)$/);
+	if (legacyMatch) {
+		return { Component: LegacyThreadPage, params: { threadId: legacyMatch[1] } };
+	}
+
+	return null;
+}
+
 export function PageTabContent({ href }: { href: string }) {
 	let routeKey = href;
 	try {
@@ -146,15 +167,17 @@ export function PageTabContent({ href }: { href: string }) {
 		routeKey = href.split('?')[0]?.split('#')[0] || href;
 	}
 
-	const Component = PAGE_COMPONENTS[routeKey];
+	const resolved = resolveComponent(routeKey);
 
-	if (!Component) {
+	if (!resolved) {
 		return (
 			<div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
 				Page not found
 			</div>
 		);
 	}
+
+	const { Component, params } = resolved;
 
 	return (
 		<Suspense
@@ -164,7 +187,7 @@ export function PageTabContent({ href }: { href: string }) {
 				</div>
 			}
 		>
-			<Component />
+			<Component params={params ? Promise.resolve(params) : undefined} />
 		</Suspense>
 	);
 }

@@ -92,7 +92,7 @@ billingApp.post('/setup/initialize', async (c: any) => {
 
   // ── Step 2: Sandbox provisioning (only for paid plans) ────────────────
   // Free users: no sandbox — they connect their own (BYOC).
-  // Pro users: auto-provision 1x cpx21 in ash (us-west) as "included" instance.
+  // Pro users: auto-provision 1x cpx22 in nbg1 (EU Nuremberg) as "included" instance.
   let sandboxStatus: 'created' | 'exists' | 'provisioning' | 'skipped' | 'failed' = 'skipped';
 
   if (isPaidTier(currentTier)) {
@@ -119,8 +119,8 @@ billingApp.post('/setup/initialize', async (c: any) => {
           accountId,
           userId,
           provider: 'hetzner',
-          hetznerServerType: 'cpx21',
-          hetznerLocation: 'ash',
+          hetznerServerType: 'cpx22',
+          hetznerLocation: config.HETZNER_DEFAULT_LOCATION,
           isIncluded: true,
         })
           .then(({ row, created }) => {
@@ -130,7 +130,7 @@ billingApp.post('/setup/initialize', async (c: any) => {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[setup/initialize] Background: sandbox provisioning failed for account ${accountId}:`, msg);
           });
-        console.log(`[setup/initialize] Kicked off cpx21/ash sandbox provisioning for account ${accountId}`);
+        console.log(`[setup/initialize] Kicked off cpx22/${config.HETZNER_DEFAULT_LOCATION} sandbox provisioning for account ${accountId}`);
       }
     } catch (err) {
       sandboxStatus = 'failed';

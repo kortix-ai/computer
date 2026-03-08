@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType, DASHBOARD_TAB_ID } from '@/stores/tab-store';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
+import { useDebouncedBusySessions } from '@/hooks/use-debounced-busy-sessions';
 import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
 import { useServerStore } from '@/stores/server-store';
 import { childMapByParent } from '@/ui';
@@ -79,8 +80,9 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     '/projects': { title: 'Workspace', type: 'page' },
     '/files': { title: 'Files', type: 'page' },
     '/configuration': { title: 'Workspace', type: 'page' },
-    '/settings/credentials': { title: 'Integrations', type: 'settings' },
+    '/settings/credentials': { title: 'Secrets Manager', type: 'settings' },
     '/settings/api-keys': { title: 'API Keys', type: 'settings' },
+    '/settings/providers': { title: 'LLM Providers', type: 'settings' },
     '/credits-explained': { title: 'Credits', type: 'page' },
     '/support': { title: 'Support', type: 'page' },
     '/admin/analytics': { title: 'Analytics', type: 'page' },
@@ -283,14 +285,15 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
         )}
         onClick={() => { onActivate(tab.id, tab.href); onClose(); }}
       >
-        {tab.type === 'session' && (isBusy || pendingCount > 0) ? (
-          <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-            {isBusy && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
-            {pendingCount > 0 && !isBusy && <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />}
-          </div>
-        ) : (
+        <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
           <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-        )}
+          {tab.type === 'session' && isBusy && (
+            <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          )}
+          {tab.type === 'session' && pendingCount > 0 && !isBusy && (
+            <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+          )}
+        </div>
         <span className="flex-1 truncate">{tab.title || 'Untitled'}</span>
         {tab.pinned && <Pin className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground/50 -rotate-[20deg]" />}
         {tab.dirty && <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-amber-500" />}
@@ -509,11 +512,12 @@ function TabItem({
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+              <Icon className={cn('h-3 w-3 flex-shrink-0 transition-colors', isActive ? 'text-foreground/50' : 'text-muted-foreground/40')} />
               {isBusy && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               )}
               {pendingCount > 0 && !isBusy && (
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
               )}
             </div>
           </TooltipTrigger>
@@ -623,6 +627,9 @@ export function TabBar() {
   const statuses = useOpenCodeSessionStatusStore((s) => s.statuses);
   const permissions = useOpenCodePendingStore((s) => s.permissions);
   const questions = useOpenCodePendingStore((s) => s.questions);
+
+  // Debounced busy state — prevents green dot from flickering during reasoning
+  const debouncedBusy = useDebouncedBusySessions(statuses);
 
   // Sessions data
   const { data: sessions, isLoading: sessionsLoading } = useOpenCodeSessions();
@@ -802,10 +809,14 @@ export function TabBar() {
   const getStatus = useCallback(
     (sessionId: string) => {
       const pendingCount = getPendingCount(sessionId);
-      const isBusy = pendingCount === 0 && statuses[sessionId]?.type === 'busy';
+      const isBusy =
+        pendingCount === 0 &&
+        (debouncedBusy[sessionId] ||
+          statuses[sessionId]?.type === 'busy' ||
+          statuses[sessionId]?.type === 'retry');
       return { isBusy: !!isBusy, pendingCount };
     },
-    [getPendingCount, statuses],
+    [getPendingCount, debouncedBusy, statuses],
   );
 
   // Tab switching: all types are pre-mounted, so always use pushState (no re-mount).
@@ -1104,7 +1115,7 @@ export function TabBar() {
         >
           {orderedTabs.map((tab, index) => {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;
-            const busy = tab.type === 'session' && pending === 0 && statuses[tab.id]?.type === 'busy';
+            const busy = tab.type === 'session' && pending === 0 && (debouncedBusy[tab.id] || statuses[tab.id]?.type === 'busy' || statuses[tab.id]?.type === 'retry');
             return (
               <div key={tab.id} data-tab-id={tab.id} className={cn("flex items-end relative", tab.id === activeTabId ? "z-20" : "z-0")}>
                 <TabItem

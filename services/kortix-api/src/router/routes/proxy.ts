@@ -7,11 +7,10 @@ import {
 } from '../config/proxy-services';
 import { validateSecretKey } from '../../repositories/api-keys';
 import { isKortixToken } from '../../shared/crypto';
-import { config, PLATFORM_FEE_MARKUP } from '../../config';
+import { config, KORTIX_MARKUP, PLATFORM_FEE_MARKUP } from '../../config';
 import { checkCredits, deductToolCredits, deductLLMCredits } from '../services/billing';
 import { getModel, type ModelConfig } from '../config/models';
 import { calculateCost, extractUsage } from '../services/llm';
-import { applyAnthropicSessionPruning } from '../services/session-pruning';
 
 const proxy = new Hono();
 
@@ -100,6 +99,7 @@ async function handleKortixProxy(
   let body = await getRequestBody(c, method);
 
   body = injectApiKey(service, headers, body, /* useKortixInjection */ true);
+  body = maybeNormalizeOpenAIResponsesInput(service, method, subPath, body, headers);
 
   // Route-specific billing overrides service default
   const billingToolName = matchedRoute.billingToolName || service.billingToolName;
@@ -114,7 +114,21 @@ async function handleKortixProxy(
     duplex: 'half',
   });
 
-  // Bill the user (fire-and-forget, don't block response)
+  // LLM services: bill per-token at KORTIX_MARKUP (1.2×)
+  if (service.isLlm === true) {
+    if (upstream.ok) {
+      return billLlmKortixProxy(upstream, service, subPath, accountId);
+    }
+    // Upstream error — don't bill for failed requests
+    console.warn(`[PROXY] LLM kortix proxy ${service.name} upstream error ${upstream.status} — no billing`);
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: upstream.headers,
+    });
+  }
+
+  // Non-LLM services: fixed per-call billing (fire-and-forget)
   deductToolCredits(
     accountId,
     billingToolName,
@@ -129,6 +143,185 @@ async function handleKortixProxy(
     statusText: upstream.statusText,
     headers: upstream.headers,
   });
+}
+
+// === Kortix-managed LLM Billing ===
+//
+// Handles both response formats based on upstream:
+// - OpenAI-compatible: usage.prompt_tokens / completion_tokens
+// - Anthropic-native: usage.input_tokens / output_tokens
+
+async function billLlmKortixProxy(
+  upstream: Response,
+  service: ProxyServiceConfig,
+  subPath: string,
+  accountId: string,
+) {
+  const contentType = upstream.headers.get('Content-Type') || '';
+  const isStreaming = contentType.includes('text/event-stream');
+
+  if (isStreaming) {
+    const upstreamBody = upstream.body;
+    if (!upstreamBody) {
+      return new Response(null, { status: 502 });
+    }
+
+    const [clientStream, billingStream] = upstreamBody.tee();
+
+    // Fire-and-forget: extract usage from billing stream
+    extractUsageFromKortixProxyStream(billingStream, service, subPath, accountId);
+
+    return new Response(clientStream, {
+      status: upstream.status,
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
+  }
+
+  // Non-streaming: read response, extract usage, bill, return
+  const responseBody = await upstream.json();
+  const isAnthropic = service.name === 'anthropic';
+
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let cachedTokens = 0;
+  let cacheWriteTokens = 0;
+  let modelId = responseBody?.model || 'unknown';
+
+  if (isAnthropic && responseBody?.usage) {
+    promptTokens = responseBody.usage.input_tokens ?? 0;
+    completionTokens = responseBody.usage.output_tokens ?? 0;
+  } else {
+    const usage = extractUsage(responseBody);
+    if (usage) {
+      promptTokens = usage.promptTokens;
+      completionTokens = usage.completionTokens;
+      cachedTokens = usage.cachedTokens;
+      cacheWriteTokens = usage.cacheWriteTokens;
+    }
+  }
+
+  if (promptTokens > 0 || completionTokens > 0) {
+    const modelConfig = getModel(modelId);
+    const cost = calculateCost(
+      modelConfig,
+      promptTokens,
+      completionTokens,
+      cachedTokens,
+      cacheWriteTokens,
+      KORTIX_MARKUP,
+    );
+
+    deductLLMCredits(
+      accountId,
+      modelId,
+      promptTokens,
+      completionTokens,
+      cost,
+    ).catch((err) => console.error(`[PROXY] LLM kortix billing error: ${err}`));
+
+    console.log(`[PROXY] LLM kortix ${modelId}: ${promptTokens}/${completionTokens} tokens, cost=$${cost.toFixed(6)} (${KORTIX_MARKUP}x)`);
+  } else {
+    console.warn(`[PROXY] LLM kortix ${service.name}: no usage data in response — billing skipped`);
+  }
+
+  return new Response(JSON.stringify(responseBody), {
+    status: upstream.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+/**
+ * Extract usage from an SSE stream and bill at KORTIX_MARKUP.
+ * Handles both OpenAI-compatible and Anthropic-native SSE formats.
+ * Runs in background (fire-and-forget).
+ */
+async function extractUsageFromKortixProxyStream(
+  stream: ReadableStream<Uint8Array>,
+  service: ProxyServiceConfig,
+  subPath: string,
+  accountId: string,
+) {
+  try {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let detectedModel = 'unknown';
+    const isAnthropic = service.name === 'anthropic';
+    let lastUsage: { promptTokens: number; completionTokens: number; cachedTokens: number; cacheWriteTokens: number } | null = null;
+    let anthropicInputTokens = 0;
+    let anthropicOutputTokens = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+        try {
+          const chunk = JSON.parse(line.slice(6));
+          if (isAnthropic) {
+            if (chunk.type === 'message_start' && chunk.message) {
+              detectedModel = chunk.message.model || detectedModel;
+              anthropicInputTokens = chunk.message.usage?.input_tokens ?? 0;
+            }
+            if (chunk.type === 'message_delta' && chunk.usage) {
+              anthropicOutputTokens = chunk.usage.output_tokens ?? 0;
+            }
+          } else {
+            if (chunk.model) detectedModel = chunk.model;
+            if (chunk.usage) {
+              const details = chunk.usage.prompt_tokens_details;
+              lastUsage = {
+                promptTokens: chunk.usage.prompt_tokens ?? 0,
+                completionTokens: chunk.usage.completion_tokens ?? 0,
+                cachedTokens: details?.cached_tokens ?? 0,
+                cacheWriteTokens: details?.cache_write_tokens ?? 0,
+              };
+            }
+          }
+        } catch {
+          // Not valid JSON — skip
+        }
+      }
+    }
+
+    if (isAnthropic) {
+      if (!(anthropicInputTokens > 0 || anthropicOutputTokens > 0)) {
+        console.warn(`[PROXY] LLM kortix stream (${service.name}): zero tokens — billing skipped`);
+        return;
+      }
+      const modelConfig = getModel(detectedModel);
+      const cost = calculateCost(modelConfig, anthropicInputTokens, anthropicOutputTokens, 0, 0, KORTIX_MARKUP);
+      await deductLLMCredits(accountId, detectedModel, anthropicInputTokens, anthropicOutputTokens, cost);
+      console.log(`[PROXY] LLM kortix stream ${detectedModel}: ${anthropicInputTokens}/${anthropicOutputTokens} tokens, cost=$${cost.toFixed(6)} (${KORTIX_MARKUP}x)`);
+      return;
+    }
+
+    if (!lastUsage) {
+      console.warn(`[PROXY] LLM kortix stream (${service.name}): no usage data — billing skipped`);
+      return;
+    }
+
+    const { promptTokens, completionTokens, cachedTokens, cacheWriteTokens } = lastUsage;
+    if (promptTokens > 0 || completionTokens > 0) {
+      const modelConfig = getModel(detectedModel);
+      const cost = calculateCost(modelConfig, promptTokens, completionTokens, cachedTokens, cacheWriteTokens, KORTIX_MARKUP);
+      await deductLLMCredits(accountId, detectedModel, promptTokens, completionTokens, cost);
+      console.log(`[PROXY] LLM kortix stream ${detectedModel}: ${promptTokens}/${completionTokens} tokens, cost=$${cost.toFixed(6)} (${KORTIX_MARKUP}x)`);
+    } else {
+      console.warn(`[PROXY] LLM kortix stream (${service.name}): zero tokens — billing skipped`);
+    }
+  } catch (err) {
+    console.error(`[PROXY] Error extracting usage from kortix proxy stream:`, err);
+  }
 }
 
 // === Kortix user with own key: passthrough + bill at platform fee (0.1×) ===
@@ -152,20 +345,7 @@ async function handleKortixPassthrough(
   headers.delete('x-kortix-token');
   let body = await getRequestBody(c, method);
 
-  // Session pruning for Anthropic passthrough (user's own key)
-  const sessionId =
-    c.req.header('X-Session-ID') ??
-    (() => {
-      try {
-        if (body) {
-          const text = typeof body === 'string' ? body : new TextDecoder().decode(body as ArrayBuffer);
-          const parsed = JSON.parse(text);
-          return typeof parsed?.metadata?.session_id === 'string' ? parsed.metadata.session_id : undefined;
-        }
-      } catch { /* ignore */ }
-      return undefined;
-    })();
-  body = maybeApplyAnthropicPruning(service, method, body, headers, sessionId);
+  body = maybeNormalizeOpenAIResponsesInput(service, method, subPath, body, headers);
 
   const billingToolName = service.billingToolName;
   const isLlm = service.isLlm === true;
@@ -223,7 +403,8 @@ async function handlePassthrough(
 ) {
   const targetUrl = `${service.targetBaseUrl}${subPath}${queryString}`;
   const headers = buildForwardHeaders(c);
-  const body = await getRequestBody(c, method);
+  let body = await getRequestBody(c, method);
+  body = maybeNormalizeOpenAIResponsesInput(service, method, subPath, body, headers);
 
   console.log(`[PROXY] ${service.name} (passthrough) ${method} ${subPath}`);
 
@@ -284,6 +465,8 @@ async function billLlmPassthrough(
   // Extract usage — handle both OpenAI and Anthropic response formats
   let promptTokens = 0;
   let completionTokens = 0;
+  let cachedTokens = 0;
+  let cacheWriteTokens = 0;
   let modelId = 'unknown';
 
   if (isAnthropic && responseBody?.usage) {
@@ -297,13 +480,15 @@ async function billLlmPassthrough(
     if (usage) {
       promptTokens = usage.promptTokens;
       completionTokens = usage.completionTokens;
+      cachedTokens = usage.cachedTokens;
+      cacheWriteTokens = usage.cacheWriteTokens;
     }
     modelId = responseBody?.model || modelId;
   }
 
   if (promptTokens > 0 || completionTokens > 0) {
     const modelConfig = getModel(modelId);
-    const cost = calculateCost(modelConfig, promptTokens, completionTokens, PLATFORM_FEE_MARKUP);
+    const cost = calculateCost(modelConfig, promptTokens, completionTokens, cachedTokens, cacheWriteTokens, PLATFORM_FEE_MARKUP);
 
     deductLLMCredits(
       accountId,
@@ -404,7 +589,7 @@ async function extractUsageFromPassthroughStream(
 
     if (promptTokens > 0 || completionTokens > 0) {
       const modelConfig = getModel(detectedModel);
-      const cost = calculateCost(modelConfig, promptTokens, completionTokens, PLATFORM_FEE_MARKUP);
+      const cost = calculateCost(modelConfig, promptTokens, completionTokens, 0, 0, PLATFORM_FEE_MARKUP);
       await deductLLMCredits(
         accountId,
         detectedModel,
@@ -494,38 +679,95 @@ async function tryAuthenticate(c: any): Promise<AuthResult> {
 }
 
 /**
- * Parse an Anthropic-format request body, apply session pruning, and
- * re-serialize. Returns the original body unchanged if parsing fails,
- * the service is not Anthropic, or the method has no body.
+ * OpenAI Responses API is strict about input item shapes. Some clients send
+ * mixed/legacy message arrays (including reasoning parts) that can be accepted
+ * by chat/completions but rejected by /responses with 400 invalid_prompt.
  *
- * Updates Content-Length on headers when the body shrinks.
+ * For /openai/responses requests we normalize input into a conservative shape:
+ *   [{ role: 'user'|'system'|'developer', content: '<text>' }, ...]
+ *
+ * This keeps conversations working instead of hard failing on schema mismatch.
  */
-function maybeApplyAnthropicPruning(
+function maybeNormalizeOpenAIResponsesInput(
   service: ProxyServiceConfig,
   method: string,
+  subPath: string,
   body: ArrayBuffer | string | undefined,
   headers: Headers,
-  sessionId: string | undefined,
 ): ArrayBuffer | string | undefined {
-  if (service.name !== 'anthropic') return body;
-  if (!body || method === 'GET' || method === 'HEAD') return body;
+  if (service.name !== 'openai') return body;
+  if (method !== 'POST') return body;
+  if (!body) return body;
+  if (subPath.split('?')[0] !== '/responses') return body;
 
   try {
     const text = typeof body === 'string' ? body : new TextDecoder().decode(body);
-    const parsed: Record<string, unknown> = JSON.parse(text);
+    const parsed = JSON.parse(text) as Record<string, any>;
+    if (!Array.isArray(parsed.input)) return body;
 
-    const modelId = typeof parsed.model === 'string' ? parsed.model : 'unknown';
-    const modelConfig = getModel(modelId);
+    const normalized: Array<{ role: 'user' | 'system' | 'developer'; content: string }> = [];
 
-    applyAnthropicSessionPruning(parsed, sessionId, modelConfig.contextWindow);
+    for (const item of parsed.input) {
+      if (typeof item === 'string') {
+        const t = item.trim();
+        if (t) normalized.push({ role: 'user', content: t });
+        continue;
+      }
 
+      if (Array.isArray(item)) {
+        const t = extractText(item).trim();
+        if (t) normalized.push({ role: 'user', content: t });
+        continue;
+      }
+
+      if (item && typeof item === 'object') {
+        const roleRaw = typeof item.role === 'string' ? item.role : 'user';
+        const role: 'user' | 'system' | 'developer' =
+          roleRaw === 'system' || roleRaw === 'developer' ? roleRaw : 'user';
+
+        const contentValue = item.content ?? item.text ?? item.output ?? item.input;
+        const t = extractText(contentValue).trim();
+        if (t) normalized.push({ role, content: t });
+      }
+    }
+
+    if (normalized.length === 0) {
+      normalized.push({ role: 'user', content: 'Continue.' });
+    }
+
+    parsed.input = normalized;
     const newBody = JSON.stringify(parsed);
     headers.set('Content-Length', new TextEncoder().encode(newBody).length.toString());
     return newBody;
   } catch {
-    // Body not JSON or pruning failed — forward as-is
     return body;
   }
+}
+
+function extractText(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => extractText(v))
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    // Common OpenAI/SDK content shapes.
+    if (typeof obj.text === 'string') return obj.text;
+    if (typeof obj.output_text === 'string') return obj.output_text;
+    if (typeof obj.content === 'string') return obj.content;
+    if (obj.content) return extractText(obj.content);
+    if (obj.output) return extractText(obj.output);
+    if (obj.input) return extractText(obj.input);
+  }
+
+  return '';
 }
 
 function buildForwardHeaders(c: any): Headers {

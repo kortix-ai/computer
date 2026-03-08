@@ -91,7 +91,7 @@ export async function buildMinimalAccountState(accountId: string): Promise<Accou
       .where(
         and(
           eq(sandboxes.accountId, accountId),
-          inArray(sandboxes.status, ['active', 'provisioning', 'stopped']),
+          inArray(sandboxes.status, ['active', 'provisioning', 'stopped', 'error']),
         ),
       );
 
@@ -104,6 +104,7 @@ export async function buildMinimalAccountState(accountId: string): Promise<Accou
         status: row.status,
         server_type: metadata?.serverType ?? null,
         location: metadata?.location ?? null,
+        error_message: metadata?.errorMessage ?? null,
         is_included: row.isIncluded ?? false,
         stripe_subscription_item_id: row.stripeSubscriptionItemId ?? null,
         created_at: row.createdAt.toISOString(),
@@ -198,6 +199,13 @@ export function buildLocalAccountState(): AccountStateResponse {
       monthly_credits: 0,
       can_purchase_credits: false,
     },
+    auto_topup: {
+      enabled: false,
+      threshold: 5,
+      amount: 15,
+    },
+    instances: [],
+    can_add_instances: false,
   };
 }
 
@@ -247,5 +255,3 @@ function extractScheduledChange(
 
   return null;
 }
-
-

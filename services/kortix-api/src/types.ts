@@ -195,6 +195,24 @@ export interface AccountStateResponse {
     monthly_credits: number;
     can_purchase_credits: boolean;
   };
+  auto_topup: {
+    enabled: boolean;
+    threshold: number;
+    amount: number;
+  };
+  instances: Array<{
+    sandbox_id: string;
+    name: string;
+    provider: string;
+    status: string;
+    server_type: string | null;
+    location: string | null;
+    error_message?: string | null;
+    is_included: boolean;
+    stripe_subscription_item_id: string | null;
+    created_at: string;
+  }>;
+  can_add_instances: boolean;
 }
 
 export interface ScheduledChange {

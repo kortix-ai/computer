@@ -316,6 +316,11 @@ app.route('/file', filesRouter)
 
 // Memory — read-only access to the OpenCode memory plugin's SQLite database
 app.route('/memory', memoryRouter)
+
+// Legacy migration — write old thread data into the OpenCode SQLite database
+import legacyMigrateRouter from './routes/legacy-migrate'
+app.route('/legacy', legacyMigrateRouter)
+
 // Proxy channel webhooks (and /reload) to opencode-channels on port 3456
 app.all('/channels/*', async (c) => {
   const subPath = c.req.path.replace(/^\/channels/, '') || '/'

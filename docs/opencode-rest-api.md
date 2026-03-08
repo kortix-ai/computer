@@ -222,7 +222,7 @@ interface Session {
 
 ## MCP Tool Part Examples
 
-Tools called via MCP servers (web-search, presentation-gen, image-gen, etc.) come through as regular tool parts. The `tool` field is the MCP tool name, and `state.input` contains the arguments.
+Tools called via MCP servers (web-search, presentation-gen, show, etc.) come through as regular tool parts. The `tool` field is the MCP tool name, and `state.input` contains the arguments.
 
 ### websearch
 

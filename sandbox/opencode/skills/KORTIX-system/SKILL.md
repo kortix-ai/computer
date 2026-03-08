@@ -604,8 +604,6 @@ Located at `/opt/opencode/tools/`:
 |---|---|---|
 | Web Search | `web-search.ts` | Tavily search API |
 | Image Search | `image-search.ts` | Serper Google Images API |
-| Image Gen | `image-gen.ts` | Replicate image generation (Flux) |
-| Video Gen | `video-gen.ts` | Replicate video generation (Seedance) |
 | Scrape Webpage | `scrape-webpage.ts` | Firecrawl web scraping |
 | Presentation Gen | `presentation-gen.ts` | HTML slide deck creation |
 | Show | `show.ts` | Present outputs to user UI (images, files, URLs, text, errors) |
@@ -618,6 +616,8 @@ Located at `/opt/opencode/tools/`:
 | Integration Run | `integration-run.ts` | Execute a Pipedream action (structured) |
 | Integration Exec | `integration-exec.ts` | Execute Node.js code with `proxyFetch()` |
 | Integration Request | `integration-request.ts` | Raw authenticated HTTP request |
+
+Replicate guidance now lives in the `replicate` skill at `/opt/opencode/skills/replicate/`.
 
 ## Debugging
 

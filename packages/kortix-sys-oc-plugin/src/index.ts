@@ -12,7 +12,7 @@
  *                                  session.created  — init session, sweep unconsolidated previous sessions
  *                                  session.deleted  — mark session completed
  *                                  session.idle     — incremental consolidation of current session
- *   messages.transform         — inject LTM index as synthetic message at position 1
+ *   messages.transform         — append memory context at the prompt tail
  *   session.compacting         — consolidate observations → LTM, inject into compaction context
  *
  * Consolidation fires in 4 places (ensuring no session's observations are lost):
@@ -41,6 +41,7 @@ import { initSearch, hybridSearchLTM, hybridSearchObservations } from "./search"
 import { ensureMemDir, writeObservationFile, writeLTMFile } from "./lss"
 import { existsSync, writeFileSync, mkdirSync } from "node:fs"
 import { getEnv, shortTs, changeSummary, formatMessages, ttcCompress, STORAGE_BASE, DB_PATH } from "./session"
+import { MEMORY_CONTEXT_MARKER, upsertMemoryContextAtPromptEnd } from "./message-transform"
 import type { LogFn, CreateLTMInput, LTMType } from "./types"
 
 // ─── Plugin Entry ────────────────────────────────────────────────────────────
@@ -366,9 +367,9 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 			}
 		},
 
-		// ── HOOK: Inject LTM index as synthetic user message at position 1
-		// System prompt untouched → KV cache preserved for prefix.
-		// Synthetic message at position 1 is stable across turns (LTM rarely changes).
+		// ── HOOK: Append memory context at the prompt tail
+		// Keep injected context out of the stable cached prefix by attaching it to the
+		// latest user turn (or, as a fallback, a final synthetic user message).
 		"experimental.chat.messages.transform": async (_input, output) => {
 			try {
 				const parts: string[] = []
@@ -396,38 +397,8 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 
 				if (parts.length === 0) return
 
-				const MARKER = "<!-- kortix-mem-context -->"
-				const syntheticText = `${MARKER}\n${parts.join("\n\n")}`
-
-				const messages = output.messages
-
-				// Check if synthetic message already exists (idempotent on repeated hook calls)
-				const existingIdx = messages.findIndex(
-					(m: any) => m.parts?.some((p: any) => p.type === "text" && p.text?.includes(MARKER))
-				)
-
-				if (existingIdx >= 0) {
-					// Update in place
-					const msg = messages[existingIdx] as any
-					const part = msg.parts.find((p: any) => p.type === "text" && p.text?.includes(MARKER))
-					if (part) part.text = syntheticText
-				} else {
-					// Insert synthetic user message at position 1 (after system prompt)
-					const insertIdx = Math.min(1, messages.length)
-					messages.splice(insertIdx, 0, {
-						info: {
-							role: "user",
-							id: "__kortix_mem_context__",
-							sessionID: currentSessionId ?? "",
-							parts: [],
-							createdAt: new Date().toISOString(),
-						} as any,
-						parts: [{
-							type: "text",
-							text: syntheticText,
-						} as any],
-					})
-				}
+				const syntheticText = `${MEMORY_CONTEXT_MARKER}\n${parts.join("\n\n")}`
+				upsertMemoryContextAtPromptEnd(output.messages as any[], syntheticText, currentSessionId ?? undefined)
 			} catch (err) {
 				log("warn", `[memory] messages.transform failed: ${err}`)
 			}

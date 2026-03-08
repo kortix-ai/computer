@@ -1,0 +1,95 @@
+'use client';
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getSupabaseAccessToken } from '@/lib/auth-token';
+
+interface LegacyThread {
+  thread_id: string;
+  account_id: string;
+  project_id: string | null;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  user_message_count: number;
+  total_message_count: number;
+  migrated_session_id: string | null;
+}
+
+interface LegacyMessage {
+  message_id: string;
+  thread_id: string;
+  type: string;
+  is_llm_message: boolean;
+  content: unknown;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+interface MigrationResult {
+  sessionId: string;
+  messagesImported: number;
+  partsImported: number;
+}
+
+function getApiUrl(): string {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  return backendUrl || 'http://localhost:8008/v1';
+}
+
+async function legacyFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = await getSupabaseAccessToken();
+  if (!token) throw new Error('Not authenticated');
+
+  const res = await fetch(`${getApiUrl()}/legacy${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers as Record<string, string>),
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error || `Legacy API error ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export function useLegacyThreads(limit = 50, offset = 0) {
+  return useQuery({
+    queryKey: ['legacy-threads', limit, offset],
+    queryFn: () =>
+      legacyFetch<{ threads: LegacyThread[]; total: number }>(
+        `/threads?limit=${limit}&offset=${offset}`,
+      ),
+    staleTime: 60_000,
+  });
+}
+
+export function useLegacyMessages(threadId: string | null) {
+  return useQuery({
+    queryKey: ['legacy-messages', threadId],
+    queryFn: () => legacyFetch<{ messages: LegacyMessage[] }>(`/threads/${threadId}/messages`),
+    enabled: !!threadId,
+  });
+}
+
+export function useMigrateLegacyThread() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ threadId, sandboxExternalId }: { threadId: string; sandboxExternalId: string }) =>
+      legacyFetch<MigrationResult>(`/threads/${threadId}/migrate`, {
+        method: 'POST',
+        body: JSON.stringify({ sandboxExternalId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['legacy-threads'] });
+      queryClient.invalidateQueries({ queryKey: ['opencode', 'sessions'] });
+    },
+  });
+}
+
+export type { LegacyThread, LegacyMessage, MigrationResult };

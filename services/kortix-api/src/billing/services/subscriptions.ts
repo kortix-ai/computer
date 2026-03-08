@@ -79,6 +79,7 @@ export async function createCheckoutSession(params: {
     success_url: successUrl,
     cancel_url: cancelUrl,
     allow_promotion_codes: true,
+    payment_method_collection: 'always',
     subscription_data: {
       metadata: {
         account_id: accountId,

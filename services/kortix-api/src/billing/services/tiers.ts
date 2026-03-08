@@ -102,7 +102,7 @@ const STRIPE_PRICES_PROD: StripePriceConfig = {
 
 const STRIPE_PRICES_STAGING: StripePriceConfig = {
   subscriptions: {
-    free: { monthly: 'price_1T56XgG6CaZppiKcTG03LXxn' },
+    free: { monthly: 'price_1RIGvuG6l1KZGqIrw14abxeL' },
     pro:  { monthly: 'price_1T7yiuG6CaZppiKc7VsgnlKI' },
   },
   credits: {
