@@ -16,7 +16,7 @@ const paragraphs: ParagraphItem[] = [
   "We believe the next era of business isn't humans using AI tools. It's AI running on infrastructure that humans oversee. The operating system matters more than the model.",
   "We're a small team. We work from everywhere. Belgrade, Lisbon, New York, San Francisco, London, Malaga, Bali. We ship fast, we argue about architecture, and we don't do meetings that could be messages.",
   "We're not chasing hype. We're building infrastructure. The kind of thing that gets more valuable the longer it runs. The kind of thing that outlasts any single model generation.",
-  "Open source because lock-in is the enemy of trust. Apache 2.0 because we mean it.",
+  "Open source because lock-in is the enemy of trust. Elastic 2.0 because we mean it.",
   { text: "Want to build it with us? ", linkText: "We're hiring.", linkHref: "/careers" }
 ];
 
