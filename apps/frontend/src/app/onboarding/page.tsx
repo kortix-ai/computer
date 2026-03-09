@@ -197,13 +197,13 @@ export default function OnboardingPage() {
   }, [refetchSandbox]);
 
   // ── Query param controls ───────────────────────────────────────
-  // ?skip_onboarding → mark complete & go to dashboard
-  // ?redo            → clear ONBOARDING_COMPLETE so the flow reruns
+  // ?skip_onboarding / ?skip → mark complete & go to dashboard
+  // ?redo                    → clear ONBOARDING_COMPLETE so the flow reruns
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const instanceUrl = getInstanceUrl();
 
-    if (params.has('skip_onboarding')) {
+    if (params.has('skip_onboarding') || params.has('skip')) {
       sessionStorage.setItem('onboarding_complete', 'true');
       if (instanceUrl) {
         authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
@@ -243,7 +243,7 @@ export default function OnboardingPage() {
   // ── Redirect if already onboarded ─────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has('skip_onboarding') || params.has('redo')) return; // handled above
+    if (params.has('skip_onboarding') || params.has('skip') || params.has('redo')) return; // handled above
     const check = async () => {
       try {
         const instanceUrl = getInstanceUrl();

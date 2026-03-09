@@ -64,7 +64,7 @@ describe("Scenario 1: Developer explores new codebase", () => {
 		{ tool: "read", args: { filePath: "/src/auth/middleware.ts" }, output: "JWT verification with refresh tokens..." },
 		{ tool: "grep", args: { pattern: "database" }, output: "src/db/prisma.ts:5\nsrc/db/migrations/:3\n" },
 		{ tool: "read", args: { filePath: "/src/db/prisma.ts" }, output: "Prisma client with PostgreSQL..." },
-		{ tool: "read", args: { filePath: "/docker-compose.yml" }, output: "services: postgres, redis, app..." },
+		{ tool: "read", args: { filePath: "/scripts/compose/docker-compose.yml" }, output: "services: postgres, redis, app..." },
 		{ tool: "bash", args: { command: "npm run build" }, output: "Build succeeded in 4.2s" },
 		{ tool: "read", args: { filePath: "/src/api/routes.ts" }, output: "REST routes: /users, /auth, /posts..." },
 		{ tool: "grep", args: { pattern: "env\\." }, output: "src/config.ts:2\nsrc/db/prisma.ts:1\n" },
@@ -138,7 +138,7 @@ describe("Scenario 1: Developer explores new codebase", () => {
 							{
 								content: "Infrastructure runs via Docker Compose: postgres, redis, app services",
 								tags: ["docker", "infrastructure"],
-								files: ["/docker-compose.yml"],
+								files: ["/scripts/compose/docker-compose.yml"],
 								source_observation_ids: [5],
 							},
 							{

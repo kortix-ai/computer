@@ -229,7 +229,7 @@ fi
 section "1c. Timing-Safe Comparison"
 
 # 1.10 Verify timing-safe comparison is in the source code
-MASTER_INDEX="/Users/markokraemer/Projects/heyagi/computer/sandbox/kortix-master/src/index.ts"
+MASTER_INDEX="/Users/markokraemer/Projects/heyagi/computer/packages/sandbox/kortix-master/src/index.ts"
 if grep -q 'timingSafeEqual' "$MASTER_INDEX"; then
   pass "Source uses crypto.timingSafeEqual()"
 else
@@ -637,19 +637,19 @@ fi # end cors section
 if [ "$SECTION" = "all" ] || [ "$SECTION" = "sandbox" ] || [ "$SECTION" = "ports" ]; then
 section "7. Port Security"
 
-# 7.1 Check docker-compose.yml binds to 127.0.0.1
-COMPOSE_FILE="/Users/markokraemer/Projects/heyagi/computer/sandbox/docker-compose.yml"
+# 7.1 Check packages/sandbox/docker/docker-compose.yml binds to 127.0.0.1
+COMPOSE_FILE="/Users/markokraemer/Projects/heyagi/computer/packages/sandbox/docker/docker-compose.yml"
 if [ -f "$COMPOSE_FILE" ]; then
   # Count port bindings that are NOT localhost
   unsafe_ports=$(grep -E '^\s+-\s+"[0-9]' "$COMPOSE_FILE" | grep -v '127.0.0.1' || true)
   if [ -z "$unsafe_ports" ]; then
-    pass "docker-compose.yml: all port bindings are 127.0.0.1"
+    pass "packages/sandbox/docker/docker-compose.yml: all port bindings are 127.0.0.1"
   else
     unsafe_count=$(echo "$unsafe_ports" | wc -l | tr -d ' ')
-    fail "docker-compose.yml: $unsafe_count port bindings not bound to 127.0.0.1"
+    fail "packages/sandbox/docker/docker-compose.yml: $unsafe_count port bindings not bound to 127.0.0.1"
   fi
 else
-  skip "docker-compose.yml not found"
+  skip "packages/sandbox/docker/docker-compose.yml not found"
 fi
 
 # 7.2 Check actual container port bindings
@@ -685,7 +685,7 @@ if [ "$SECTION" = "all" ] || [ "$SECTION" = "sandbox" ] || [ "$SECTION" = "sync"
 section "8. Key Sync & Self-Healing (Static Checks)"
 
 # 8.1 Check sandbox-health.ts exists in kortix-api
-HEALTH_SVC="/Users/markokraemer/Projects/heyagi/computer/services/kortix-api/src/platform/services/sandbox-health.ts"
+HEALTH_SVC="/Users/markokraemer/Projects/heyagi/computer/kortix-api/src/platform/services/sandbox-health.ts"
 if [ -f "$HEALTH_SVC" ]; then
   pass "sandbox-health.ts service exists"
 
@@ -714,7 +714,7 @@ else
 fi
 
 # 8.5 Check local-preview.ts has retry counter (not boolean)
-LOCAL_PREVIEW="/Users/markokraemer/Projects/heyagi/computer/services/kortix-api/src/daytona-proxy/routes/local-preview.ts"
+LOCAL_PREVIEW="/Users/markokraemer/Projects/heyagi/computer/kortix-api/src/daytona-proxy/routes/local-preview.ts"
 if [ -f "$LOCAL_PREVIEW" ]; then
   if grep -q '_syncAttempts' "$LOCAL_PREVIEW"; then
     pass "local-preview.ts uses _syncAttempts counter (not boolean)"
@@ -726,7 +726,7 @@ else
 fi
 
 # 8.6 Check INTERNAL_SERVICE_KEY persistence in api config
-API_CONFIG="/Users/markokraemer/Projects/heyagi/computer/services/kortix-api/src/config.ts"
+API_CONFIG="/Users/markokraemer/Projects/heyagi/computer/kortix-api/src/config.ts"
 if grep -q 'appendFileSync\|persistFile\|Persisted INTERNAL_SERVICE_KEY' "$API_CONFIG"; then
   pass "kortix-api persists INTERNAL_SERVICE_KEY to .env"
 else
@@ -820,7 +820,7 @@ if [ -n "$USER_API_KEY" ]; then
 fi
 
 # 10.4 Source code checks — isKortixToken rejects old prefixes
-API_AUTH_FILES=$(find /Users/markokraemer/Projects/heyagi/computer/services/kortix-api/src -name "*.ts" -exec grep -l 'isKortixToken' {} \; 2>/dev/null || true)
+API_AUTH_FILES=$(find /Users/markokraemer/Projects/heyagi/computer/kortix-api/src -name "*.ts" -exec grep -l 'isKortixToken' {} \; 2>/dev/null || true)
 if [ -n "$API_AUTH_FILES" ]; then
   pass "isKortixToken() function found in kortix-api"
   # Check it validates kortix_ prefix

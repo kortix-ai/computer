@@ -675,7 +675,7 @@ export function updateObservationEnrichment(
 	},
 ): void {
 	const sets: string[] = []
-	const params: unknown[] = []
+	const params: Array<string | number | null> = []
 
 	if (fields.type) { sets.push("type = ?"); params.push(fields.type) }
 	if (fields.title) { sets.push("title = ?"); params.push(fields.title) }

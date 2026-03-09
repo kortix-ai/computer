@@ -2,24 +2,24 @@
 
 Standalone source-of-truth package for the Kortix OpenCode runtime.
 
-This package ships:
-- a full `runtime/` tree mirroring the OpenCode config/runtime layout
-- a materializer CLI to stage that runtime into an OpenCode config directory
-- verification helpers for runtime parity
-- plugin tests under `tests/plugin/kortix-sys/`
-- plugin docs under `docs/kortix-sys/`
-- plugin infra helpers under `infra/kortix-sys/`
+## OpenCode setup
 
-## Commands
+The package is published on npm as `@kortix/kortix-oc`, and `latest` currently points to `0.1.1`.
 
-```bash
-bun run bin/kortix-oc.ts verify
-bun run bin/kortix-oc.ts materialize /tmp/kortix-opencode --clean
-bun run test:plugin
+For the published package, add a single plugin entry:
+
+```jsonc
+{
+  "plugin": ["@kortix/kortix-oc@^0.1.1"]
+}
 ```
 
-## Notes
+For a local workspace checkout, use a filesystem path to the package root:
 
-OpenCode plugins can directly provide hooks and tools, but agents, tools, and skills still need filesystem-backed config assets. Commands are compiled into inline `command` config during materialization so the repo does not need a checked-in `sandbox/opencode/` tree.
+```jsonc
+{
+  "plugin": ["/absolute/path/to/computer/packages/kortix-oc/"]
+}
+```
 
-`computer/packages/kortix-sys-oc-plugin` has been absorbed into this package. The canonical plugin runtime now lives at `computer/packages/kortix-oc/runtime/plugin/kortix-sys`.
+The root plugin entry auto-loads the Kortix agent, commands, skills, tools, provider defaults, and Context7 wiring. Do not manually copy `agents/`, `commands/`, or `skills/` into your OpenCode config.

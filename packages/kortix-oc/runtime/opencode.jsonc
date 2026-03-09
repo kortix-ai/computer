@@ -1,65 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": "allow",
-  "plugin": [
-    "opencode-pty",
-    "envsitter-guard",
-    "./plugin/kortix-oc.ts"
-  ],
-  "skills": {
-    "paths": ["./plugin/kortix-sys/skills"]
-  },
-  "command": {},
-  "autoupdate": true,
-  "default_agent": "kortix",
-  "agent": {
-    // compaction, title, summary are hidden infra agents -- leave them
-  },
-  // ── LLM Providers ────────────────────────────────────────────────────────
-  // In cloud mode, kortix-env-setup.sh redirects SDK traffic to the Kortix
-  // router by setting *_BASE_URL env vars (Anthropic/OpenAI) and patching
-  // this file to add baseURL for providers without env var support
-  // (xAI/Gemini/Groq). API keys are set to KORTIX_TOKEN so the router
-  // recognises Mode 1 (Kortix-managed) requests.
-  //
-  // X-Kortix-Token enables passthrough billing (0.1× platform fee) when the
-  // user connects their own API key. Empty token (local mode) is harmless —
-  // the proxy ignores it and falls through to pure passthrough.
-  "provider": {
-    "anthropic": {
-      "options": {
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "openai": {
-      "options": {
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "xai": {
-      "options": {
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "google": {
-      "options": {
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "groq": {
-      "options": {
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    }
-  },
-  "mcp": {
-    "context7": {
-      "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
-      "headers": {
-        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
-      },
-      "enabled": true
-    }
-  }
+  "plugin": ["./plugin/kortix-oc.ts"],
+  "autoupdate": true
 }

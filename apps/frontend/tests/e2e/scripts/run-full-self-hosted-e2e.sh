@@ -40,7 +40,7 @@ NEXT_OUTPUT=standalone pnpm --dir apps/frontend run build >/dev/null
 docker build -f "apps/frontend/Dockerfile" -t "kortix/kortix-frontend:latest" . >/dev/null
 
 echo "[e2e] Building local API image with current source"
-docker build --build-arg SERVICE=kortix-api -f "services/Dockerfile" -t "kortix/kortix-api:latest" . >/dev/null
+docker build --build-arg SERVICE=kortix-api -f "kortix-api/Dockerfile" -t "kortix/kortix-api:latest" . >/dev/null
 
 docker compose -f "$HOME/.kortix/docker-compose.yml" up -d kortix-api frontend >/dev/null
 

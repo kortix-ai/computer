@@ -11,86 +11,13 @@ export interface MaterializeOptions {
 const FILTERED_RUNTIME_DIRS = new Set(["commands", "patches", "plugin"])
 const FILTERED_RUNTIME_NAMES = new Set([".DS_Store", ".kortix", ".local", "bun.lock", "node_modules", "ocx.lock"])
 
-interface CommandDefinition {
-  name: string
-  description: string
-  agent?: string
-  template: string
-}
-
-function parseFrontmatter(frontmatter: string): Record<string, string> {
-  const fields: Record<string, string> = {}
-
-  for (const line of frontmatter.split("\n")) {
-    const separator = line.indexOf(":")
-    if (separator === -1) continue
-    const key = line.slice(0, separator).trim()
-    const value = line.slice(separator + 1).trim().replace(/^"|"$/g, "")
-    if (key) fields[key] = value
-  }
-
-  return fields
-}
-
-function parseCommandMarkdown(filePath: string): CommandDefinition {
-  const raw = readFileSync(filePath, "utf8")
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
-  if (!match) {
-    throw new Error(`Invalid command markdown (missing frontmatter): ${filePath}`)
-  }
-
-  const [, frontmatter, body] = match
-  const fields = parseFrontmatter(frontmatter)
-  const name = path.basename(filePath, path.extname(filePath))
-
-  if (!fields.description) {
-    throw new Error(`Command markdown missing description: ${filePath}`)
-  }
-
-  return {
-    name,
-    description: fields.description,
-    agent: fields.agent,
-    template: body.trim(),
-  }
-}
-
-function buildCommandBlock(): string {
-  const commandsDir = path.join(RUNTIME_ROOT, "commands")
-  const commandFiles = [
-    "onboarding.md",
-    "work-loop.md",
-    "ulw-loop.md",
-    "stop-continuation.md",
-  ]
-
-  const definitions = commandFiles.map((file) => parseCommandMarkdown(path.join(commandsDir, file)))
-  const lines = definitions.flatMap((definition, index) => {
-    const suffix = index === definitions.length - 1 ? "" : ","
-    const entry = [
-      `    ${JSON.stringify(definition.name)}: {`,
-      `      "description": ${JSON.stringify(definition.description)},`,
-      definition.agent ? `      "agent": ${JSON.stringify(definition.agent)},` : null,
-      `      "template": ${JSON.stringify(definition.template)}`,
-      `    }${suffix}`,
-    ].filter(Boolean) as string[]
-
-    return entry
-  })
-
-  return ['  "command": {', ...lines, "  },"].join("\n")
-}
-
 function rewriteOpencodeConfig(targetDir: string): void {
   const opencodeConfigPath = path.join(targetDir, "opencode.jsonc")
   const relativeRuntimeRoot = path.relative(targetDir, RUNTIME_ROOT).split(path.sep).join("/")
   const pluginPath = `${relativeRuntimeRoot}/plugin/kortix-oc.ts`
-  const pluginSkillsPath = `${relativeRuntimeRoot}/plugin/kortix-sys/skills`
 
   let config = readFileSync(opencodeConfigPath, "utf8")
   config = config.replaceAll("./plugin/kortix-oc.ts", pluginPath)
-  config = config.replaceAll("./plugin/kortix-sys/skills", pluginSkillsPath)
-  config = config.replace('  "command": {},', buildCommandBlock())
   writeFileSync(opencodeConfigPath, config)
 }
 

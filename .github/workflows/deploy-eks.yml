@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "services/**"
+      - "kortix-api/**"
+      - "deploy/**"
       - "packages/**"
       - "infra/**"
       - "pnpm-lock.yaml"
@@ -50,7 +51,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: services/Dockerfile
+          file: kortix-api/Dockerfile
           push: true
           build-args: SERVICE=kortix-api
           tags: |

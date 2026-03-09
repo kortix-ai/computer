@@ -26,6 +26,4 @@ export const RUNTIME_EXCLUDE_NAMES = new Set([
   "bun.lock",
   "ocx.lock",
   "oh-my-opencode.json.bak.2026-03-08T12-32-36-054Z",
-  "image-gen.ts.deleted",
-  "video-gen.ts.deleted",
 ])

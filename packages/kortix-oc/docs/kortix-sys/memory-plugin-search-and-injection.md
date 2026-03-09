@@ -265,7 +265,7 @@ unifiedSearch("docker deploy", { limit: 15, source: "both" })
 
   [LTM/procedural] #3 (confidence: 1.00)
     Deploy: bun build then docker compose up -d
-    Files: Dockerfile, docker-compose.yml
+    Files: Dockerfile, scripts/compose/docker-compose.yml
 
   [LTM/semantic] #1 (confidence: 1.00)
     The API uses Express with JWT at /src/auth/

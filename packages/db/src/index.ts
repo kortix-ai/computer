@@ -102,8 +102,6 @@ export type {
   AccountUser,
   NewApiKey,
   SandboxSelect,
-  TriggerSelect,
-  ExecutionSelect,
   ChannelConfig,
   ChannelSession,
   ChannelMessage,

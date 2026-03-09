@@ -6,9 +6,9 @@
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$ROOT_DIR/scripts/get-kortix.sh"
 ENTRYPOINT="$ROOT_DIR/apps/frontend/docker-entrypoint.sh"
-ENV_ROUTES="$ROOT_DIR/sandbox/kortix-master/src/routes/env.ts"
-MASTER_INDEX="$ROOT_DIR/sandbox/kortix-master/src/index.ts"
-MASTER_CONFIG="$ROOT_DIR/sandbox/kortix-master/src/config.ts"
+ENV_ROUTES="$ROOT_DIR/packages/sandbox/kortix-master/src/routes/env.ts"
+MASTER_INDEX="$ROOT_DIR/packages/sandbox/kortix-master/src/index.ts"
+MASTER_CONFIG="$ROOT_DIR/packages/sandbox/kortix-master/src/config.ts"
 
 PASS=0; FAIL=0; TOTAL=0
 
@@ -120,7 +120,7 @@ else
   fail "entrypoint rewrites localhost:8008 URLs"
 fi
 
-# localhost:14000 rewrite removed — sandbox now routes through backend (/v1/sandbox/*)
+# localhost:14000 rewrite removed — sandbox now routes through backend (/v1/platform/sandbox/*)
 pass "sandbox routes through backend proxy (no direct sandbox URL)"
 
 if grep -q 'exec node' "$ENTRYPOINT"; then
@@ -255,8 +255,8 @@ fi
 echo "  ${BOLD:-}API service key forwarding${NC:-}"
 echo ""
 
-API_PROVIDERS="$ROOT_DIR/services/kortix-api/src/providers/routes.ts"
-API_SETUP="$ROOT_DIR/services/kortix-api/src/setup/index.ts"
+API_PROVIDERS="$ROOT_DIR/kortix-api/src/providers/routes.ts"
+API_SETUP="$ROOT_DIR/kortix-api/src/setup/index.ts"
 
 if grep -q 'INTERNAL_SERVICE_KEY' "$API_PROVIDERS"; then
   pass "providers/routes.ts injects INTERNAL_SERVICE_KEY"

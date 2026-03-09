@@ -30,7 +30,7 @@ async function getAccessToken(page: Page): Promise<string> {
     const cookie = document.cookie
       .split(';')
       .map((c) => c.trim())
-      .find((c) => c.startsWith('sb-localhost-auth-token='));
+      .find((c) => /^sb-.*-auth-token=/.test(c));
     if (!cookie) return null;
 
     const encoded = decodeURIComponent(cookie.split('=')[1] || '');
@@ -46,6 +46,22 @@ async function getAccessToken(page: Page): Promise<string> {
   });
 
   if (!token) {
+    const authCookie = (await page.context().cookies()).find((cookie) => /^sb-.*-auth-token$/.test(cookie.name));
+    if (authCookie) {
+      const encoded = decodeURIComponent(authCookie.value || '');
+      if (encoded.startsWith('base64-')) {
+        try {
+          const decoded = Buffer.from(encoded.slice('base64-'.length), 'base64').toString('utf8');
+          const parsed = JSON.parse(decoded);
+          if (parsed?.access_token) {
+            return parsed.access_token as string;
+          }
+        } catch {
+          // fall through to error below
+        }
+      }
+    }
+
     throw new Error('Access token missing in browser session');
   }
 

@@ -651,8 +651,8 @@ curl http://localhost:8000/lss/status
 ## Docker Compose
 
 ```bash
-docker compose -f sandbox/docker-compose.yml up --build -d
-docker compose -f sandbox/docker-compose.yml logs -f
+docker compose -f packages/sandbox/docker/docker-compose.yml up --build -d
+docker compose -f packages/sandbox/docker/docker-compose.yml logs -f
 docker exec -it kortix-sandbox bash
 docker exec -it -u abc kortix-sandbox bash
 ```

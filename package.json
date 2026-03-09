@@ -7,6 +7,8 @@
     "dev:services": "pnpm --filter kortix-api dev",
     "dev:frontend": "pnpm --filter Kortix-Computer-Frontend dev",
     "dev:api": "pnpm --filter kortix-api dev",
+    "dev:sandbox": "docker compose -f packages/sandbox/docker/docker-compose.yml up",
+    "dev:sandbox:docker": "docker compose -f packages/sandbox/docker/docker-compose.yml -f packages/sandbox/docker/docker-compose.docker.yml up",
     "build": "pnpm -r run build",
     "build:frontend": "pnpm --filter Kortix-Computer-Frontend build",
     "typecheck": "pnpm -r run typecheck",

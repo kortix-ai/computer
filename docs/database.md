@@ -337,8 +337,8 @@ bunx drizzle-kit pull --config drizzle.config.pull.ts
 | `packages/db/src/index.ts` | Barrel exports |
 | `packages/db/drizzle.config.ts` | Drizzle Kit config (targets `kortix` schema) |
 | `packages/db/drizzle.config.pull.ts` | Drizzle Kit config for legacy introspection |
-| `services/kortix-api/src/db/index.ts` | Example: service consuming `@kortix/db` |
+| `kortix-api/src/db/index.ts` | Example: service consuming `@kortix/db` |
 | `services/postgres/Dockerfile` | Custom PG16 image with pg_cron + pg_net |
 | `services/postgres/init/00-init-kortix.sql` | Init SQL: schema, tables, indexes, scheduler functions |
-| `services/kortix-api/src/cron/services/scheduler.ts` | pg_cron job management + configure_scheduler() call |
-| `services/kortix-api/src/cron/routes/tick.ts` | Global tick + per-trigger execution endpoints |
+| `kortix-api/src/cron/services/scheduler.ts` | pg_cron job management + configure_scheduler() call |
+| `kortix-api/src/cron/routes/tick.ts` | Global tick + per-trigger execution endpoints |

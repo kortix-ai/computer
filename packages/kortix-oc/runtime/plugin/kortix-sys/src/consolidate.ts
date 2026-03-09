@@ -42,7 +42,7 @@ EPISODIC — What happened this session. Decisions made, tasks completed, bugs f
   Bad: "Read some files about auth"
 
 SEMANTIC — Stable facts about the codebase, architecture, environment, or domain. Things that remain true across sessions.
-  Good: "Frontend uses Next.js App Router at apps/frontend/; API is Bun/Hono at services/kortix-api/ (port 8008)"
+  Good: "Frontend uses Next.js App Router at apps/frontend/; API is Bun/Hono at kortix-api/ (port 8008)"
   Bad: "There is a frontend"
 
 PROCEDURAL — How to do things. Concrete workflows, commands, debugging recipes, deploy steps. Must be actionable.

@@ -50,7 +50,7 @@ coverage/
 .vercel/
 
 # Supabase
-supabase/.temp/
+infra/supabase/.temp/
 
 # Misc
 state.json
@@ -67,7 +67,7 @@ test/
 services/kortix-api/.kortix-data/
 services/kortix-api/.sandbox-auth-token.json
 packages/kortix-oc/runtime/.kortix/
-sandbox/opencode/
+deploy/sandbox/.buildx-cache/
 
 .nx/
 .pulumi

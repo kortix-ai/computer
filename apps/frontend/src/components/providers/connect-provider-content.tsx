@@ -43,6 +43,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
 
+const FALLBACK_PROVIDER_CARDS = [
+  {
+    id: 'opencode',
+    name: 'OpenCode Zen',
+    env: [],
+    models: {},
+  },
+] as const;
+
 // =============================================================================
 // ConnectProviderContent
 // =============================================================================
@@ -90,7 +99,12 @@ export function ConnectProviderContent({
     modelName: '',
   });
 
-  const allProviders = useMemo(() => providers?.all || [], [providers]);
+  const allProviders = useMemo(() => {
+    const listedProviders = providers?.all || [];
+    const seenIds = new Set(listedProviders.map((provider) => provider.id));
+    const fallbackProviders = FALLBACK_PROVIDER_CARDS.filter((provider) => !seenIds.has(provider.id));
+    return [...fallbackProviders, ...listedProviders];
+  }, [providers]);
 
   const filteredProviders = useMemo(() => {
     const q = search.toLowerCase();

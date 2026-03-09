@@ -44,7 +44,7 @@ export interface ContinuationConfig {
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
 export const DEFAULT_FEATURES: ContinuationFeatures = {
-	continuation: true,
+	continuation: false,
 	todoEnforcer: true,
 	intentGate: true,
 	planner: false,

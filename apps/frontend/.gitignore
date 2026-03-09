@@ -41,9 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 # supabase for testing
-supabase/.branches
-supabase/.temp
-supabase/**/*.env
+infra/supabase/.branches
+infra/supabase/.temp
+infra/supabase/**/*.env
 **/.prompts/
 **/__pycache__/
 
