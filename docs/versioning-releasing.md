@@ -6,7 +6,7 @@ Current released version is `0.7.14`. The next release should be `0.7.15`.
 
 Update this section after every release so the next person knows what version to use.
 
-> **Hetzner snapshot:** After releasing, run `./sandbox/build-hetzner-snapshot.sh 0.7.15`
+> **Hetzner snapshot:** After releasing, run `./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.15`
 > to build the Hetzner snapshot for the new version (see [Hetzner Snapshot](#hetzner-snapshot) below).
 
 ## Overview
@@ -521,16 +521,16 @@ small machines from the UI.
 
 ```bash
 # Build snapshot for v0.7.15
-./sandbox/build-hetzner-snapshot.sh 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.15
 
 # Dry run (validates Docker Hub image exists, checks for existing snapshot)
-./sandbox/build-hetzner-snapshot.sh --dry-run 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh --dry-run 0.7.15
 
 # Different location (default: nbg1 — Nuremberg)
-./sandbox/build-hetzner-snapshot.sh --location ash 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh --location ash 0.7.15
 
 # Also attach your personal SSH key for debugging
-./sandbox/build-hetzner-snapshot.sh --ssh-key my-key-name 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh --ssh-key my-key-name 0.7.15
 ```
 
 The script:
@@ -561,7 +561,7 @@ After the standard `./scripts/release/sandbox/release.sh --docker 0.7.15`:
 
 ```bash
 # 1. Build Hetzner snapshot (requires Docker Hub image to be published first)
-./sandbox/build-hetzner-snapshot.sh 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.15
 
 # 2. Update .env with new snapshot ID (printed by the script)
 # HETZNER_SNAPSHOT_ID=<new-id>
