@@ -21,8 +21,8 @@ End-to-end tests for the Kortix sandbox authentication system.
 
 | Requirement | How to start |
 |-------------|-------------|
-| Docker container `kortix-sandbox` on `127.0.0.1:14000` | `docker compose up -d` in `computer/sandbox/` |
-| kortix-api on `127.0.0.1:8008` | `pnpm run dev` in `computer/services/kortix-api/` |
+| Docker container `kortix-sandbox` on `127.0.0.1:14000` | `docker compose -f packages/sandbox/docker/docker-compose.yml up -d` in `computer/` |
+| kortix-api on `127.0.0.1:8008` | `pnpm run dev` in `computer/kortix-api/` |
 | `jq` | `brew install jq` |
 | `/tmp/sandbox_token.txt` | Contains `kortix_sb_*` token (optional — skips section 4 if missing) |
 | `/tmp/api_key.txt` | Contains `kortix_*` user API key (optional — skips sections 5/11 if missing) |
@@ -124,7 +124,7 @@ Verifies Docker port bindings use `127.0.0.1` (not `0.0.0.0`).
 
 | # | Test | Method |
 |---|------|--------|
-| 7.1 | `docker-compose.yml` bindings | File grep |
+| 7.1 | `packages/sandbox/docker/docker-compose.yml` bindings | File grep |
 | 7.2 | Running container bindings | `docker port` |
 | 7.3 | Port 8000 → 127.0.0.1:14000 | File grep |
 
@@ -204,7 +204,7 @@ Sandbox  ──[KORTIX_TOKEN]──→ kortix-api ──→ LLM providers / inte
 docker exec kortix-sandbox cat /run/s6/container_environment/INTERNAL_SERVICE_KEY
 
 # Check what key the API has
-grep INTERNAL_SERVICE_KEY computer/services/kortix-api/.env
+grep INTERNAL_SERVICE_KEY computer/kortix-api/.env
 
 # If they differ, sync manually:
 docker exec kortix-sandbox bash -c "echo '<api-key>' > /run/s6/container_environment/INTERNAL_SERVICE_KEY"
@@ -214,14 +214,14 @@ docker exec kortix-sandbox sudo s6-svc -r /run/service/svc-kortix-master
 ### CORS returns `*` instead of allowlist
 The updated sandbox code hasn't been deployed. Run:
 ```bash
-docker cp computer/sandbox/kortix-master/src/index.ts kortix-sandbox:/opt/kortix-master/src/index.ts
+docker cp computer/packages/sandbox/kortix-master/src/index.ts kortix-sandbox:/opt/kortix-master/src/index.ts
 docker exec kortix-sandbox sudo s6-svc -r /run/service/svc-kortix-master
 ```
 
 ### Ports bound to 0.0.0.0
-The container was created before `docker-compose.yml` was updated. Recreate:
+The container was created before `packages/sandbox/docker/docker-compose.yml` was updated. Recreate:
 ```bash
-cd computer/sandbox && docker compose down && docker compose up -d
+cd computer && docker compose -f packages/sandbox/docker/docker-compose.yml down && docker compose -f packages/sandbox/docker/docker-compose.yml up -d
 ```
 
 ### OpenCode integration tools get 401

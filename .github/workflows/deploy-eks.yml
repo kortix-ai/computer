@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "services/**"
+      - "kortix-api/**"
+      - "deploy/**"
       - "packages/**"
       - "infra/**"
       - "pnpm-lock.yaml"
@@ -18,7 +19,7 @@ permissions:
 
 env:
   AWS_REGION: us-west-2
-  GHCR_IMAGE: ghcr.io/kortix-ai/suna
+  GHCR_IMAGE: ghcr.io/kortix-ai/computer
   EKS_CLUSTER: kortix-prod
 
 jobs:
@@ -50,7 +51,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: services/Dockerfile
+          file: kortix-api/Dockerfile
           push: true
           build-args: SERVICE=kortix-api
           tags: |
@@ -67,40 +68,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Install Pulumi CLI
-        uses: pulumi/actions@v5
-
-      - name: Install infra dependencies
-        working-directory: infra/prod
-        run: npm ci
-
-      - name: Pulumi up
-        uses: pulumi/actions@v5
-        with:
-          command: up
-          stack-name: prod
-          work-dir: infra/prod
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-          PULUMI_CONFIG: >-
-            kortix-eks:imageTag=${{ needs.build.outputs.image_tag }}
 
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig \
             --name ${{ env.EKS_CLUSTER }} \
             --region ${{ env.AWS_REGION }}
+
+      - name: Update deployment image
+        run: |
+          kubectl set image deployment/kortix-api \
+            -n kortix \
+            kortix-api=${{ env.GHCR_IMAGE }}:${{ needs.build.outputs.image_tag }}
 
       - name: Verify rollout
         run: |
@@ -118,7 +103,7 @@ jobs:
           for i in $(seq 1 30); do
             STATUS=$(curl -sk -o /dev/null -w '%{http_code}' \
               "https://${INGRESS_HOST}/v1/health" \
-              -H "Host: api.kortix.com" || true)
+              -H "Host: new-api.kortix.com" || true)
             if [ "$STATUS" = "200" ]; then
               echo "Health check passed"
               exit 0

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": "allow",
+  "plugin": ["./plugin/kortix-oc.ts"],
+  "autoupdate": true
+}

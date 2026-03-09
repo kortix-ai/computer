@@ -13,7 +13,7 @@ Four Docker images, all published to Docker Hub under `kortix/`:
 | `kortix/kortix-frontend:latest` | `apps/frontend/` | Next.js dashboard (standalone mode) |
 | `kortix/kortix-api:latest` | `services/` | Bun/Hono backend API |
 | `kortix/postgres:latest` | `services/postgres/` | PostgreSQL 16 + pg_cron + pg_net (scheduler) |
-| `kortix/computer:latest` | `sandbox/` | AI agent sandbox (s6-overlay, OpenCode, kortix-master) |
+| `kortix/computer:latest` | `packages/sandbox/` + `packages/sandbox/docker/` | AI agent sandbox (s6-overlay, OpenCode, kortix-master) |
 
 The installer script (`scripts/get-kortix.sh`) writes `~/.kortix/docker-compose.yml` + `.env` + CLI helper, pulls the images, and starts everything.
 
@@ -95,7 +95,7 @@ The Dockerfile is a simple runner-only image (~100MB):
 
 ```bash
 cd /path/to/computer
-docker build --build-arg SERVICE=kortix-api -f services/Dockerfile -t kortix/kortix-api:latest .
+docker build --build-arg SERVICE=kortix-api -f kortix-api/Dockerfile -t kortix/kortix-api:latest .
 ```
 
 Straightforward Bun image. `drizzle-kit` is a direct dependency of `kortix-api` (needed for `drizzle-kit push` at runtime). The Dockerfile uses `pnpm install --prod=false` to include it. Can be built **in parallel** with the frontend host build and sandbox build.
@@ -117,7 +117,7 @@ Custom PG16 image (~460MB). Stage 1 compiles `pg_net` from source; stage 2 insta
 
 ```bash
 cd /path/to/computer
-docker build -f sandbox/Dockerfile -t kortix/computer:latest .
+docker build -f packages/sandbox/docker/Dockerfile -t kortix/computer:latest .
 ```
 
 Large image (~4GB) with s6-overlay, OpenCode, browser tools, etc. Takes a few minutes. Can be built **in parallel** with the frontend host build, API build, and Postgres build.
@@ -144,12 +144,12 @@ cd /path/to/computer
 
 # Sandbox (multi-platform, builds Rust + Node for each arch natively)
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -f sandbox/Dockerfile -t kortix/computer:latest --push .
+  -f packages/sandbox/docker/Dockerfile -t kortix/computer:latest --push .
 
 # API
 docker buildx build --platform linux/amd64,linux/arm64 \
   --build-arg SERVICE=kortix-api \
-  -f services/Dockerfile -t kortix/kortix-api:latest --push .
+  -f kortix-api/Dockerfile -t kortix/kortix-api:latest --push .
 
 # PostgreSQL (pg_cron + pg_net)
 docker buildx build --platform linux/amd64,linux/arm64 \
@@ -165,7 +165,7 @@ docker buildx build --platform linux/amd64,linux/arm64 --no-cache \
 ### Local-only build (single platform, for dev/testing)
 
 ```bash
-docker build -f sandbox/Dockerfile -t kortix/computer:latest .
+docker build -f packages/sandbox/docker/Dockerfile -t kortix/computer:latest .
 ```
 
 This builds for your host platform only. Fast, but the image won't work on other architectures.
@@ -388,12 +388,12 @@ print('ANTHROPIC configured:', d['configured']['ANTHROPIC_API_KEY'])
 
 ## Key Architecture: Installed Mode vs Repo/Dev Mode
 
-The provider API routes (`services/kortix-api/src/providers/routes.ts`) and legacy setup routes (`services/kortix-api/src/setup/index.ts`) both operate in two modes:
+The provider API routes (`kortix-api/src/providers/routes.ts`) and legacy setup routes (`kortix-api/src/setup/index.ts`) both operate in two modes:
 
 ### Repo/Dev Mode (running from source)
 
 - Detected by `findRepoRoot()` finding `docker-compose.local.yml`
-- Reads/writes `.env` and `sandbox/.env` files directly on disk
+- Reads/writes `.env` and `packages/sandbox/docker/.env` files directly on disk
 - Used when running `pnpm dev` locally
 
 ### Installed/Docker Mode (via `get-kortix.sh`)
@@ -451,7 +451,7 @@ The setup/onboarding flow is an **overlay on top of the dashboard**, not a separ
 
 ## CORS Configuration
 
-The API uses mode-aware CORS (see `services/kortix-api/src/index.ts`):
+The API uses mode-aware CORS (see `kortix-api/src/index.ts`):
 
 | Mode | Allowed origins |
 |---|---|
@@ -463,7 +463,7 @@ The API uses mode-aware CORS (see `services/kortix-api/src/index.ts`):
 
 In Docker, the frontend runs on port `13737` and the API on port `13738`. Since these are different origins (`localhost:13737` ≠ `localhost:13738`), the browser enforces CORS. The default `localhost:3000` allowlist doesn't cover the remapped port.
 
-The installer sets `CORS_ALLOWED_ORIGINS=http://localhost:13737,http://127.0.0.1:13737` on the `kortix-api` service in docker-compose.yml.
+The installer sets `CORS_ALLOWED_ORIGINS=http://localhost:13737,http://127.0.0.1:13737` on the `kortix-api` service in `docker-compose.yml`.
 
 ### VPS mode
 
@@ -479,16 +479,15 @@ The sandbox needs to call the Kortix API (`KORTIX_API_URL`). How it reaches the 
 
 | Scenario | API running | Sandbox `KORTIX_API_URL` | Command |
 |---|---|---|---|
-| **Host dev** (most common) | `pnpm run dev` on Mac | `http://host.docker.internal:8008` | `cd sandbox && docker compose up` |
-| **All Docker** | Docker container | `http://kortix-api:8008` | `cd sandbox && docker compose -f docker-compose.yml -f docker-compose.docker.yml up` |
+| **Host dev** (most common) | `pnpm run dev` on Mac | `http://host.docker.internal:8008` | `docker compose -f packages/sandbox/docker/docker-compose.yml up` |
+| **All Docker** | Docker container | `http://kortix-api:8008` | `docker compose -f packages/sandbox/docker/docker-compose.yml -f packages/sandbox/docker/docker-compose.docker.yml up` |
 
 ### Host dev (default — no extra config)
 
-You run `pnpm run dev` for `kortix-api` on your Mac. The sandbox container reaches it via `host.docker.internal` — a special Docker DNS name that resolves to the host machine. This is the **default** in `sandbox/docker-compose.yml`.
+You run `pnpm run dev` for `kortix-api` on your Mac. The sandbox container reaches it via `host.docker.internal` — a special Docker DNS name that resolves to the host machine. This is the **default** in `packages/sandbox/docker/docker-compose.yml`.
 
 ```bash
-cd sandbox
-docker compose up        # Just works — KORTIX_API_URL defaults to host.docker.internal:8008
+docker compose -f packages/sandbox/docker/docker-compose.yml up
 ```
 
 ### All Docker (API + sandbox both in Docker)
@@ -496,8 +495,7 @@ docker compose up        # Just works — KORTIX_API_URL defaults to host.docker
 When `kortix-api` runs in Docker too (e.g. via `~/.kortix/docker-compose.yml`), containers need to be on the **same Docker network** for DNS resolution. Use the `docker-compose.docker.yml` override:
 
 ```bash
-cd sandbox
-docker compose -f docker-compose.yml -f docker-compose.docker.yml up
+docker compose -f packages/sandbox/docker/docker-compose.yml -f packages/sandbox/docker/docker-compose.docker.yml up
 ```
 
 This override:
@@ -507,7 +505,7 @@ This override:
 If the API's compose project has a different name, override the network:
 
 ```bash
-KORTIX_NETWORK=computer_default docker compose -f docker-compose.yml -f docker-compose.docker.yml up
+KORTIX_NETWORK=computer_default docker compose -f packages/sandbox/docker/docker-compose.yml -f packages/sandbox/docker/docker-compose.docker.yml up
 ```
 
 ### All-in-one compose (`docker-compose.local.yml`)
@@ -533,7 +531,7 @@ docker exec kortix-sandbox curl -sf http://kortix-api:8008/v1/health
 
 | Var | Used by | Purpose |
 |---|---|---|
-| `KORTIX_API_URL` | sandbox container | Base URL the sandbox uses to call the API. Default: `http://host.docker.internal:8008` (host dev). Consumers append service paths like `/v1/router`, `/v1/cron`, etc. |
+| `KORTIX_API_URL` | sandbox container | Base URL the sandbox uses to call the API. Default: `http://host.docker.internal:8008` (host dev). Consumers append service paths like `/v1/router` and integrations APIs. |
 | `KORTIX_NETWORK` | `docker-compose.docker.yml` | External Docker network to join (default: `kortix_default`) |
 | `SANDBOX_NETWORK` | `kortix-api` (`local-docker.ts`) | Network for programmatically-created sandbox containers |
 | `KORTIX_URL` | `kortix-api` | URL the API gives to sandboxes for callbacks |
@@ -547,7 +545,7 @@ Schema is managed declaratively using `drizzle-kit push` — no migration files.
 ### How it works
 
 1. **Single source of truth:** `packages/db/src/schema/kortix.ts` (kortix schema) and `packages/db/src/schema/public.ts` (public schema billing tables)
-2. **On every startup:** `services/kortix-api/src/ensure-schema.ts` shells out to `bun drizzle-kit push --force`
+2. **On every startup:** `kortix-api/src/ensure-schema.ts` shells out to `bun drizzle-kit push --force`
 3. **drizzle-kit diffs** the live database against the schema definitions and applies changes (CREATE TABLE, ALTER TABLE, etc.)
 4. **Idempotent:** Safe to run on every startup. No-ops if schema is already up to date.
 
@@ -555,7 +553,7 @@ Schema is managed declaratively using `drizzle-kit push` — no migration files.
 
 | Schema | Tables | Config |
 |---|---|---|
-| `kortix` | sandboxes, integrations, sandbox_integrations, triggers, executions, deployments, server_entries, api_keys, channel_configs, channel_sessions, channel_messages, channel_identity_map | `schemaFilter: ['kortix']` |
+| `kortix` | sandboxes, integrations, sandbox_integrations, deployments, server_entries, api_keys, channel_configs, channel_sessions, channel_messages, channel_identity_map | `schemaFilter: ['kortix']` |
 | `public` | credit_accounts, credit_ledger, credit_usage, credit_purchases, account_deletion_requests, api_keys | `schemaFilter: ['public']`, `tablesFilter` whitelist |
 
 ### Key files
@@ -563,16 +561,15 @@ Schema is managed declaratively using `drizzle-kit push` — no migration files.
 - `packages/db/src/schema/kortix.ts` — Kortix schema table definitions
 - `packages/db/src/schema/public.ts` — Public schema billing/auth table definitions
 - `packages/db/drizzle.config.ts` — Drizzle Kit config (schema paths, filters, DB URL)
-- `services/kortix-api/src/ensure-schema.ts` — Startup script that runs `drizzle-kit push`
+- `kortix-api/src/ensure-schema.ts` — Startup script that runs `drizzle-kit push`
 
 ### Startup sequence
 
 ```
 1. ensureSchema()        — drizzle-kit push creates/updates all tables
 2. bootstrapLocalIdentity() — inserts local sandbox row into kortix.sandboxes
-3. startScheduler()      — configures pg_cron
-4. startChannelService() — starts Slack/Telegram adapters
-5. startDrainer()        — starts message queue drainer
+3. startChannelService() — starts Slack/Telegram adapters
+4. startDrainer()        — starts message queue drainer
 ```
 
 All services start AFTER schema push completes. If schema push fails, services still start (graceful degradation).
@@ -630,11 +627,11 @@ docker exec kortix-postgres-1 psql -U postgres -c "SELECT sandbox_id, status FRO
 
 **Symptom:** `[schema] Schema push failed` with `Cannot find package 'drizzle-kit'`.
 
-**Root cause:** `drizzle-kit` must be a direct dependency of `services/kortix-api` (not just `packages/db`) for pnpm's `--filter` to hoist it.
+**Root cause:** `drizzle-kit` must be a direct dependency of `kortix-api` (not just `packages/db`) for pnpm's `--filter` to hoist it.
 
-**Fix:** Ensure `drizzle-kit` is in `services/kortix-api/package.json` dependencies AND the lockfile is up to date:
+**Fix:** Ensure `drizzle-kit` is in `kortix-api/package.json` dependencies AND the lockfile is up to date:
 ```bash
-pnpm install --filter ./services/kortix-api...
+pnpm install --filter ./kortix-api...
 ```
 
 ### Sandbox `kortix-master` crashes with EACCES
@@ -684,7 +681,7 @@ docker exec kortix-sandbox s6-svc -r /run/service/svc-kortix-master
 
 **Symptom:** Frontend can't connect to the sandbox.
 
-**Root cause:** All sandbox requests now route through the backend (`/v1/sandbox/*`). Ensure `NEXT_PUBLIC_BACKEND_URL` is correctly set at build time.
+**Root cause:** All sandbox requests now route through the backend (`/v1/platform/sandbox/*`). Ensure `NEXT_PUBLIC_BACKEND_URL` is correctly set at build time.
 
 **Fix:** Ensure `NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1` is passed during the host build step. This is the baked-in default; the entrypoint rewrites it at runtime when `NEXT_PUBLIC_BACKEND_URL` is set in docker-compose.
 
@@ -732,8 +729,8 @@ The installer writes `~/.kortix/docker-compose.yml` with:
 - `packages/db/src/schema/kortix.ts` — Kortix schema table definitions (single source of truth)
 - `packages/db/src/schema/public.ts` — Public schema billing/auth table definitions
 - `packages/db/drizzle.config.ts` — Drizzle Kit config (schema paths, filters)
-- `services/kortix-api/src/ensure-schema.ts` — Startup schema push (`drizzle-kit push --force`)
-- `services/kortix-api/src/platform/local-identity.ts` — Bootstrap local sandbox DB record
+- `kortix-api/src/ensure-schema.ts` — Startup schema push (`drizzle-kit push --force`)
+- `kortix-api/src/platform/local-identity.ts` — Bootstrap local sandbox DB record
 
 ### PostgreSQL
 - `services/postgres/Dockerfile` — Custom PG16 image with pg_cron 1.6 + pg_net 0.20.2 (no init SQL — schema managed by API)
@@ -753,16 +750,16 @@ The installer writes `~/.kortix/docker-compose.yml` with:
 - `apps/frontend/next.config.ts` — `outputFileTracingRoot`, `output: standalone`
 
 ### Backend — Provider & Setup API
-- `services/kortix-api/src/providers/registry.ts` — Shared provider registry (single source of truth)
-- `services/kortix-api/src/providers/routes.ts` — Unified provider API (`/v1/providers/*`)
-- `services/kortix-api/src/setup/index.ts` — Legacy setup routes (backward compat, onboarding)
-- `services/kortix-api/src/integrations/routes.ts` — OAuth integration routes (`/v1/integrations/*`)
+- `kortix-api/src/providers/registry.ts` — Shared provider registry (single source of truth)
+- `kortix-api/src/providers/routes.ts` — Unified provider API (`/v1/providers/*`)
+- `kortix-api/src/setup/index.ts` — Legacy setup routes (backward compat, onboarding)
+- `kortix-api/src/integrations/routes.ts` — OAuth integration routes (`/v1/integrations/*`)
 
 ### Sandbox
-- `sandbox/kortix-master/src/routes/env.ts` — Env routes (GET, POST, DELETE)
-- `sandbox/kortix-master/src/services/secret-store.ts` — Encrypted storage
-- `sandbox/config/97-secrets-to-s6-env.sh` — Init script (permissions + sync)
-- `sandbox/kortix-master/src/scripts/sync-s6-env.ts` — Sync secrets to s6 env
+- `packages/sandbox/kortix-master/src/routes/env.ts` — Env routes (GET, POST, DELETE)
+- `packages/sandbox/kortix-master/src/services/secret-store.ts` — Encrypted storage
+- `packages/sandbox/config/97-secrets-to-s6-env.sh` — Init script (permissions + sync)
+- `packages/sandbox/kortix-master/src/scripts/sync-s6-env.ts` — Sync secrets to s6 env
 
 ### E2E Testing
 - `test/e2e.md` — Full 46-step install-to-verify test plan

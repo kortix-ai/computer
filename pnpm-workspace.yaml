@@ -1,8 +1,7 @@
 packages:
   - 'apps/*'
   - 'packages/*'
-  - 'services/*'
-  - 'sandbox/*'
+  - 'kortix-api'
   - 'infra/*'
 
 catalog:

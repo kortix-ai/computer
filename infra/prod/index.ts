@@ -21,12 +21,15 @@ const config = new pulumi.Config("kortix-eks");
 const acmCertificateArn = config.require("acmCertificateArn");
 const imageTag = config.get("imageTag") || "latest";
 
+const ghcrImage = "ghcr.io/kortix-ai/computer";
+
 const { vpc, albSg } = createVpc();
 
 const { cluster } = createEksCluster({
   vpcId: vpc.vpcId,
   publicSubnetIds: vpc.publicSubnetIds,
   privateSubnetIds: vpc.privateSubnetIds,
+  albSgId: albSg.id,
 });
 
 const k8sProvider = new k8s.Provider("k8s-provider", {
@@ -34,7 +37,7 @@ const k8sProvider = new k8s.Provider("k8s-provider", {
 });
 
 const { repo } = createEcrRepository();
-const imageUri = pulumi.interpolate`${repo.repositoryUrl}:${imageTag}`;
+const imageUri = pulumi.interpolate`${ghcrImage}:${imageTag}`;
 
 const { podRole, albControllerRole, esoRole } = createIamRoles({ cluster });
 
@@ -61,12 +64,15 @@ const { externalSecret } = createExternalSecret({
   ns,
 });
 
+const ghcrToken = config.getSecret("ghcrToken");
+
 const { deployment } = createDeployment({
   k8sProvider,
   ns,
   externalSecret,
   imageUri,
   podRoleArn: podRole.arn,
+  ...(ghcrToken ? { ghcrToken } : {}),
 });
 
 const { service } = createService({ k8sProvider, ns });

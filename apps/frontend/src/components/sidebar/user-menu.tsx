@@ -7,6 +7,7 @@ import {
   ChevronsUpDown,
   Heart,
   ChevronRight,
+  Moon,
 } from 'lucide-react';
 import { useAccountState } from '@/hooks/billing';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -41,12 +42,14 @@ import { ReferralDialog } from '@/components/referrals/referral-dialog';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { trackCtaUpgrade } from '@/lib/analytics/gtm';
 import { ServerSelector } from '@/components/sidebar/server-selector';
+import { useSleep } from '@/components/dashboard/sleep-overlay';
 import {
   getItemsByGroup,
   themeOptions,
   type MenuItemDef,
   type SettingsTabId,
 } from '@/lib/menu-registry';
+import { PlanUpgradeCard } from './plan-upgrade-card';
 
 // ============================================================================
 // Types
@@ -80,6 +83,7 @@ export function UserMenu({ user }: UserMenuProps) {
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab>('general');
   const { isOpen: isReferralDialogOpen, openDialog: openReferralDialog, closeDialog: closeReferralDialog } = useReferralDialog();
   const { theme, setTheme } = useTheme();
+  const { sleep } = useSleep();
 
 
   const isFreeTier = billingActive && (
@@ -161,7 +165,7 @@ export function UserMenu({ user }: UserMenuProps) {
   return (
     <>
       <SidebarMenu>
-        <SidebarMenuItem className="relative">
+        <SidebarMenuItem className="relative group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
           {billingActive && (
             <div className="absolute bottom-full left-0 right-0 mb-2 px-0 group-data-[collapsible=icon]:hidden z-50 flex flex-col gap-2">
               <SpotlightCard className="bg-zinc-200/60 dark:bg-zinc-800/60 backdrop-blur-md">
@@ -179,14 +183,7 @@ export function UserMenu({ user }: UserMenuProps) {
                 </button>
               </SpotlightCard>
               {isFreeTier && (
-                <Button
-                  onClick={() => { trackCtaUpgrade(); setShowPlanModal(true); }}
-                  variant="default"
-                  size="lg"
-                  className="w-full"
-                >
-                  {t('upgrade')}
-                </Button>
+                <PlanUpgradeCard />
               )}
             </div>
           )}
@@ -260,6 +257,10 @@ export function UserMenu({ user }: UserMenuProps) {
                 </div>
               </div>
               <DropdownMenuSeparator className="my-1" />
+              <DropdownMenuItem onClick={sleep} className="gap-2 p-2 cursor-pointer">
+                <Moon className="h-4 w-4" />
+                <span>Sleep</span>
+              </DropdownMenuItem>
               {viewItems.map(renderRegistryItem)}
             </DropdownMenuContent>
           </DropdownMenu>

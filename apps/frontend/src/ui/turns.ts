@@ -769,7 +769,7 @@ export function getQuestionForTool(
  * The billing system deducts cost × COST_MARKUP from the user's credits.
  * We apply the same multiplier here so the UI matches what's actually billed.
  *
- * Must stay in sync with KORTIX_MARKUP in services/kortix-api/src/config.ts.
+ * Must stay in sync with KORTIX_MARKUP in kortix-api/src/config.ts.
  */
 export const COST_MARKUP = 1.2;
 

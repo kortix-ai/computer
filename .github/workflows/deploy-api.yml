@@ -4,8 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'services/kortix-api/**'
-      - 'services/Dockerfile'
+      - 'kortix-api/**'
+      - 'kortix-api/Dockerfile'
+      - 'scripts/compose/**'
       - 'packages/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -34,9 +35,9 @@ jobs:
             git submodule update --init --recursive
 
             # Stop and remove old containers first to avoid name conflicts
-            docker compose --profile backend down --remove-orphans || true
-            docker compose --profile backend build --no-cache
-            docker compose --profile backend up -d
+            docker compose -f scripts/compose/docker-compose.yml --profile backend down --remove-orphans || true
+            docker compose -f scripts/compose/docker-compose.yml --profile backend build --no-cache
+            docker compose -f scripts/compose/docker-compose.yml --profile backend up -d
 
             for i in $(seq 1 15); do
               if curl -sf http://localhost:8008/v1/health > /dev/null 2>&1; then
@@ -48,4 +49,4 @@ jobs:
             done
 
             docker image prune -af --filter "until=24h" || true
-            docker compose --profile backend ps
+            docker compose -f scripts/compose/docker-compose.yml --profile backend ps

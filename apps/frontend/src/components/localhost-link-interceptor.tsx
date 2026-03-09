@@ -21,6 +21,9 @@ import {
   parseLocalhostUrl,
   proxyUrlToInternal,
   isPreviewUrl,
+  isWebProxyUrl,
+  parseWebProxyUrl,
+  buildWebProxyUrl,
   rewriteLocalhostUrl,
   toInternalUrl,
 } from '@/lib/utils/sandbox-url';
@@ -97,6 +100,29 @@ export function LocalhostLinkInterceptor() {
               type: 'preview',
               href: `/p/${port}`,
               metadata: enrichPreviewMetadata({ url: proxyUrl, port, originalUrl: internalUrl, path }),
+            });
+            return;
+          }
+        }
+      }
+
+      // ── Case 3: Web proxy URL (external site proxied through /web-proxy/) ──
+      // The href goes through /web-proxy/{scheme}/{host}/{path} — would navigate
+      // the browser to the backend proxy endpoint. Open in preview tab instead.
+      if (isWebProxyUrl(href)) {
+        const originalUrl = parseWebProxyUrl(href);
+        if (originalUrl) {
+          const proxyUrl = buildWebProxyUrl(originalUrl, serverUrl);
+          if (proxyUrl) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            openTabAndNavigate({
+              id: 'preview:web-proxy',
+              title: new URL(originalUrl).hostname,
+              type: 'preview',
+              href: '/web-proxy',
+              metadata: enrichPreviewMetadata({ url: proxyUrl, originalUrl }),
             });
             return;
           }

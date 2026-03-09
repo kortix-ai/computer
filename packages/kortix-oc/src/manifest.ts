@@ -1,0 +1,29 @@
+export const RUNTIME_EXPECTED_FILES = [
+  "opencode.jsonc",
+  "ocx.jsonc",
+  "package.json",
+  "tsconfig.json",
+  "agents/kortix.md",
+  "plugin/kortix-oc.ts",
+  "commands/onboarding.md",
+  "commands/work-loop.md",
+  "commands/ulw-loop.md",
+  "commands/stop-continuation.md",
+  "tools/show.ts",
+  "plugin/worktree.ts",
+  "plugin/morph.ts",
+  "plugin/agent-tunnel/index.ts",
+  "plugin/kortix-sys/src/index.ts",
+  "plugin/kortix-sys/skills/session-search/SKILL.md",
+  "skills/opencode/SKILL.md",
+  "patches/apply.sh",
+] as const
+
+export const RUNTIME_EXCLUDE_NAMES = new Set([
+  ".DS_Store",
+  ".git",
+  "node_modules",
+  "bun.lock",
+  "ocx.lock",
+  "oh-my-opencode.json.bak.2026-03-08T12-32-36-054Z",
+])

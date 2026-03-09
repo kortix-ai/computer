@@ -8,7 +8,7 @@ How running sandboxes are remotely updated without rebuilding the Docker image.
 
 ## Changelog
 
-Every release includes a structured changelog at `sandbox/CHANGELOG.json`. It is:
+Every release includes a structured changelog at `packages/sandbox/CHANGELOG.json`. It is:
 
 - Bundled in the `@kortix/sandbox` npm package
 - Deployed to `/opt/kortix/CHANGELOG.json` by `postinstall.sh`
@@ -16,7 +16,7 @@ Every release includes a structured changelog at `sandbox/CHANGELOG.json`. It is
 - Served by the platform API at `GET /v1/platform/sandbox/version` (latest version's entry)
 - Shown in the frontend update UI ("What's new in vX.Y.Z")
 
-To add a changelog entry, edit `sandbox/CHANGELOG.json` before running the release script. The release script validates that an entry exists for the target version.
+To add a changelog entry, edit `packages/sandbox/CHANGELOG.json` before running the release script. The release script validates that an entry exists for the target version.
 
 ---
 
@@ -24,13 +24,13 @@ To add a changelog entry, edit `sandbox/CHANGELOG.json` before running the relea
 
 Every running Kortix sandbox can be updated remotely via a single npm package: `@kortix/sandbox`. This package bundles all Kortix-specific code (agents, skills, tools, configs) and declares all dependency versions. When published to npm, running sandboxes detect the new version and can self-update.
 
-**Single source of truth:** `sandbox/package.json` declares ALL versioned dependencies. Both the Dockerfile (initial build) and `postinstall.sh` (live updates) read from it. No versions are hardcoded anywhere else.
+**Single source of truth:** `packages/sandbox/package.json` declares ALL versioned dependencies. Both the Dockerfile (initial build) and `postinstall.sh` (live updates) read from it. No versions are hardcoded anywhere else.
 
 ---
 
 ## What `@kortix/sandbox` Controls
 
-### Versions declared in `sandbox/package.json`
+### Versions declared in `packages/sandbox/package.json`
 
 ```json
 {
@@ -59,26 +59,27 @@ Every running Kortix sandbox can be updated remotely via a single npm package: `
 
 | Directory/File | What it is | Deployed to |
 |---|---|---|
-| `opencode/agents/` | Agent definitions | `/opt/opencode/agents/` |
-| `opencode/skills/` | Skill definitions | `/opt/opencode/skills/` |
-| `opencode/tools/` | Custom tools | `/opt/opencode/tools/` |
-| `opencode/commands/` | Slash commands | `/opt/opencode/commands/` |
-| `opencode/plugin/` | Memory plugin, etc. | `/opt/opencode/plugin/` |
-| `opencode/patches/` | Patches applied via postinstall | `/opt/opencode/patches/` |
-| `opencode/opencode.jsonc` | OpenCode config | `/opt/opencode/opencode.jsonc` |
-| `opencode/package.json` | OpenCode deps (SDK, plugin, etc.) | `/opt/opencode/package.json` |
-| `kortix-master/` | Proxy server + update handler | `/opt/kortix-master/` |
+| `packages/kortix-oc/runtime/agents/` | Agent definitions | `/opt/opencode/agents/` |
+| `packages/kortix-oc/runtime/skills/` | Skill definitions | `/opt/opencode/skills/` |
+| `packages/kortix-oc/runtime/tools/` | Custom tools | `/opt/opencode/tools/` |
+| `packages/kortix-oc/runtime/commands/` | Slash command source markdown | Inlined into `/opt/opencode/opencode.jsonc` during materialization |
+| `packages/kortix-oc/runtime/plugin/` | Wrapper plugin + source modules | Kept in `/opt/kortix-oc/runtime/plugin/`, referenced from `/opt/opencode/opencode.jsonc` |
+| `packages/kortix-oc/runtime/patches/` | Patch scripts | Kept in `/opt/kortix-oc/runtime/patches/`, applied to `/opt/opencode` during install |
+| `packages/kortix-oc/runtime/opencode.jsonc` | OpenCode config | `/opt/opencode/opencode.jsonc` |
+| `packages/kortix-oc/runtime/package.json` | OpenCode runtime deps | `/opt/opencode/package.json` |
+| `packages/kortix-oc/` | Full source-of-truth package | `/opt/kortix-oc/` |
+| `packages/sandbox/kortix-master/` | Proxy server + update handler | `/opt/kortix-master/` |
 | `browser-viewer/` | Agent browser viewer (static HTML) | `/opt/agent-browser-viewer/` |
-| `config/` | Container init scripts | `/custom-cont-init.d/` |
-| `services/` | Service run scripts (executed by core supervisor) | `/etc/s6-overlay/s6-rc.d/` |
-| `core/manifest.json` | Core artifact contract | `/opt/kortix/core/manifest.json` |
-| `core/service-spec.json` | Declarative service graph for supervisor | `/opt/kortix/core/service-spec.json` |
-| `postinstall.sh` | Deployment script | Runs on `npm install` |
-| `patch-agent-browser.js` | Agent browser patches | Applied during postinstall |
+| `packages/sandbox/config/` | Container init scripts | `/custom-cont-init.d/` |
+| `packages/sandbox/s6-services/` | Service run scripts (executed by core supervisor) | `/etc/s6-overlay/s6-rc.d/` |
+| `packages/sandbox/core/manifest.json` | Core artifact contract | `/opt/kortix/core/manifest.json` |
+| `packages/sandbox/core/service-spec.json` | Declarative service graph for supervisor | `/opt/kortix/core/service-spec.json` |
+| `packages/sandbox/postinstall.sh` | Deployment script | Runs on `npm install` |
+| `packages/sandbox/patch-agent-browser.js` | Agent browser patches | Applied during postinstall |
 
 ### Secondary deps (resolved by `bun install` during postinstall)
 
-These live in `sandbox/opencode/package.json` and auto-resolve within their `^` ranges on every update:
+These live in `packages/kortix-oc/runtime/package.json` and auto-resolve within their `^` ranges on every update:
 
 | Package | Range | Purpose |
 |---|---|---|
@@ -120,17 +121,18 @@ Sandbox (kortix-master/src/routes/update.ts)
 
 postinstall.sh (runs inside sandbox)
   1. rsync kortix-master/ → /opt/kortix-master/     (+ bun install)
-  2. rsync opencode/      → /opt/opencode/           (+ bun install, resolves SDK/plugin/etc.)
-  3. rsync services/      → /etc/s6-overlay/s6-rc.d/ (service run scripts)
-  4. cp config/           → /custom-cont-init.d/      (init scripts)
-  5. npm install -g opencode-ai@{version}              (CLI binary + musl symlink)
-  6. npm install -g agent-browser@{version}            (browser automation)
-  7. node patch-agent-browser.js                       (browser patches)
-  8. rsync browser-viewer/ → /opt/agent-browser-viewer/
-  9. Write /opt/kortix/.version                         (version stamp)
-  10. pip3 install {pythonDependencies}                  (LSS, pypdf2, pptx, etc.)
-  11. pip3 install playwright (musl cross-install)
-  12. chown -R 1000:1000 /opt/...                       (fix permissions)
+  2. rsync packages/kortix-oc/ → /opt/kortix-oc/    (full source package)
+  3. materialize /opt/kortix-oc/runtime → /opt/opencode
+  4. rsync s6-services/   → /etc/s6-overlay/s6-rc.d/ (service run scripts)
+  5. cp config/           → /custom-cont-init.d/      (init scripts)
+  6. npm install -g opencode-ai@{version}              (CLI binary + musl symlink)
+  7. npm install -g agent-browser@{version}            (browser automation)
+  8. node patch-agent-browser.js                       (browser patches)
+  9. rsync browser-viewer/ → /opt/agent-browser-viewer/
+  10. Write /opt/kortix/.version                         (version stamp)
+  11. pip3 install {pythonDependencies}                  (LSS, pypdf2, pptx, etc.)
+  12. pip3 install playwright (musl cross-install)
+  13. chown -R 1000:1000 /opt/...                       (fix permissions)
 
 kortix-master (after postinstall completes)
   → Reconciles core services from /opt/kortix/core/service-spec.json
@@ -140,7 +142,7 @@ kortix-master (after postinstall completes)
 
 ### Result
 
-The sandbox now runs the exact same software as a freshly built Docker image with that version — agents, skills, tools, configs, CLI binary, SDK, browser, pip packages — all updated.
+The sandbox now runs the exact same software as a freshly built Docker image with that version — agents, skills, tools, inline commands, configs, CLI binary, SDK, browser, pip packages — all updated.
 
 ---
 
@@ -148,9 +150,9 @@ The sandbox now runs the exact same software as a freshly built Docker image wit
 
 ### 1. Make changes
 
-Edit files under `sandbox/` — agents, skills, tools, configs, kortix-master, etc.
+Edit sandbox wrapper/runtime-image files under `packages/sandbox/` and `packages/sandbox/docker/`, but edit OpenCode runtime files under `packages/kortix-oc/runtime/`.
 
-### 2. Update versions in `sandbox/package.json` (if dependencies changed)
+### 2. Update versions in `packages/sandbox/package.json` (if dependencies changed)
 
 ```json
 {
@@ -178,7 +180,7 @@ Edit files under `sandbox/` — agents, skills, tools, configs, kortix-master, e
 ### 4. Publish to npm
 
 ```bash
-cd computer/sandbox
+cd computer/packages/sandbox
 npm publish
 ```
 
@@ -209,7 +211,7 @@ Everything else flows through `@kortix/sandbox` and is live-updatable.
 ## Architecture Diagram
 
 ```
-sandbox/package.json  ←── SINGLE SOURCE OF TRUTH
+packages/sandbox/package.json  ←── SINGLE SOURCE OF TRUTH
 │
 ├── version: "0.4.16"
 │
@@ -227,10 +229,10 @@ sandbox/package.json  ←── SINGLE SOURCE OF TRUTH
 │       └── firecrawl, tavily, replicate...
 │
 │
-│   Dockerfile reads from ──► sandbox/package.json
+│   Dockerfile reads from ──► packages/sandbox/package.json
 │   (initial Docker build)     pip versions, CLI version, agent-browser version
 │
-│   postinstall.sh reads from ► sandbox/package.json
+│   postinstall.sh reads from ► packages/sandbox/package.json
 │   (live updates)               CLI, agent-browser, pip versions
 │
 │
@@ -252,11 +254,11 @@ sandbox/package.json  ←── SINGLE SOURCE OF TRUTH
 
 | File | Purpose |
 |---|---|
-| `sandbox/package.json` | Single source of truth — all versions, bundled file list |
-| `sandbox/postinstall.sh` | Deployment script — runs on npm install, deploys everything |
-| `sandbox/Dockerfile` | Docker image build — reads versions from package.json |
-| `sandbox/kortix-master/src/routes/update.ts` | HTTP endpoint for triggering updates |
-| `services/kortix-api/src/platform/routes/version.ts` | Platform API — checks npm for latest version |
+| `packages/sandbox/package.json` | Single source of truth — all versions, bundled file list |
+| `packages/sandbox/postinstall.sh` | Deployment script — runs on npm install, deploys everything |
+| `packages/sandbox/docker/Dockerfile` | Docker image build — reads versions from package.json |
+| `packages/sandbox/kortix-master/src/routes/update.ts` | HTTP endpoint for triggering updates |
+| `kortix-api/src/platform/routes/version.ts` | Platform API — checks npm for latest version |
 | `apps/frontend/src/hooks/platform/use-sandbox-update.ts` | Frontend hook — version comparison + update trigger |
 
 ---

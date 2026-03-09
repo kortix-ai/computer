@@ -986,9 +986,6 @@ ${supabase_db_env}
       - DOCKER_HOST=unix:///var/run/docker.sock
       - KORTIX_URL=http://kortix-api:8008/v1/router
       - SANDBOX_NETWORK=kortix_default
-      - CRON_API_URL=http://kortix-api:8008
-      - CRON_TICK_SECRET=\${CRON_TICK_SECRET}
-      - SCHEDULER_ENABLED=true
       - INTERNAL_SERVICE_KEY=\${INTERNAL_SERVICE_KEY}
       - FRONTEND_URL=\${PUBLIC_URL}
       - CHANNELS_PUBLIC_URL=\${API_PUBLIC_URL}
@@ -1043,7 +1040,6 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
 # ─── Security ────────────────────────────────────────────────────────────────
 INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
-CRON_TICK_SECRET=${CRON_SECRET}
 CHANNELS_CREDENTIAL_KEY=${CHANNELS_CREDENTIAL_KEY}
 API_KEY_SECRET=${API_KEY_SECRET}
 

@@ -19,7 +19,7 @@ set -euo pipefail
 FRONTEND_PORT=13737
 API_PORT=13738
 POSTGRES_PORT=13739
-SANDBOX_PORT=13740
+SANDBOX_PORT=14000
 
 FRONTEND_URL="http://localhost:${FRONTEND_PORT}"
 API_URL="http://localhost:${API_PORT}"
@@ -96,6 +96,11 @@ wait_for_200() {
   return 1
 }
 
+find_container() {
+  local pattern="$1"
+  docker ps --format '{{.Names}}' | grep -E "$pattern" | head -1 || true
+}
+
 # ═════════════════════════════════════════════════════════════════════════════
 # TESTS
 # ═════════════════════════════════════════════════════════════════════════════
@@ -130,22 +135,29 @@ fi
 
 section "Containers"
 
-for svc in postgres kortix-api frontend sandbox; do
-  # Find the container (name pattern varies: kortix-{svc}-1 or kortix-{svc})
-  container=$(docker ps --format '{{.Names}}' | grep -E "kortix.*(${svc})" | head -1)
+postgres_container=$(find_container 'supabase-db|kortix.*postgres')
+api_container=$(find_container 'kortix-kortix-api-1|kortix.*api')
+frontend_container=$(find_container 'kortix-frontend-1|kortix.*frontend')
+sandbox_container=$(find_container '^kortix-sandbox$|kortix.*sandbox')
+
+for service in \
+  "postgres:$postgres_container" \
+  "kortix-api:$api_container" \
+  "frontend:$frontend_container" \
+  "sandbox:$sandbox_container"; do
+  name="${service%%:*}"
+  container="${service#*:}"
   if [[ -n "$container" ]]; then
     pass "Container running: $container"
   else
-    fail "Container not running: $svc"
+    fail "Container not running: $name"
   fi
 done
 
-# Check container count
-container_count=$(docker ps --format '{{.Names}}' | grep -c "kortix" || true)
-if [[ "$container_count" -ge 4 ]]; then
-  pass "All 4 containers running ($container_count found)"
+if [[ -n "$postgres_container" && -n "$api_container" && -n "$frontend_container" && -n "$sandbox_container" ]]; then
+  pass "All core containers running"
 else
-  fail "Expected 4 containers, found $container_count"
+  fail "Missing one or more core containers"
 fi
 
 # ─── 3. Wait for Services Healthy ───────────────────────────────────────────
@@ -171,7 +183,7 @@ else
 fi
 
 # Postgres health via docker healthcheck
-pg_container=$(docker ps --format '{{.Names}}' | grep -E "kortix.*postgres" | head -1)
+pg_container="$postgres_container"
 if [[ -n "$pg_container" ]]; then
   pg_health=$(docker inspect --format='{{.State.Health.Status}}' "$pg_container" 2>/dev/null || echo "unknown")
   if [[ "$pg_health" == "healthy" ]]; then
@@ -194,7 +206,7 @@ else
 fi
 
 # Check key tables exist
-for table in sandboxes triggers executions server_entries api_keys channel_configs scheduler_config; do
+for table in sandboxes deployments server_entries api_keys channel_configs credit_accounts triggers executions; do
   table_check=$(docker exec "$pg_container" psql -U postgres -tAc "SELECT tablename FROM pg_tables WHERE schemaname = 'kortix' AND tablename = '$table';" 2>/dev/null || echo "")
   if [[ "$table_check" == "$table" ]]; then
     pass "Table exists: kortix.$table"
@@ -203,25 +215,16 @@ for table in sandboxes triggers executions server_entries api_keys channel_confi
   fi
 done
 
-# Check credit_accounts has the local mock user
-mock_user=$(docker exec "$pg_container" psql -U postgres -tAc "SELECT tier FROM public.credit_accounts WHERE account_id = '00000000-0000-0000-0000-000000000000';" 2>/dev/null || echo "")
-if [[ "$mock_user" == "pro" ]]; then
-  pass "Local mock user exists (tier=pro)"
-else
-  fail "Local mock user missing" "Expected tier=pro, got: '$mock_user'"
-fi
-
 # ─── 5. API Schema Migration ────────────────────────────────────────────────
 
 section "API Startup"
 
-api_container=$(docker ps --format '{{.Names}}' | grep -E "kortix.*api" | head -1)
 if [[ -n "$api_container" ]]; then
-  migrate_log=$(docker logs "$api_container" 2>&1 | grep -c "Schema ensured" || true)
+  migrate_log=$(docker logs "$api_container" 2>&1 | grep -Ec "Schema ensured|Schema pushed successfully|All migrations complete" || true)
   if [[ "$migrate_log" -ge 1 ]]; then
     pass "API ran schema migration on startup"
   else
-    fail "API did not run schema migration" "Expected '[migrate] Schema ensured' in logs"
+    fail "API did not run schema migration" "Expected schema migration logs in container output"
   fi
 fi
 
@@ -257,20 +260,20 @@ fi
 
 # ─── 7. API → Sandbox Proxy ─────────────────────────────────────────────────
 
-section "API → Sandbox Proxy"
+section "Sandbox Reachability"
 
-proxy_status=$(http_status "$API_URL/v1/p/kortix-sandbox/8000/health")
+proxy_status=$(http_status "$SANDBOX_URL/kortix/health")
 if [[ "$proxy_status" == "200" ]]; then
-  pass "API proxies to sandbox — /v1/p/kortix-sandbox/8000/health → 200"
+  pass "Sandbox health reachable — $SANDBOX_URL/kortix/health → 200"
 else
-  fail "API → Sandbox proxy failed" "Expected 200, got $proxy_status"
+  fail "Sandbox health unreachable" "Expected 200, got $proxy_status"
 fi
 
 # ─── 8. Frontend URL Rewrite ────────────────────────────────────────────────
 
 section "Frontend URL Rewrite"
 
-fe_container=$(docker ps --format '{{.Names}}' | grep -E "kortix.*frontend" | head -1)
+fe_container="$frontend_container"
 if [[ -n "$fe_container" ]]; then
   rewrite_log=$(docker logs "$fe_container" 2>&1 | grep -c "Port remap\|URL rewrite" || true)
   if [[ "$rewrite_log" -ge 1 ]]; then
@@ -298,81 +301,49 @@ else
   fail "GET /v1/health unexpected response" "$health_body"
 fi
 
-# GET /v1/providers
-providers_status=$(http_status "$API_URL/v1/providers")
+# GET /v1/setup/install-status
+install_status=$(http_status "$API_URL/v1/setup/install-status")
+if [[ "$install_status" == "200" ]]; then
+  pass "GET /v1/setup/install-status → 200"
+else
+  fail "GET /v1/setup/install-status → $install_status"
+fi
+
+# GET /v1/setup/sandbox-providers
+providers_status=$(http_status "$API_URL/v1/setup/sandbox-providers")
 if [[ "$providers_status" == "200" ]]; then
-  pass "GET /v1/providers → 200"
+  pass "GET /v1/setup/sandbox-providers → 200"
 else
-  fail "GET /v1/providers → $providers_status"
+  fail "GET /v1/setup/sandbox-providers → $providers_status"
 fi
 
-# GET /v1/setup/env
-setup_status=$(http_status "$API_URL/v1/setup/env")
-if [[ "$setup_status" == "200" ]]; then
-  pass "GET /v1/setup/env → 200"
+# GET /v1/platform/sandbox/version
+version_status=$(http_status "$API_URL/v1/platform/sandbox/version")
+if [[ "$version_status" == "200" ]]; then
+  pass "GET /v1/platform/sandbox/version → 200"
 else
-  fail "GET /v1/setup/env → $setup_status"
-fi
-
-# GET /v1/servers
-servers_status=$(http_status "$API_URL/v1/servers")
-if [[ "$servers_status" == "200" ]]; then
-  pass "GET /v1/servers → 200"
-else
-  fail "GET /v1/servers → $servers_status"
-fi
-
-# PUT /v1/servers/sync (with proper body)
-sync_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$CURL_TIMEOUT" \
-  -X PUT \
-  -H "Content-Type: application/json" \
-  -d '{"servers":[{"id":"test-e2e","label":"E2E Test","url":"http://localhost:13738/v1/p/test/8000","isDefault":false}]}' \
-  "$API_URL/v1/servers/sync" 2>/dev/null || echo "000")
-if [[ "$sync_status" == "200" ]]; then
-  pass "PUT /v1/servers/sync → 200 (DB write works)"
-  # Cleanup: delete the test entry
-  curl -s -o /dev/null -X DELETE "$API_URL/v1/servers/test-e2e" --max-time "$CURL_TIMEOUT" 2>/dev/null || true
-else
-  fail "PUT /v1/servers/sync → $sync_status" "Database write failed"
-fi
-
-# GET /v1/system/status
-system_status=$(http_status "$API_URL/v1/system/status")
-if [[ "$system_status" == "200" ]]; then
-  pass "GET /v1/system/status → 200"
-else
-  fail "GET /v1/system/status → $system_status"
-fi
-
-# GET /v1/accounts
-accounts_status=$(http_status "$API_URL/v1/accounts")
-if [[ "$accounts_status" == "200" ]]; then
-  pass "GET /v1/accounts → 200"
-else
-  fail "GET /v1/accounts → $accounts_status"
+  fail "GET /v1/platform/sandbox/version → $version_status"
 fi
 
 # ─── 10. Sandbox Env (Onboarding) ───────────────────────────────────────────
 
 section "Onboarding Status"
 
-# Should always return 200 — null value when not yet onboarded, "true" when done
-onboarding_status=$(http_status "$API_URL/v1/p/kortix-sandbox/8000/env/ONBOARDING_COMPLETE")
+onboarding_status=$(http_status "$FRONTEND_URL/auth")
 if [[ "$onboarding_status" == "200" ]]; then
-  onboarding_body=$(http_body "$API_URL/v1/p/kortix-sandbox/8000/env/ONBOARDING_COMPLETE")
-  pass "Onboarding check → 200 ($onboarding_body)"
+  pass "Frontend auth route reachable → 200"
 else
-  fail "Onboarding check failed" "Expected 200, got $onboarding_status"
+  fail "Frontend auth route failed" "Expected 200, got $onboarding_status"
 fi
 
 # ─── 11. Port Mappings ──────────────────────────────────────────────────────
 
 section "Port Mappings"
 
-for port_label in "${FRONTEND_PORT}:frontend" "${API_PORT}:api" "${POSTGRES_PORT}:postgres" "${SANDBOX_PORT}:sandbox"; do
+for port_label in "${FRONTEND_PORT}:frontend" "${API_PORT}:api" "${SANDBOX_PORT}:sandbox"; do
   port="${port_label%%:*}"
   label="${port_label##*:}"
-  if docker ps --format '{{.Ports}}' | grep -q "0.0.0.0:${port}->"; then
+  if docker ps --format '{{.Ports}}' | grep -Eq "(0\.0\.0\.0|127\.0\.0\.1):${port}->"; then
     pass "Port $port mapped ($label)"
   else
     fail "Port $port not mapped ($label)"

@@ -26,7 +26,7 @@ Both are available to the running OpenCode instance — LLM keys from `auth.json
 
 **Encryption:** `scryptSync(KORTIX_TOKEN, salt, 32)` derives the key. Each value encrypted with random 16-byte IV. Format: `{iv}:{authTag}:{ciphertext}`.
 
-**Code:** `sandbox/kortix-master/src/services/secret-store.ts`
+**Code:** `packages/sandbox/kortix-master/src/services/secret-store.ts`
 
 ```
 SecretStore.get(key)         → decrypt one
@@ -185,15 +185,15 @@ docker exec kortix-sandbox s6-svc -r /run/service/svc-kortix-master
 
 | File | Purpose |
 |------|---------|
-| `sandbox/kortix-master/src/services/secret-store.ts` | AES-256-GCM encrypted storage |
-| `sandbox/kortix-master/src/routes/env.ts` | HTTP API for get/set/delete env vars |
-| `sandbox/kortix-master/src/scripts/sync-s6-env.ts` | Sync secrets → s6 env dir (boot time) |
-| `sandbox/kortix-master/src/index.ts` | Entry point, loads secrets into process.env |
-| `sandbox/config/97-secrets-to-s6-env.sh` | Init script: permissions + sync |
-| `sandbox/config/kortix-env-setup.sh` | Cloud-mode proxy URL routing |
-| `sandbox/s6-services/svc-kortix-master/run` | kortix-master service definition |
-| `sandbox/s6-services/svc-opencode-serve/run` | OpenCode API server (port 4096) |
-| `sandbox/s6-services/svc-opencode-web/run` | OpenCode web UI (port 3111) |
-| `services/kortix-api/src/providers/routes.ts` | Backend provider API (calls sandbox /env) |
-| `services/kortix-api/src/providers/registry.ts` | Provider definitions (single source of truth) |
+| `packages/sandbox/kortix-master/src/services/secret-store.ts` | AES-256-GCM encrypted storage |
+| `packages/sandbox/kortix-master/src/routes/env.ts` | HTTP API for get/set/delete env vars |
+| `packages/sandbox/kortix-master/src/scripts/sync-s6-env.ts` | Sync secrets → s6 env dir (boot time) |
+| `packages/sandbox/kortix-master/src/index.ts` | Entry point, loads secrets into process.env |
+| `packages/sandbox/config/97-secrets-to-s6-env.sh` | Init script: permissions + sync |
+| `packages/sandbox/config/kortix-env-setup.sh` | Cloud-mode proxy URL routing |
+| `packages/sandbox/s6-services/svc-kortix-master/run` | kortix-master service definition |
+| `packages/sandbox/s6-services/svc-opencode-serve/run` | OpenCode API server (port 4096) |
+| `packages/sandbox/s6-services/svc-opencode-web/run` | OpenCode web UI (port 3111) |
+| `kortix-api/src/providers/routes.ts` | Backend provider API (calls sandbox /env) |
+| `kortix-api/src/providers/registry.ts` | Provider definitions (single source of truth) |
 | OpenCode `auth/index.ts` (upstream) | OpenCode auth.json read/write |

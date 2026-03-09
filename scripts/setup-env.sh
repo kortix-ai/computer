@@ -14,7 +14,7 @@ ENV_FILE="${1:-.env}"
 
 if [ ! -f "$ROOT_DIR/$ENV_FILE" ]; then
   echo "ERROR: $ROOT_DIR/$ENV_FILE not found."
-  echo "  Create a root .env with your values (see services/kortix-api/.env.example)"
+  echo "  Create a root .env with your values (see kortix-api/.env.example)"
   exit 1
 fi
 
@@ -56,7 +56,7 @@ write_env() {
 echo "Generating .env files from $ENV_FILE ..."
 echo ""
 
-write_env "services/kortix-api/.env" \
+write_env "kortix-api/.env" \
   "# Core" \
   "PORT=8008" \
   "$(kv ENV_MODE local)" \
@@ -86,11 +86,6 @@ write_env "services/kortix-api/.env" \
   "$(kv PIPEDREAM_CLIENT_SECRET)" \
   "$(kv PIPEDREAM_PROJECT_ID)" \
   "$(kv PIPEDREAM_ENVIRONMENT development)" \
-  "" \
-  "# Scheduler" \
-  "$(kv SCHEDULER_ENABLED true)" \
-  "$(kv CRON_TICK_SECRET)" \
-  "# CRON_API_URL auto-derived from PORT + DOCKER_HOST" \
   "" \
   "# LLM Providers (optional — cloud routing)" \
   "$(kv OPENROUTER_API_KEY)" \

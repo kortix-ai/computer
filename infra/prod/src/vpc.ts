@@ -53,5 +53,5 @@ export function createVpc() {
     tags: { ...commonTags, Name: "kortix-alb-sg" },
   });
 
-  return { vpc, albSg };
+  return { vpc, albSg, albSgId: albSg.id };
 }

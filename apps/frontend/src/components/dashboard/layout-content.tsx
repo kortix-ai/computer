@@ -82,6 +82,12 @@ const MobileAppInterstitial = lazy(() =>
 	})),
 );
 
+const SleepOverlay = lazy(() =>
+	import("@/components/dashboard/sleep-overlay").then((mod) => ({
+		default: mod.SleepOverlay,
+	})),
+);
+
 const TechnicalIssueBanner = lazy(() =>
 	import("@/components/announcements/technical-issue-banner").then((mod) => ({
 		default: mod.TechnicalIssueBanner,
@@ -205,7 +211,6 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
 		<div
 			className={cn(
 				"bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative",
-				"md:rounded-tl-xl md:rounded-tr-xl md:border-t md:border-l md:border-r md:border-border/50",
 			)}
 		>
 			{/* Pre-mounted session tabs — always rendered, shown/hidden via CSS */}
@@ -518,6 +523,9 @@ export default function DashboardLayoutContent({
 
 	return (
 		<NovuInboxProvider>
+			<Suspense fallback={null}>
+				<SleepOverlay />
+			</Suspense>
 			<AppProviders
 				showSidebar={true}
 				defaultSidebarOpen={true}
@@ -550,11 +558,12 @@ export default function DashboardLayoutContent({
 					<Suspense fallback={null}>
 						<CommandPalette />
 					</Suspense>
-					{/* UpdateBanner removed — update indicator lives in the sidebar footer */}
 					<Suspense fallback={null}>
 						<OnboardingProvider>
 							<TabBar />
-							<SessionTabsContainer>{children}</SessionTabsContainer>
+							<div className="flex-1 min-h-0 flex flex-col md:border-l md:border-r md:border-border/50 overflow-hidden">
+								<SessionTabsContainer>{children}</SessionTabsContainer>
+							</div>
 						</OnboardingProvider>
 					</Suspense>
 					<Suspense fallback={null}>

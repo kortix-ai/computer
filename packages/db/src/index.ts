@@ -8,8 +8,6 @@ export {
   kortixSchema,
   // Enums
   sandboxStatusEnum,
-  executionStatusEnum,
-  sessionModeEnum,
   deploymentStatusEnum,
   deploymentSourceEnum,
   channelTypeEnum,
@@ -24,8 +22,6 @@ export {
   accountMembersRelations,
   // Kortix tables
   sandboxes,
-  triggers,
-  executions,
   deployments,
   channelConfigs,
   channelSessions,
@@ -39,8 +35,6 @@ export {
   integrationStatusEnum,
   // Relations
   sandboxesRelations,
-  triggersRelations,
-  executionsRelations,
   deploymentsRelations,
   channelConfigsRelations,
   channelSessionsRelations,
@@ -72,6 +66,9 @@ export {
   // WoA
   woaPostTypeEnum,
   woaPosts,
+  // Platform User Roles
+  platformRoleEnum,
+  platformUserRoles,
   // Access Control
   accessRequestStatusEnum,
   platformSettings,
@@ -102,18 +99,12 @@ export type {
   NewAccount,
   NewAccountMember,
   Sandbox,
-  Trigger,
-  Execution,
   NewSandbox,
-  NewTrigger,
-  NewExecution,
   ApiKey,
   CreditAccount,
   AccountUser,
   NewApiKey,
   SandboxSelect,
-  TriggerSelect,
-  ExecutionSelect,
   ChannelConfig,
   ChannelSession,
   ChannelMessage,

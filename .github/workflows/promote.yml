@@ -1,0 +1,51 @@
+name: Promote Branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      promotion:
+        description: "Promotion flow"
+        required: true
+        type: choice
+        options:
+          - "main → staging"
+          - "staging → production"
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    name: "${{ inputs.promotion }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set branches
+        id: branches
+        run: |
+          if [ "${{ inputs.promotion }}" = "main → staging" ]; then
+            echo "source=main" >> "$GITHUB_OUTPUT"
+            echo "target=staging" >> "$GITHUB_OUTPUT"
+          else
+            echo "source=staging" >> "$GITHUB_OUTPUT"
+            echo "target=production" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.branches.outputs.target }}
+          fetch-depth: 0
+
+      - name: Merge source into target
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin ${{ steps.branches.outputs.source }}
+          git merge origin/${{ steps.branches.outputs.source }} --no-edit
+          git push origin ${{ steps.branches.outputs.target }}
+
+      - name: Summary
+        run: |
+          echo "### Promoted \`${{ steps.branches.outputs.source }}\` → \`${{ steps.branches.outputs.target }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: \`$(git rev-parse --short HEAD)\`" >> "$GITHUB_STEP_SUMMARY"

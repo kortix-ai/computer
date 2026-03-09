@@ -489,3 +489,64 @@ export function proxyUrlToInternal(
 export function isPreviewUrl(url: string): boolean {
   return isSubdomainUrl(url);
 }
+
+// ── Web Forward Proxy Utilities ─────────────────────────────────────────────
+
+const WEB_PROXY_PATH_PREFIX = '/web-proxy/';
+
+export function buildWebProxyUrl(
+  targetUrl: string,
+  serverUrl: string,
+): string | null {
+  try {
+    const parsed = new URL(targetUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    const scheme = parsed.protocol.replace(':', '');
+    const proxyPath = `${WEB_PROXY_PATH_PREFIX}${scheme}/${parsed.host}${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const server = new URL(serverUrl);
+    return `${server.origin}${proxyPath}`;
+  } catch {
+    return null;
+  }
+}
+
+export function parseWebProxyUrl(proxyUrl: string): string | null {
+  try {
+    const url = new URL(proxyUrl);
+    const wpIdx = url.pathname.indexOf(WEB_PROXY_PATH_PREFIX);
+    if (wpIdx === -1) return null;
+    const remainder = url.pathname.slice(wpIdx + WEB_PROXY_PATH_PREFIX.length);
+    const match = remainder.match(/^(https?)\/([\w.\-]+(?::\d+)?)(\/.*)?$/);
+    if (!match) return null;
+    const scheme = match[1];
+    const host = match[2];
+    const path = match[3] || '/';
+    return `${scheme}://${host}${path}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+export function isWebProxyUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.includes(WEB_PROXY_PATH_PREFIX);
+  } catch {
+    return url.includes(WEB_PROXY_PATH_PREFIX);
+  }
+}
+
+export function isExternalUrl(rawUrl: string): boolean {
+  if (!rawUrl) return false;
+  const trimmed = rawUrl.trim();
+  if (/^https?:\/\/(?!localhost|127\.0\.0\.1)/i.test(trimmed)) return true;
+  if (/^[a-z0-9][\w.-]*\.[a-z]{2,}/i.test(trimmed)) return true;
+  return false;
+}
+
+export function normalizeExternalInput(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^[a-z0-9][\w.-]*\.[a-z]{2,}/i.test(trimmed)) return `https://${trimmed}`;
+  return null;
+}

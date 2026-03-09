@@ -1,4 +1,4 @@
-import { sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers, creditAccounts, tunnelConnections, tunnelPermissions, tunnelPermissionRequests, tunnelAuditLogs, woaPosts } from './schema/kortix';
+import { sandboxes, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers, creditAccounts, tunnelConnections, tunnelPermissions, tunnelPermissionRequests, tunnelAuditLogs, woaPosts } from './schema/kortix';
 import { apiKeys, accountUser } from './schema/public';
 
 // Select types (what you get back from queries)
@@ -7,8 +7,6 @@ export type AccountMember = typeof accountMembers.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 export type NewAccountMember = typeof accountMembers.$inferInsert;
 export type Sandbox = typeof sandboxes.$inferSelect;
-export type Trigger = typeof triggers.$inferSelect;
-export type Execution = typeof executions.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type CreditAccount = typeof creditAccounts.$inferSelect;
 /** @deprecated Use AccountMember instead — basejump.account_user is being migrated to kortix.account_members */
@@ -21,9 +19,7 @@ export type KortixApiKey = typeof kortixApiKeys.$inferSelect;
 
 // Insert types (what you pass to inserts)
 export type NewSandbox = typeof sandboxes.$inferInsert;
-export type NewTrigger = typeof triggers.$inferInsert;
 export type Deployment = typeof deployments.$inferSelect;
-export type NewExecution = typeof executions.$inferInsert;
 export type NewDeployment = typeof deployments.$inferInsert;
 export type NewApiKey = typeof apiKeys.$inferInsert;
 export type NewChannelConfig = typeof channelConfigs.$inferInsert;
@@ -54,6 +50,4 @@ export type NewWoaPost = typeof woaPosts.$inferInsert;
 
 // Aliases
 export type SandboxSelect = Sandbox;
-export type TriggerSelect = Trigger;
-export type ExecutionSelect = Execution;
 export type DeploymentSelect = Deployment;
