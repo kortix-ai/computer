@@ -39,28 +39,28 @@ export function TechStack() {
   return (
     <div className="w-full border border-border/50 rounded-2xl bg-card/30 overflow-hidden shadow-sm">
       <StackRow
-        icon={<Box className="size-5 text-muted-foreground/70" />}
+        icon={<Box className="size-5 text-primary" />}
         label="Agents"
         sublabel="The Workforce"
         details="Your agents, community agents, and 19+ pre-built skill modules. They operate tools and browser sessions."
       />
 
       <StackRow
-        icon={<Layers className="size-5 text-muted-foreground/70" />}
+        icon={<Layers className="size-5 text-primary" />}
         label="Kortix Orchestrator"
         sublabel="The Manager"
         details="Handles OAuth auth, MCP server connections, cron scheduling, and secure agent tunneling."
       />
 
       <StackRow
-        icon={<Cpu className="size-5 text-muted-foreground/70" />}
+        icon={<Cpu className="size-5 text-primary" />}
         label="OpenCode Engine"
         sublabel="The Brain"
         details="Core agent framework. Manages session context, tool execution, error recovery, and memory persistence."
       />
 
       <StackRow
-        icon={<HardDrive className="size-5 text-muted-foreground/70" />}
+        icon={<HardDrive className="size-5 text-primary" />}
         label="Linux OS"
         sublabel="The Machine"
         details="Real filesystem, bash shell, Chromium, Git, SSH, Docker. All state persisted to a single /workspace volume."

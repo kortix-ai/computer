@@ -10,7 +10,7 @@ interface IntegrationItemProps {
 
 function IntegrationItem({ name, method, status, icon }: IntegrationItemProps) {
   return (
-    <div className="group flex items-center justify-between p-4 bg-card/30 border border-border/50 rounded-2xl hover:bg-muted/20 hover:border-border/80 transition-all duration-200">
+    <div className="group flex items-center justify-between p-4 bg-card/30 border border-border/50 rounded-2xl hover:bg-card/50 hover:border-border/80 transition-all duration-200">
       <div className="flex items-center gap-3">
         <div className="flex items-center justify-center size-9 rounded-xl bg-muted/20 border border-border/50 text-muted-foreground/70 group-hover:text-foreground/80 transition-colors">
           {icon}
@@ -22,7 +22,7 @@ function IntegrationItem({ name, method, status, icon }: IntegrationItemProps) {
       </div>
       <div className="relative flex items-center justify-center">
          {status === "connected" ? (
-           <div className="flex items-center justify-center size-6 rounded-full bg-muted/30 text-muted-foreground/60">
+           <div className="flex items-center justify-center size-6 rounded-full bg-primary/30 text-primary/60">
              <Check className="size-3.5" />
            </div>
          ) : (
