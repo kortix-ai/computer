@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, ExternalLink, Loader2, Search, Globe, Image, Mic, BookOpen, Flame, Server } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -18,32 +19,38 @@ import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/clie
 
 export type SandboxProviderName = 'local_docker' | 'daytona' | 'hetzner';
 
+const DEFAULT_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+
 export function useInstallStatus() {
-  const [installed, setInstalled] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [sandboxProviders, setSandboxProviders] = useState<SandboxProviderName[]>([]);
-  const [defaultProvider, setDefaultProvider] = useState<SandboxProviderName>('local_docker');
+  const query = useQuery({
+    queryKey: ['self-hosted-install-status'],
+    queryFn: async ({ signal }) => {
+      const [statusData, providerData] = await Promise.all([
+        fetch(`${DEFAULT_BACKEND_URL}/setup/install-status`, { signal })
+          .then((res) => res.json())
+          .catch(() => ({ installed: false })),
+        fetch(`${DEFAULT_BACKEND_URL}/setup/sandbox-providers`, { signal })
+          .then((res) => res.json())
+          .catch(() => ({ providers: ['local_docker'], default: 'local_docker' })),
+      ]);
 
-  useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+      return {
+        installed: statusData.installed === true,
+        sandboxProviders: providerData.providers || ['local_docker'],
+        defaultProvider: providerData.default || 'local_docker',
+      };
+    },
+    staleTime: 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
-    // Fetch both install-status and sandbox-providers in parallel
-    Promise.all([
-      fetch(`${backendUrl}/setup/install-status`)
-        .then((res) => res.json())
-        .catch(() => ({ installed: false })),
-      fetch(`${backendUrl}/setup/sandbox-providers`)
-        .then((res) => res.json())
-        .catch(() => ({ providers: ['local_docker'], default: 'local_docker' })),
-    ]).then(([statusData, providerData]) => {
-      setInstalled(statusData.installed === true);
-      setSandboxProviders(providerData.providers || ['local_docker']);
-      setDefaultProvider(providerData.default || 'local_docker');
-      setLoading(false);
-    });
-  }, []);
-
-  return { installed, loading, sandboxProviders, defaultProvider };
+  return {
+    installed: query.data?.installed ?? null,
+    loading: query.isLoading,
+    sandboxProviders: query.data?.sandboxProviders ?? [],
+    defaultProvider: query.data?.defaultProvider ?? 'local_docker',
+  };
 }
 
 /* ─── Step Indicator ───────────────────────────────────────────────────────── */
@@ -281,6 +288,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   const router = useRouter();
 
   const hasMultipleProviders = sandboxProviders.length > 1;
+  const backendUrl = DEFAULT_BACKEND_URL;
 
   // If the parent remounts this component while the wizard is in progress,
   // keep the furthest step reached instead of snapping back to step 1.
@@ -290,58 +298,67 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
 
   // ── On step 2: if sandbox is already ready (e.g. after page refresh),
   //    skip "Preparing…" by fetching status immediately.
+  const existingLocalSandboxQuery = useQuery({
+    queryKey: ['self-hosted-local-sandbox-status', wizardStep],
+    queryFn: async ({ signal }) => {
+      let jwt = jwtRef.current;
+      if (!jwt) {
+        const supabase = createBrowserSupabaseClient();
+        const { data } = await supabase.auth.getSession();
+        jwt = data.session?.access_token ?? null;
+      }
+      if (!jwt) return null;
+
+      const res = await fetch(`${backendUrl}/platform/init/local/status`, {
+        headers: { 'Authorization': `Bearer ${jwt}` },
+        signal,
+      });
+      if (!res.ok) return null;
+
+      return {
+        jwt,
+        data: await res.json(),
+      };
+    },
+    enabled: wizardStep === 2 && !sandboxReady,
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
     if (wizardStep !== 2 || sandboxReady) return;
+    const result = existingLocalSandboxQuery.data;
+    if (!result) return;
 
-    const checkExisting = async () => {
-      try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const { jwt, data } = result;
 
-        // Get current JWT — prefer jwtRef (just signed up), fall back to Supabase session (refresh)
-        let jwt = jwtRef.current;
-        if (!jwt) {
-          const supabase = createBrowserSupabaseClient();
-          const { data } = await supabase.auth.getSession();
-          jwt = data.session?.access_token ?? null;
-        }
-        if (!jwt) return;
+    if (data.status === 'ready' && data.data) {
+      registerSandbox(data.data);
+      setSandboxReady(true);
+      setPullProgress(null);
+      setChosenProvider((prev) => prev ?? (data.data.provider as SandboxProviderName ?? 'local_docker'));
+      return;
+    }
 
-        const res = await fetch(`${backendUrl}/platform/init/local/status`, {
-          headers: { 'Authorization': `Bearer ${jwt}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
+    if (data.status === 'pulling' || data.status === 'creating') {
+      setPullProgress({
+        progress: data.progress || 0,
+        message: data.status === 'creating' ? 'Creating sandbox container…' : data.message || 'Pulling sandbox image...',
+      });
+      pollLocalStatus(jwt, backendUrl);
+      return;
+    }
 
-        if (data.status === 'ready' && data.data) {
-          registerSandbox(data.data);
-          setSandboxReady(true);
-          setPullProgress(null);
-          // Ensure chosenProvider is set so the correct sub-state renders
-          setChosenProvider((prev) => prev ?? (data.data.provider as SandboxProviderName ?? 'local_docker'));
-        } else if (data.status === 'pulling' || data.status === 'creating') {
-          // Mid-pull on page refresh — resume polling
-          setPullProgress({
-            progress: data.progress || 0,
-            message: data.status === 'creating' ? 'Creating sandbox container…' : data.message || 'Pulling sandbox image...',
-          });
-          pollLocalStatus(jwt, backendUrl);
-        } else if (data.status === 'error') {
-          // Previous provision failed — show error with retry
-          setChosenProvider((prev) => prev ?? 'local_docker');
-          setSandboxError(data.message || 'Previous sandbox setup failed');
-        } else {
-          // 'none' or unknown — re-provision
-          setChosenProvider((prev) => prev ?? 'local_docker');
-          provisionSandbox(jwt, backendUrl, 'local_docker');
-        }
-      } catch {
-        // Ignore — if status check fails, the normal provision flow handles it
-      }
-    };
+    if (data.status === 'error') {
+      setChosenProvider((prev) => prev ?? 'local_docker');
+      setSandboxError(data.message || 'Previous sandbox setup failed');
+      return;
+    }
 
-    checkExisting();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wizardStep]);
+    setChosenProvider((prev) => prev ?? 'local_docker');
+    void provisionSandbox(jwt, backendUrl, 'local_docker');
+  }, [wizardStep, sandboxReady, existingLocalSandboxQuery.data, registerSandbox, pollLocalStatus, provisionSandbox, backendUrl]);
 
   // ── Helpers (hooks must be before any early return) ──
 
@@ -655,8 +672,6 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
 
         // Provision sandbox — if only one provider, auto-provision immediately.
         // If multiple providers, defer to step 2 where user picks.
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-
         if (!hasMultipleProviders && jwt) {
           const autoProvider = sandboxProviders[0] || 'local_docker';
           setChosenProvider(autoProvider);

@@ -24,6 +24,7 @@ const MAX_EMAILS = 3;
 export function ReferralEmailInvitation({ className }: ReferralEmailProps) {
   const t = useTranslations('settings.referrals');
   const sendEmailsMutation = useSendReferralEmails();
+  const inputId = React.useId();
   
   const [inputValue, setInputValue] = React.useState('');
   const [emails, setEmails] = React.useState<EmailStatus[]>([]);
@@ -79,6 +80,13 @@ export function ReferralEmailInvitation({ className }: ReferralEmailProps) {
     pastedEmails.forEach(email => addEmail(email));
   };
 
+  const handleContainerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      inputRef.current?.focus();
+    }
+  };
+
   const sendAllEmails = async () => {
     const unsent = emails.filter(e => e.status === 'pending' || e.status === 'error');
     
@@ -127,7 +135,7 @@ export function ReferralEmailInvitation({ className }: ReferralEmailProps) {
 
   return (
     <div className={cn('space-y-2', className)}>
-      <label className="text-xs sm:text-sm font-medium text-foreground block">
+      <label htmlFor={inputId} className="text-xs sm:text-sm font-medium text-foreground block">
         {t('inviteByEmail')}
       </label>
 
@@ -139,6 +147,9 @@ export function ReferralEmailInvitation({ className }: ReferralEmailProps) {
             'flex flex-wrap gap-1.5 items-center cursor-text'
           )}
           onClick={() => inputRef.current?.focus()}
+          onKeyDown={handleContainerKeyDown}
+          role="button"
+          tabIndex={0}
         >
           {emails.map(({ email, status }) => (
             <Badge
@@ -171,6 +182,7 @@ export function ReferralEmailInvitation({ className }: ReferralEmailProps) {
           ))}
           
           <input
+            id={inputId}
             ref={inputRef}
             type="email"
             value={inputValue}

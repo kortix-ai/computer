@@ -158,6 +158,19 @@ function PricingCard({
 
       <p className="mt-2 text-sm text-muted-foreground">{tier.description}</p>
 
+      {isProTier && (
+        <div className="relative mt-3 h-44 w-[calc(100%+3rem)] -mx-6 overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/20 via-primary/5 to-transparent" />
+          <Image
+            src="/kortix-computer.png"
+            alt="Kortix Pro cloud computer"
+            fill
+            sizes="(max-width: 767px) 100vw, 50vw"
+            className="object-contain object-top scale-110 -translate-y-2"
+            priority
+          />
+        </div>
+      )}
       <ul className="mt-6 space-y-2 flex-1">
         {tier.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2 text-sm text-foreground/90">
@@ -192,7 +205,7 @@ function PricingCard({
             : isCurrent
               ? 'Current Plan'
               : tier.tierKey === 'free'
-                ? 'Choose Free'
+                ? 'Downgrade to Free'
                 : 'Upgrade to Pro'}
         </Button>
       </div>

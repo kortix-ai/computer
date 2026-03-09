@@ -28,14 +28,6 @@ class ToolViewRegistry {
     });
   }
 
-  register(toolName: string, component: ToolViewComponent): void {
-    this.registry[toolName] = component;
-  }
-
-  registerMany(components: Partial<ToolViewRegistryType>): void {
-    Object.assign(this.registry, components);
-  }
-
   get(toolName: string): ToolViewComponent {
     const candidates = new Set<string>();
     const add = (value?: string | null) => {
@@ -79,17 +71,6 @@ class ToolViewRegistry {
     return this.registry['default'];
   }
 
-  has(toolName: string): boolean {
-    return toolName in this.registry;
-  }
-
-  getToolNames(): string[] {
-    return Object.keys(this.registry).filter(key => key !== 'default');
-  }
-
-  clear(): void {
-    this.registry = { default: this.registry['default'] };
-  }
 }
 
 export const toolViewRegistry = new ToolViewRegistry();

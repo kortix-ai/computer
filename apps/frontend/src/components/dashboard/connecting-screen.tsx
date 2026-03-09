@@ -260,7 +260,7 @@ function UnreachableState({
 
 /** Returns a human-readable elapsed time string, updating every second */
 function useElapsedTime(since: number | null): string | null {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!since) return;

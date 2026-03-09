@@ -44,7 +44,6 @@ const LeftArc = ({
             className={className}
             style={{
                 overflow: 'visible',
-                willChange: 'transform',
                 transform: 'translate3d(0, 0, 0)',
                 ...style
             }}
@@ -120,7 +119,6 @@ const RightArc = ({
             className={className}
             style={{
                 overflow: 'visible',
-                willChange: 'transform',
                 transform: 'translate3d(0, 0, 0)',
                 ...style
             }}
@@ -170,6 +168,23 @@ type ArcCfg = {
     scale: number[];
     blur: string[]; // DOF: more blur when smaller
 };
+
+function getArcKey(side: 'left' | 'right', cfg: ArcCfg): string {
+    return [
+        side,
+        cfg.pos.left ?? '',
+        cfg.pos.right ?? '',
+        cfg.pos.top,
+        cfg.size,
+        cfg.tone,
+        cfg.opacity,
+        cfg.delay,
+        cfg.x.join(','),
+        cfg.y.join(','),
+        cfg.scale.join(','),
+        cfg.blur.join(','),
+    ].join('|');
+}
 
 const Arc = ({ left, cfg }: { left?: boolean; cfg: ArcCfg }) => {
     const stylePos: React.CSSProperties = {
@@ -431,12 +446,12 @@ export function AnimatedBg({ variant = 'hero', blurMultiplier = 1, sizeMultiplie
             }}
         >
             <div className="absolute inset-0">
-                {left.map((cfg, i) => (
-                    <Arc key={`L${i}`} left cfg={cfg} />
-                ))}
-                {right.map((cfg, i) => (
-                    <Arc key={`R${i}`} cfg={cfg} />
-                ))}
+                {left.map((cfg) => (
+                    <Arc key={getArcKey('left', cfg)} left cfg={cfg} />
+                 ))}
+                {right.map((cfg) => (
+                    <Arc key={getArcKey('right', cfg)} cfg={cfg} />
+                 ))}
             </div>
             {/* Bottom gradient fade overlay */}
             {variant === 'hero' && (
@@ -445,4 +460,3 @@ export function AnimatedBg({ variant = 'hero', blurMultiplier = 1, sizeMultiplie
         </div>
     );
 }
-

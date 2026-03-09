@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ interface NetworkScopeEditorProps {
 }
 
 export function NetworkScopeEditor({ scope, onChange }: NetworkScopeEditorProps) {
+  const id = useId();
   const [portInput, setPortInput] = useState('');
   const [hostInput, setHostInput] = useState('');
 
@@ -69,13 +70,13 @@ export function NetworkScopeEditor({ scope, onChange }: NetworkScopeEditorProps)
 
       {/* Ports */}
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-muted-foreground">Ports</Label>
+        <Label htmlFor={`${id}-ports`} className="text-xs font-medium text-muted-foreground">Ports</Label>
         {scope.ports.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {scope.ports.map((port) => (
               <Badge key={port} variant="secondary" className="gap-1 pr-1 font-mono text-xs">
                 {port}
-                <button onClick={() => removePort(port)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
+                <button type="button" aria-label={`Remove port ${port}`} onClick={() => removePort(port)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
@@ -84,6 +85,7 @@ export function NetworkScopeEditor({ scope, onChange }: NetworkScopeEditorProps)
         )}
         <div className="flex gap-1.5">
           <input
+            id={`${id}-ports`}
             type="number"
             min={1}
             max={65535}
@@ -93,7 +95,7 @@ export function NetworkScopeEditor({ scope, onChange }: NetworkScopeEditorProps)
             placeholder="e.g. 3000, 8080"
             className="w-[140px] rounded-lg border bg-background px-2.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
-          <Button variant="outline" size="sm" onClick={addPort} disabled={!portInput.trim()}>
+          <Button type="button" variant="outline" size="sm" onClick={addPort} disabled={!portInput.trim()} aria-label="Add port">
             <Plus className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -101,13 +103,13 @@ export function NetworkScopeEditor({ scope, onChange }: NetworkScopeEditorProps)
 
       {/* Hosts */}
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-muted-foreground">Hosts</Label>
+        <Label htmlFor={`${id}-hosts`} className="text-xs font-medium text-muted-foreground">Hosts</Label>
         {scope.hosts.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {scope.hosts.map((host) => (
               <Badge key={host} variant="secondary" className="gap-1 pr-1 font-mono text-xs">
                 {host}
-                <button onClick={() => removeHost(host)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
+                <button type="button" aria-label={`Remove host ${host}`} onClick={() => removeHost(host)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
@@ -116,6 +118,7 @@ export function NetworkScopeEditor({ scope, onChange }: NetworkScopeEditorProps)
         )}
         <div className="flex gap-1.5">
           <input
+            id={`${id}-hosts`}
             type="text"
             value={hostInput}
             onChange={(e) => setHostInput(e.target.value)}
@@ -123,7 +126,7 @@ export function NetworkScopeEditor({ scope, onChange }: NetworkScopeEditorProps)
             placeholder="e.g. localhost, 127.0.0.1"
             className="flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
-          <Button variant="outline" size="sm" onClick={addHost} disabled={!hostInput.trim()}>
+          <Button type="button" variant="outline" size="sm" onClick={addHost} disabled={!hostInput.trim()} aria-label="Add host">
             <Plus className="h-3.5 w-3.5" />
           </Button>
         </div>

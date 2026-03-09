@@ -47,6 +47,14 @@ interface Props {
   accountId?: string;
 }
 
+const CREDIT_TRANSACTION_SKELETON_ROWS = [
+  'credit-transaction-skeleton-1',
+  'credit-transaction-skeleton-2',
+  'credit-transaction-skeleton-3',
+  'credit-transaction-skeleton-4',
+  'credit-transaction-skeleton-5',
+] as const;
+
 export default function CreditTransactions({ accountId }: Props) {
   const [offset, setOffset] = useState(0);
   const [typeFilter, setTypeFilter] = useState<string | undefined>(undefined);
@@ -99,7 +107,7 @@ export default function CreditTransactions({ accountId }: Props) {
 
   const handleNextPage = () => {
     if (data?.pagination.has_more) {
-      setOffset(offset + limit);
+      setOffset((currentOffset) => currentOffset + limit);
     }
   };
 
@@ -113,8 +121,8 @@ export default function CreditTransactions({ accountId }: Props) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+              {CREDIT_TRANSACTION_SKELETON_ROWS.map((rowId) => (
+                <Skeleton key={rowId} className="h-12 w-full" />
               ))}
             </div>
           </CardContent>

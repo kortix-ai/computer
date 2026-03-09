@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   CircleAlert,
   AlertTriangle,
@@ -82,6 +82,19 @@ function getDisplayPath(path: string): string {
   }
 
   return normalized;
+}
+
+function getDiagnosticKey(diagnostic: LspDiagnostic): string {
+  return [
+    diagnostic.file,
+    diagnostic.line,
+    diagnostic.column,
+    diagnostic.endLine ?? '',
+    diagnostic.endColumn ?? '',
+    diagnostic.severity,
+    diagnostic.source ?? '',
+    diagnostic.message,
+  ].join('|');
 }
 
 // ============================================================================
@@ -210,9 +223,9 @@ function FileGroupSection({
       </button>
       {expanded && (
         <div className="ml-3 border-l border-border/30 pl-1 mb-1">
-          {group.diagnostics.map((d, i) => (
+          {group.diagnostics.map((d) => (
             <DiagnosticRow
-              key={`${d.line}:${d.column}:${i}`}
+              key={getDiagnosticKey(d)}
               diagnostic={d}
               onClick={() => onDiagnosticClick(d)}
             />
@@ -233,24 +246,12 @@ export function DiagnosticsBadge() {
 
   const openFileInComputer = useKortixComputerStore((s) => s.openFileInComputer);
 
-  const allDiagnostics = useMemo(() => {
-    const all: LspDiagnostic[] = [];
-    for (const diags of Object.values(byFile)) {
-      all.push(...diags);
-    }
-    return all;
-  }, [byFile]);
+  const allDiagnostics = Object.values(byFile).flat();
 
-  const errorCount = useMemo(
-    () => allDiagnostics.filter((d) => d.severity === 1).length,
-    [allDiagnostics],
-  );
-  const warningCount = useMemo(
-    () => allDiagnostics.filter((d) => d.severity === 2).length,
-    [allDiagnostics],
-  );
+  const errorCount = allDiagnostics.filter((d) => d.severity === 1).length;
+  const warningCount = allDiagnostics.filter((d) => d.severity === 2).length;
 
-  const groups = useMemo(() => groupByFile(allDiagnostics), [allDiagnostics]);
+  const groups = groupByFile(allDiagnostics);
 
   const totalCount = errorCount + warningCount;
 
@@ -354,24 +355,12 @@ export function DiagnosticsDialog({ open, onOpenChange }: DiagnosticsDialogProps
   const byFile = useDiagnosticsStore((s) => s.byFile);
   const openFileInComputer = useKortixComputerStore((s) => s.openFileInComputer);
 
-  const allDiagnostics = useMemo(() => {
-    const all: LspDiagnostic[] = [];
-    for (const diags of Object.values(byFile)) {
-      all.push(...diags);
-    }
-    return all;
-  }, [byFile]);
+  const allDiagnostics = Object.values(byFile).flat();
 
-  const errorCount = useMemo(
-    () => allDiagnostics.filter((d) => d.severity === 1).length,
-    [allDiagnostics],
-  );
-  const warningCount = useMemo(
-    () => allDiagnostics.filter((d) => d.severity === 2).length,
-    [allDiagnostics],
-  );
+  const errorCount = allDiagnostics.filter((d) => d.severity === 1).length;
+  const warningCount = allDiagnostics.filter((d) => d.severity === 2).length;
 
-  const groups = useMemo(() => groupByFile(allDiagnostics), [allDiagnostics]);
+  const groups = groupByFile(allDiagnostics);
 
   const handleDiagnosticClick = useCallback(
     (diagnostic: LspDiagnostic) => {

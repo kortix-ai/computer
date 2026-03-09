@@ -1,9 +1,14 @@
-'use client';
-
+import type { Metadata } from 'next';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
+
+export const metadata: Metadata = {
+  title: 'Work at Kortix',
+  description:
+    'Explore open roles at Kortix and learn what it is like to build with us.',
+};
 
 const openings = [
   {

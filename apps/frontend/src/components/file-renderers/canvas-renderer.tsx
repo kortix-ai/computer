@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import {
   Plus,
   Minus,
@@ -93,6 +94,17 @@ interface FrameCanvasElement extends BaseCanvasElement {
 }
 
 type CanvasElement = ImageCanvasElement | FrameCanvasElement;
+
+const EMPTY_FRAMES: FrameCanvasElement[] = [];
+
+const subscribeToMountedFlag = (onStoreChange: () => void) => {
+  onStoreChange();
+  return () => {};
+};
+
+function useMountedFlag() {
+  return useSyncExternalStore(subscribeToMountedFlag, () => true, () => false);
+}
 
 // Snap guide for visual alignment feedback
 interface SnapGuide {
@@ -261,9 +273,10 @@ function SnapGuidesOverlay({
 
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 50 }}>
-      {guides.map((guide, idx) => {
+      {guides.map((guide) => {
         const frame = frames.find(f => f.id === guide.frameId);
         if (!frame) return null;
+        const guideKey = `${guide.type}-${guide.frameId}-${guide.position}`;
 
         if (guide.type === 'vertical') {
           // Vertical line at frame center X
@@ -273,7 +286,7 @@ function SnapGuidesOverlay({
 
           return (
             <div
-              key={`guide-${idx}`}
+              key={`${guideKey}-vertical`}
               style={{
                 position: 'absolute',
                 left: screenX,
@@ -293,7 +306,7 @@ function SnapGuidesOverlay({
 
           return (
             <div
-              key={`guide-${idx}`}
+              key={`${guideKey}-horizontal`}
               style={{
                 position: 'absolute',
                 left: frameLeft,
@@ -358,7 +371,7 @@ function CanvasImageElement({
   authToken,
   isProcessing = false,
   clipPath,
-  frames = [],
+  frames = EMPTY_FRAMES,
   onSnapChange,
 }: {
   element: ImageCanvasElement;
@@ -628,6 +641,8 @@ function CanvasImageElement({
   return (
     <div
       onMouseDown={(e) => handleMouseDown(e, 'move')}
+      role="button"
+      aria-label={`Move ${element.name}`}
       style={{
         position: 'absolute',
         left: posX,
@@ -647,8 +662,15 @@ function CanvasImageElement({
         className="w-full h-full rounded overflow-hidden relative"
         style={{ clipPath: clipPath || undefined }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageSrc} alt={element.name} draggable={false} className="w-full h-full object-fill pointer-events-none" />
+        <Image
+          src={imageSrc}
+          alt={element.name}
+          fill
+          unoptimized
+          draggable={false}
+          sizes={`${Math.max(1, Math.round(width))}px`}
+          className="object-fill pointer-events-none"
+        />
       </div>
 
       {/* Selection ring - OUTSIDE clipped area, always fully visible */}
@@ -663,15 +685,15 @@ function CanvasImageElement({
       {isSelected && !element.locked && (
         <>
           {/* Corner handles - blue */}
-          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
-          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
-          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
-          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
+          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" role="button" aria-label={`Resize ${element.name} from top left`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
+          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" role="button" aria-label={`Resize ${element.name} from top right`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
+          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" role="button" aria-label={`Resize ${element.name} from bottom left`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
+          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" role="button" aria-label={`Resize ${element.name} from bottom right`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
           {/* Edge handles - blue */}
-          <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
-          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
+          <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" role="button" aria-label={`Resize ${element.name} from left edge`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
+          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" role="button" aria-label={`Resize ${element.name} from right edge`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" role="button" aria-label={`Resize ${element.name} from top edge`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" role="button" aria-label={`Resize ${element.name} from bottom edge`} onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
         </>
       )}
     </div>
@@ -853,6 +875,8 @@ function CanvasFrameElement({
         {/* Frame label - top left outside frame - THIS is the click target for selection/move */}
         <div
           className="absolute left-0 flex items-center gap-1 px-1.5 py-0.5 rounded-t-sm"
+          role="button"
+          aria-label={`Move frame ${element.name}`}
           style={{
             top: '-22px',
             backgroundColor: isSelected ? '#3b82f6' : '#333333',
@@ -888,14 +912,14 @@ function CanvasFrameElement({
       {/* Resize handles - blue when selected, pointer-events:auto so they're clickable */}
       {isSelected && !element.locked && (
         <>
-          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 rounded-sm cursor-nwse-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
-          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-sm cursor-nesw-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
-          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 rounded-sm cursor-nesw-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
-          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 rounded-sm cursor-nwse-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
-          <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 rounded-sm cursor-ew-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
-          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 rounded-sm cursor-ew-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-sm cursor-ns-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-sm cursor-ns-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
+          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 rounded-sm cursor-nwse-resize z-10" role="button" aria-label={`Resize frame ${element.name} from top left`} style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
+          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-sm cursor-nesw-resize z-10" role="button" aria-label={`Resize frame ${element.name} from top right`} style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
+          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 rounded-sm cursor-nesw-resize z-10" role="button" aria-label={`Resize frame ${element.name} from bottom left`} style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
+          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 rounded-sm cursor-nwse-resize z-10" role="button" aria-label={`Resize frame ${element.name} from bottom right`} style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
+          <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 rounded-sm cursor-ew-resize z-10" role="button" aria-label={`Resize frame ${element.name} from left edge`} style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
+          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 rounded-sm cursor-ew-resize z-10" role="button" aria-label={`Resize frame ${element.name} from right edge`} style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-sm cursor-ns-resize z-10" role="button" aria-label={`Resize frame ${element.name} from top edge`} style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-sm cursor-ns-resize z-10" role="button" aria-label={`Resize frame ${element.name} from bottom edge`} style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
         </>
       )}
     </div>
@@ -1046,6 +1070,8 @@ function CropOverlay({
       {/* Crop rectangle */}
       <div
         className="absolute border-2 border-blue-500 cursor-move z-40"
+        role="button"
+        aria-label={`Move crop selection for ${element.name}`}
         style={{
           left: cropX,
           top: cropY,
@@ -1055,15 +1081,15 @@ function CropOverlay({
         onMouseDown={(e) => handleMouseDown(e, 'move')}
       >
         {/* Corner handles */}
-        <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
-        <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
-        <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
-        <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
+        <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" role="button" aria-label={`Resize crop for ${element.name} from top left`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
+        <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" role="button" aria-label={`Resize crop for ${element.name} from top right`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
+        <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" role="button" aria-label={`Resize crop for ${element.name} from bottom left`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
+        <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" role="button" aria-label={`Resize crop for ${element.name} from bottom right`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
         {/* Edge handles */}
-        <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
-        <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
-        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
-        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
+        <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" role="button" aria-label={`Resize crop for ${element.name} from left edge`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
+        <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" role="button" aria-label={`Resize crop for ${element.name} from right edge`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
+        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" role="button" aria-label={`Resize crop for ${element.name} from top edge`} onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
+        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" role="button" aria-label={`Resize crop for ${element.name} from bottom edge`} onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
 
         {/* Grid lines for rule of thirds */}
         <div className="absolute top-1/3 left-0 right-0 border-t border-blue-400/30" />
@@ -1120,6 +1146,7 @@ function FloatingToolbar({
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState('');
+  const mergePromptId = React.useId();
 
   // Text edit mode state
   const [textEditMode, setTextEditMode] = useState(false);
@@ -1531,7 +1558,6 @@ function FloatingToolbar({
                     ? "Type the new text you want here..."
                     : "Enter replacement text..."}
                 className="min-h-[100px]"
-                autoFocus
               />
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={cancelTextEditMode}>
@@ -1893,7 +1919,6 @@ function FrameFloatingToolbar({
                     }
                   }}
                   className="w-40 h-7 px-2 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  autoFocus
                 />
                 <Button
                   size="sm"
@@ -1986,8 +2011,9 @@ function FrameFloatingToolbar({
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-muted-foreground uppercase">Width</label>
+                    <label htmlFor="frame-width" className="text-[10px] text-muted-foreground uppercase">Width</label>
                     <input
+                      id="frame-width"
                       type="number"
                       value={tempWidth}
                       onChange={(e) => setTempWidth(e.target.value)}
@@ -1998,8 +2024,9 @@ function FrameFloatingToolbar({
                   </div>
                   <X className="h-3 w-3 text-muted-foreground mt-4" />
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-muted-foreground uppercase">Height</label>
+                    <label htmlFor="frame-height" className="text-[10px] text-muted-foreground uppercase">Height</label>
                     <input
+                      id="frame-height"
                       type="number"
                       value={tempHeight}
                       onChange={(e) => setTempHeight(e.target.value)}
@@ -2329,18 +2356,20 @@ function MultiSelectToolbar({
           <div className="space-y-4">
             {/* Image order preview */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Image order (click arrows to swap)</label>
+              <div className="text-xs font-medium text-muted-foreground">Image order (click arrows to swap)</div>
               <div className="flex items-center gap-2 overflow-x-auto py-2">
                 {orderedElements.map((el, idx) => (
                   <div key={el.id} className="flex items-center gap-1">
                     <div className="relative group">
                       <div className="w-16 h-16 rounded border border-border overflow-hidden bg-card shrink-0 relative">
                         {el.src?.startsWith('data:') ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={el.src}
                             alt={el.name}
-                            className="w-full h-full object-cover"
+                            fill
+                            unoptimized
+                            sizes="64px"
+                            className="object-cover"
                           />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-xs text-muted-foreground p-1">
@@ -2371,13 +2400,13 @@ function MultiSelectToolbar({
 
             {/* Merge prompt */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">How should these images be merged?</label>
+              <label htmlFor={mergePromptId} className="text-xs font-medium text-muted-foreground">How should these images be merged?</label>
               <Textarea
+                id={mergePromptId}
                 value={mergePrompt}
                 onChange={(e) => setMergePrompt(e.target.value)}
                 placeholder='e.g. "Blend seamlessly", "Create a collage", "Overlay second on first"'
                 className="min-h-[80px]"
-                autoFocus
               />
             </div>
 
@@ -2433,7 +2462,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
   const [stagePosition, setStagePosition] = useState({ x: 50, y: 50 });
   const [toolMode, setToolMode] = useState<'select' | 'pan'>('select');
   const [isPanning, setIsPanning] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useMountedFlag();
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [selectionRect, setSelectionRect] = useState<{ startX: number; startY: number; x: number; y: number; w: number; h: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -2514,8 +2543,6 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, fileName]);
-
-  useEffect(() => { setIsMounted(true); }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -3459,20 +3486,33 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
                   {/* Generated previews */}
                   {generatedPreviews.length > 0 && (
                     <div className="grid grid-cols-2 gap-2 pt-2">
-                      {generatedPreviews.map((src, idx) => (
-                        <div
-                          key={idx}
+                      {generatedPreviews.map((src, idx) => {
+                        const occurrence = generatedPreviews
+                          .slice(0, idx)
+                          .filter((existingSrc) => existingSrc === src).length + 1;
+
+                        return (
+                        <button
+                          type="button"
+                          key={`${src}-${occurrence}`}
                           onClick={() => addGeneratedImageToCanvas(src)}
                           style={{ borderColor: 'var(--border)' }}
                           className="relative aspect-square rounded-lg overflow-hidden border outline-none transition-colors group cursor-pointer"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={src} alt={`Generated ${idx + 1}`} className="w-full h-full object-cover" />
+                          <Image
+                            src={src}
+                            alt={`Generated ${idx + 1}`}
+                            fill
+                            unoptimized
+                            sizes="(max-width: 768px) 50vw, 160px"
+                            className="object-cover"
+                          />
                           <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <Plus className="h-3 w-3" />
                           </div>
-                        </div>
-                      ))}
+                        </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -3487,6 +3527,8 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden bg-background"
+        role="application"
+        aria-label="Canvas editor"
         style={{
           cursor: isPanning ? 'grabbing' : toolMode === 'pan' ? 'grab' : selectionRect ? 'crosshair' : 'default',
           touchAction: 'none', // Prevent default touch behaviors

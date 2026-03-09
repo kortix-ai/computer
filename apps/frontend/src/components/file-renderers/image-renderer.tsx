@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -34,8 +35,6 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
   const [showControls, setShowControls] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-
   // Check if the url is an SVG
   const isSvg =
     url?.toLowerCase().endsWith('.svg') || url?.includes('image/svg');
@@ -48,17 +47,16 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
   }, [zoom, isFitToScreen]);
 
   // Handle image load success
-  const handleImageLoad = () => {
+  const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     setImgLoaded(true);
     setImgError(false);
 
-    if (imageRef.current) {
-      setImgInfo({
-        width: imageRef.current.naturalWidth,
-        height: imageRef.current.naturalHeight,
-        type: isSvg ? 'SVG' : url.split('.').pop()?.toUpperCase() || 'Image',
-      });
-    }
+    const image = event.currentTarget;
+    setImgInfo({
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      type: isSvg ? 'SVG' : url.split('.').pop()?.toUpperCase() || 'Image',
+    });
   };
 
   // Handle image load error
@@ -256,6 +254,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
       <div
         ref={containerRef}
         className="w-full h-full overflow-hidden relative bg-background"
+        role="presentation"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -282,39 +281,23 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
               transition: isPanning ? 'none' : 'transform 0.1s ease',
             }}
           >
-            {isSvg ? (
-              // For SVGs, just use img tag - object tag has issues with blob URLs
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                ref={imageRef}
-                src={url}
-                alt="SVG preview"
-                className="max-w-full max-h-full object-contain"
-                style={{
-                  transform: imageTransform,
-                  transition: 'transform 0.2s ease',
-                }}
-                draggable={false}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                ref={imageRef}
-                src={url}
-                alt="Image preview"
-                className="max-w-full max-h-full object-contain"
-                style={{
-                  transform: imageTransform,
-                  transition: 'transform 0.2s ease',
-                  boxShadow: imgLoaded ? '0 8px 32px -4px rgba(0, 0, 0, 0.15)' : 'none',
-                }}
-                draggable={false}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            )}
+            <Image
+              src={url}
+              alt={isSvg ? 'SVG preview' : 'Image preview'}
+              width={1600}
+              height={1200}
+              unoptimized
+              sizes="100vw"
+              className="max-w-full max-h-full object-contain"
+              style={{
+                transform: imageTransform,
+                transition: 'transform 0.2s ease',
+                boxShadow: !isSvg && imgLoaded ? '0 8px 32px -4px rgba(0, 0, 0, 0.15)' : 'none',
+              }}
+              draggable={false}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+            />
           </div>
         )}
       </div>

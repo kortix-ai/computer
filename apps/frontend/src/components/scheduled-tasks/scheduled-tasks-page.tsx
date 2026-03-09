@@ -121,7 +121,18 @@ const TaskListItem = ({
         isSelected ? "bg-muted" : "bg-card"
       )}
     >
-      <div onClick={onClick} className="flex items-center justify-between p-5">
+      <div
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          onClick();
+        }}
+        className="flex items-center justify-between p-5"
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
+      >
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-card border border-border/50 shrink-0">
             <Timer className="h-5 w-5 text-foreground" />
@@ -191,8 +202,8 @@ const EmptyState = ({ onCreateClick }: { onCreateClick: () => void }) => (
 
 const LoadingSkeleton = () => (
   <div className="space-y-4">
-    {[1, 2, 3].map((i) => (
-      <div key={i} className="rounded-xl border dark:bg-card px-4 py-3">
+    {['task-skeleton-1', 'task-skeleton-2', 'task-skeleton-3'].map((skeletonKey) => (
+      <div key={skeletonKey} className="rounded-xl border dark:bg-card px-4 py-3">
         <div className="flex items-center gap-3">
           <Skeleton className="h-12 w-12 rounded-xl" />
           <div className="flex-1 space-y-2">
@@ -321,9 +332,11 @@ export function ScheduledTasksPage() {
       <div className="h-[100dvh] 2xl:flex overflow-hidden">
         {/* Backdrop overlay */}
         {selectedTrigger && (
-          <div
+          <button
+            type="button"
             className="block 2xl:hidden fixed inset-0 bg-black/70 z-30"
             onClick={handleClosePanel}
+            aria-label="Close task details"
           />
         )}
 

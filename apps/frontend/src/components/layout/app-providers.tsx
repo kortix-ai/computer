@@ -15,6 +15,14 @@ const SidebarRight = lazy(() =>
   import('@/components/sidebar/sidebar-right').then(mod => ({ default: mod.SidebarRight }))
 );
 
+const SIDEBAR_SKELETON_KEYS = [
+  'sidebar-skeleton-1',
+  'sidebar-skeleton-2',
+  'sidebar-skeleton-3',
+  'sidebar-skeleton-4',
+  'sidebar-skeleton-5',
+] as const;
+
 // Sidebar skeleton for immediate render
 function SidebarSkeleton() {
   return (
@@ -22,8 +30,8 @@ function SidebarSkeleton() {
       <div className="p-4 space-y-4">
         <div className="h-8 w-32 bg-muted/40 rounded animate-pulse" />
         <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-9 bg-muted/30 rounded animate-pulse" />
+          {SIDEBAR_SKELETON_KEYS.map((key) => (
+            <div key={key} className="h-9 bg-muted/30 rounded animate-pulse" />
           ))}
         </div>
       </div>

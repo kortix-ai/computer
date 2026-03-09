@@ -770,7 +770,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
         {isLoading ? (
           <div className="space-y-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-lg">
+              <div key={`session-list-skeleton-${i}`} className="flex items-center gap-3 px-3 py-1.5 rounded-lg">
                 <div className="h-3.5 w-24 bg-muted rounded animate-pulse" />
               </div>
             ))}
@@ -906,7 +906,6 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') confirmRename();
             }}
-            autoFocus
             placeholder="Session title..."
           />
           <DialogFooter>

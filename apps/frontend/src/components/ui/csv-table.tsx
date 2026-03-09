@@ -129,9 +129,12 @@ export function CsvTable({
                     }}
                 />
                 {/* Header row */}
-                {headers.map((header, index) => (
+                {headers.map((header, index) => {
+                    const duplicateCount = headers.slice(0, index).filter((existingHeader) => existingHeader === header).length + 1;
+
+                    return (
                     <div
-                        key={`header-${index}`}
+                        key={`${header}-${duplicateCount}`}
                         className={cn(
                             "sticky top-0 z-20 flex items-center px-4 font-medium",
                             resolvedTheme === 'dark' ? 'bg-muted' : 'bg-background'
@@ -152,7 +155,7 @@ export function CsvTable({
                             </div>
                         </button>
                     </div>
-                ))}
+                );})}
 
                 {/* Data rows */}
                 {data.map((row: any, rowIndex) => (

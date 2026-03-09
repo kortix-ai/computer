@@ -85,8 +85,8 @@ export function RatingDistributionChart() {
                 radius={[0, 4, 4, 0]}
                 maxBarSize={24}
               >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                {chartData.map((entry) => (
+                  <Cell key={entry.rating} fill={entry.fill} />
                 ))}
               </Bar>
             </BarChart>

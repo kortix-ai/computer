@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default function NotificationManagementPage() {
   const [workflowId, setWorkflowId] = useState("");
-  const [payload, setPayload] = useState(
+  const [payload, setPayload] = useState(() =>
     JSON.stringify(
       {
         message: "Your custom message here",
@@ -201,8 +201,8 @@ export default function NotificationManagementPage() {
                     )}
                     {selectedWorkflow.tags.length > 0 && (
                       <div className="flex gap-1 flex-wrap">
-                        {selectedWorkflow.tags.map((tag, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
+                        {selectedWorkflow.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
                             {tag}
                           </Badge>
                         ))}

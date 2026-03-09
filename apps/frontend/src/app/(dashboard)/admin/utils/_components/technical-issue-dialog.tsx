@@ -93,7 +93,7 @@ export function TechnicalIssueDialog({
           {enabled && (
             <>
               <div className="space-y-2">
-                <Label>Severity</Label>
+                <div className="text-sm font-medium leading-none">Severity</div>
                 <Select value={severity} onValueChange={(v: Severity) => setSeverity(v)}>
                   <SelectTrigger>
                     <SelectValue />
@@ -142,30 +142,35 @@ export function TechnicalIssueDialog({
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Affected Services</Label>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium leading-none">Affected services</legend>
                 <div className="grid grid-cols-2 gap-2">
                   {AVAILABLE_SERVICES.map((service) => {
                     const Icon = service.icon;
                     const isSelected = services.includes(service.label);
+                    const checkboxId = `affected-service-${service.id}`;
                     return (
-                      <div
+                      <Label
                         key={service.id}
-                        onClick={() => toggleService(service.label)}
+                        htmlFor={checkboxId}
                         className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-sm ${
                           isSelected 
                             ? 'border-primary bg-primary/5' 
                             : 'border-border hover:border-primary/50'
                         }`}
                       >
-                        <Checkbox checked={isSelected} />
+                        <Checkbox
+                          id={checkboxId}
+                          checked={isSelected}
+                          onCheckedChange={() => toggleService(service.label)}
+                        />
                         <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
                         <span>{service.label}</span>
-                      </div>
+                      </Label>
                     );
                   })}
                 </div>
-              </div>
+              </fieldset>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">

@@ -83,11 +83,12 @@ export function DeploymentLogsDialog({
 
           {!isLoading && data?.logs && data.logs.length > 0 && (
             <div className="p-3 space-y-0.5 font-mono text-xs">
-              {data.logs.map((log, i) => {
+              {data.logs.map((log) => {
                 const level = (log.level || 'info').toLowerCase();
+                const logKey = `${log.timestamp ?? 'no-timestamp'}:${level}:${log.message ?? JSON.stringify(log)}`;
                 return (
                   <div
-                    key={i}
+                    key={logKey}
                     className={cn(
                       'flex gap-2 px-2 py-0.5 rounded-sm hover:bg-muted/50',
                       level === 'error' && 'text-red-500 dark:text-red-400',

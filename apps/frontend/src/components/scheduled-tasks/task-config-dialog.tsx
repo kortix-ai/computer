@@ -198,16 +198,16 @@ export function TaskConfigDialog({ open, onOpenChange, onCreated }: TaskConfigDi
 
             {/* Schedule — visual builder */}
             <div className="space-y-2">
-              <Label>Schedule</Label>
+              <div className="text-sm font-medium leading-none">Schedule Builder</div>
               <ScheduleBuilder value={cronExpr} onChange={setCronExpr} />
             </div>
 
             {/* Timezone + Session Mode row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Timezone</Label>
+                <Label htmlFor="task-timezone">Timezone</Label>
                 <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger className="cursor-pointer hover:bg-muted/40 transition-colors">
+                  <SelectTrigger id="task-timezone" className="cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -218,9 +218,9 @@ export function TaskConfigDialog({ open, onOpenChange, onCreated }: TaskConfigDi
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Session Mode</Label>
+                <Label htmlFor="task-session-mode">Session Mode</Label>
                 <Select value={sessionMode} onValueChange={(v) => setSessionMode(v as SessionMode)}>
-                  <SelectTrigger className="cursor-pointer hover:bg-muted/40 transition-colors">
+                  <SelectTrigger id="task-session-mode" className="cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

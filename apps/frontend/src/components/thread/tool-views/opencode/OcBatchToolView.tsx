@@ -87,9 +87,9 @@ export function OcBatchToolView({
         <ScrollArea className="h-full w-full">
           <div className="p-3 space-y-1.5">
             {toolCalls.length > 0 ? (
-              toolCalls.map((call, i) => (
+              toolCalls.map((call) => (
                 <div
-                  key={i}
+                  key={`${call.title}-${call.description}-${call.success ? 'success' : 'pending'}`}
                   className={cn(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg border',
                     call.success

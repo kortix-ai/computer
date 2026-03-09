@@ -1,13 +1,18 @@
-'use client';
-
-import React, { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import type { Metadata } from 'next';
 import { ShareViewer } from './_components/ShareViewer';
 import { SharePageWrapper } from './_components/SharePageWrapper';
 
-export default function SharePage() {
-  const params = useParams();
-  const shareId = params?.shareId as string;
+export const metadata: Metadata = {
+  title: 'Shared Conversation',
+  description: 'View a shared Kortix conversation in read-only mode.',
+};
+
+export default async function SharePage({
+  params,
+}: {
+  params: Promise<{ shareId: string }>;
+}) {
+  const { shareId } = await params;
 
   if (!shareId) {
     return (

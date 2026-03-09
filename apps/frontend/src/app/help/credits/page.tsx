@@ -1,5 +1,4 @@
-'use client';
-
+import type { Metadata } from 'next';
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,16 +18,22 @@ import {
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
+export const metadata: Metadata = {
+  title: 'What are Credits?',
+  description:
+    'Learn how Kortix credits work, when they are used, and what affects usage.',
+};
+
 export default function CreditsPage() {
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/help">
-          <Button variant="ghost" className="mb-4">
+        <Button asChild variant="ghost" className="mb-4">
+          <Link href="/help">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Help Center
-          </Button>
-        </Link>
+          </Link>
+        </Button>
         <h1 className="text-4xl font-bold mb-2">What are Credits?</h1>
         <p className="text-lg text-muted-foreground">
           Learn how credits work and how they're consumed
@@ -331,21 +336,17 @@ export default function CreditsPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 mb-8">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => window.location.href = 'mailto:hey@kortix.com'}
-            >
-              <Mail className="h-4 w-4" />
-              Email Support
+            <Button asChild variant="outline" className="gap-2">
+              <a href="mailto:hey@kortix.com">
+                <Mail className="h-4 w-4" />
+                Email Support
+              </a>
             </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => window.open('https://discord.com/invite/RvFhXUdZ9H', '_blank')}
-            >
-              <MessageCircle className="h-4 w-4" />
-              Join Discord
+            <Button asChild variant="outline" className="gap-2">
+              <a href="https://discord.com/invite/RvFhXUdZ9H" target="_blank" rel="noreferrer">
+                <MessageCircle className="h-4 w-4" />
+                Join Discord
+              </a>
             </Button>
           </div>
 

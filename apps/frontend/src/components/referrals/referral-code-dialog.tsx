@@ -59,7 +59,6 @@ export function ReferralCodeDialog({ open, onOpenChange, referralCode = '', onCo
               placeholder={t('enterCode')}
               maxLength={8}
               className="font-mono text-center text-base font-semibold"
-              autoFocus
             />
           </div>
 

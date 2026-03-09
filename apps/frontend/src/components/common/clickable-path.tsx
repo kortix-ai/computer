@@ -74,6 +74,28 @@ export function ClickablePath({
     [filePath],
   );
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLSpanElement>) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.metaKey || e.ctrlKey) {
+        const fileName = filePath.split('/').pop() || filePath;
+        openTabAndNavigate({
+          id: `file:${filePath}`,
+          title: fileName,
+          type: 'file',
+          href: `/files/${encodeURIComponent(filePath)}`,
+        });
+        return;
+      }
+
+      openPreview(filePath, lineNumber);
+    },
+    [filePath, lineNumber, openPreview],
+  );
+
   const title = lineNumber
     ? `${filePath}:${lineNumber}${column ? `:${column}` : ''} — Click to preview, Ctrl/Cmd+Click to open in tab`
     : `${filePath} — Click to preview, Ctrl/Cmd+Click to open in tab`;
@@ -88,6 +110,7 @@ export function ClickablePath({
           className,
         )}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         title={title}
         role="button"
         tabIndex={0}
@@ -115,6 +138,7 @@ export function ClickablePath({
         className,
       )}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
       title={title}
       role="button"
       tabIndex={0}
@@ -144,6 +168,40 @@ interface TextWithPathsProps {
   variant?: 'inline' | 'terminal';
 }
 
+function getPathSegmentKey(
+  segment: ReturnType<typeof splitTextByPaths>[number],
+  occurrence: number,
+) {
+  if (segment.type === 'text') {
+    return `text:${segment.value}:${occurrence}`;
+  }
+
+  return `path:${segment.filePath}:${segment.lineNumber ?? ''}:${segment.column ?? ''}:${occurrence}`;
+}
+
+function getSegmentKeys(segments: ReturnType<typeof splitTextByPaths>) {
+  const occurrences = new Map<string, number>();
+
+  return segments.map((segment) => {
+    const baseKey = getPathSegmentKey(segment, 0);
+    const nextOccurrence = (occurrences.get(baseKey) ?? 0) + 1;
+    occurrences.set(baseKey, nextOccurrence);
+
+    return getPathSegmentKey(segment, nextOccurrence);
+  });
+}
+
+function getLineKeys(lines: string[]) {
+  const occurrences = new Map<string, number>();
+
+  return lines.map((line) => {
+    const nextOccurrence = (occurrences.get(line) ?? 0) + 1;
+    occurrences.set(line, nextOccurrence);
+
+    return `line:${line}:${nextOccurrence}`;
+  });
+}
+
 /**
  * Renders a string of text with all detected file paths made clickable.
  * Paths are rendered using ClickablePath which supports file preview
@@ -151,6 +209,7 @@ interface TextWithPathsProps {
  */
 export const TextWithPaths = React.memo<TextWithPathsProps>(({ text, className, variant = 'inline' }) => {
   const segments = useMemo(() => splitTextByPaths(text), [text]);
+  const segmentKeys = useMemo(() => getSegmentKeys(segments), [segments]);
 
   // If no paths found, return plain text
   if (segments.length === 1 && segments[0].type === 'text') {
@@ -161,11 +220,11 @@ export const TextWithPaths = React.memo<TextWithPathsProps>(({ text, className, 
     <span className={className}>
       {segments.map((seg, i) => {
         if (seg.type === 'text') {
-          return <React.Fragment key={i}>{seg.value}</React.Fragment>;
+          return <React.Fragment key={segmentKeys[i]}>{seg.value}</React.Fragment>;
         }
         return (
           <ClickablePath
-            key={i}
+            key={segmentKeys[i]}
             filePath={seg.filePath!}
             lineNumber={seg.lineNumber}
             column={seg.column}
@@ -198,11 +257,12 @@ interface PreWithPathsProps {
  */
 export const PreWithPaths = React.memo<PreWithPathsProps>(({ text, className }) => {
   const lines = useMemo(() => text.split('\n'), [text]);
+  const lineKeys = useMemo(() => getLineKeys(lines), [lines]);
 
   return (
     <pre className={className}>
       {lines.map((line, lineIdx) => (
-        <React.Fragment key={lineIdx}>
+        <React.Fragment key={lineKeys[lineIdx]}>
           {lineIdx > 0 && '\n'}
           <TextWithPaths text={line} variant="terminal" />
         </React.Fragment>
@@ -229,6 +289,7 @@ export function wrapChildrenWithPaths(
     // String text nodes — scan for paths
     if (typeof child === 'string') {
       const segments = splitTextByPaths(child);
+      const segmentKeys = getSegmentKeys(segments);
       if (segments.length === 1 && segments[0].type === 'text') {
         return child; // No paths found
       }
@@ -236,11 +297,11 @@ export function wrapChildrenWithPaths(
         <>
           {segments.map((seg, i) => {
             if (seg.type === 'text') {
-              return <React.Fragment key={i}>{seg.value}</React.Fragment>;
+              return <React.Fragment key={segmentKeys[i]}>{seg.value}</React.Fragment>;
             }
             return (
               <ClickablePath
-                key={i}
+                key={segmentKeys[i]}
                 filePath={seg.filePath!}
                 lineNumber={seg.lineNumber}
                 column={seg.column}

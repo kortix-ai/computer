@@ -67,6 +67,15 @@ interface MemoryStats {
 
 type TabFilter = 'all' | 'ltm' | 'observation';
 
+const MEMORY_LOADING_SKELETON_ROWS = [
+	'memory-loading-skeleton-1',
+	'memory-loading-skeleton-2',
+	'memory-loading-skeleton-3',
+	'memory-loading-skeleton-4',
+	'memory-loading-skeleton-5',
+	'memory-loading-skeleton-6',
+] as const;
+
 // ============================================================================
 // Type config
 // ============================================================================
@@ -429,6 +438,7 @@ function MemoryCard({
 	const Icon = config.icon;
 	const isLTM = entry.source === 'ltm';
 	const displayTitle = entry.title || entry.content.slice(0, 80);
+	const factCounts = new Map<string, number>();
 
 	return (
 		<SpotlightCard
@@ -437,7 +447,18 @@ function MemoryCard({
 				isExpanded ? 'bg-muted/30' : 'bg-card',
 			)}
 		>
-			<div className="flex items-center justify-between p-4 sm:p-5 cursor-pointer" onClick={onToggle}>
+			<div
+				className="flex items-center justify-between p-4 sm:p-5 cursor-pointer"
+				onClick={onToggle}
+				onKeyDown={(e) => {
+					if (e.key !== 'Enter' && e.key !== ' ') return;
+					e.preventDefault();
+					onToggle();
+				}}
+				role="button"
+				tabIndex={0}
+				aria-expanded={isExpanded}
+			>
 				<div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
 					<div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-card border border-border/50 shrink-0">
 						<Icon className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
@@ -488,7 +509,7 @@ function MemoryCard({
 					>
 						<Trash2 className="h-4 w-4" />
 					</button>
-					<div className="text-muted-foreground/50">
+					<div className="text-muted-foreground/50" aria-hidden="true">
 						{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
 					</div>
 				</div>
@@ -507,11 +528,18 @@ function MemoryCard({
 							<div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
 								Facts
 							</div>
-							{entry.facts.map((fact, i) => (
-								<div key={i} className="text-sm text-foreground/70 pl-3 border-l-2 border-primary/30">
-									{fact}
-								</div>
-							))}
+							{entry.facts.map((fact) => {
+								const duplicateIndex = factCounts.get(fact) ?? 0;
+								factCounts.set(fact, duplicateIndex + 1);
+								return (
+									<div
+										key={`${fact}-${duplicateIndex}`}
+										className="text-sm text-foreground/70 pl-3 border-l-2 border-primary/30"
+									>
+										{fact}
+									</div>
+								);
+							})}
 						</div>
 					)}
 
@@ -570,8 +598,8 @@ function MemoryCard({
 function MemoryLoadingSkeleton() {
 	return (
 		<div className="space-y-3">
-			{Array.from({ length: 6 }).map((_, i) => (
-				<div key={i} className="rounded-2xl border bg-card p-4 sm:p-5">
+			{MEMORY_LOADING_SKELETON_ROWS.map((rowId) => (
+				<div key={rowId} className="rounded-2xl border bg-card p-4 sm:p-5">
 					<div className="flex items-center gap-3 sm:gap-4">
 						<Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl" />
 						<div className="flex-1 space-y-2">

@@ -119,7 +119,7 @@ export function QuestionPrompt({
 			}
 
 			// Advance to next tab
-			setTab(tab + 1);
+			setTab((currentTab) => currentTab + 1);
 			setEditing(false);
 		},
 		[answers, customInputs, tab, isSingle, request.id, onReply],
@@ -260,19 +260,13 @@ export function QuestionPrompt({
 						{headerSummary}
 					</span>
 				</span>
-				<span
-					role="button"
-					tabIndex={0}
+				<button
+					type="button"
 					onClick={reject}
-					onKeyDown={(e) => {
-						if (e.key === "Enter" || e.key === " ") {
-							reject();
-						}
-					}}
 					className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
 				>
 					<X className="size-3" />
-				</span>
+				</button>
 			</div>
 
 			{/* Body */}
@@ -284,7 +278,7 @@ export function QuestionPrompt({
 								const isAnswered = (answers[i]?.length ?? 0) > 0;
 								return (
 									<button
-										key={i}
+										key={q.header || q.question}
 										onClick={() => {
 											setTab(i);
 											setEditing(false);
@@ -345,7 +339,7 @@ export function QuestionPrompt({
 									const done = ans.length > 0;
 									return (
 										<div
-											key={i}
+											key={q.header || q.question}
 											className={cn(
 												"flex items-center gap-1.5 py-0.5",
 												!done && "opacity-40",
@@ -379,7 +373,6 @@ export function QuestionPrompt({
 								})}
 								<div className="flex items-center justify-end pt-2">
 									<button
-										autoFocus={isConfirm}
 										onClick={submit}
 										className="min-h-9 px-4 py-1.5 text-sm font-medium rounded-lg bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer"
 									>
@@ -402,7 +395,7 @@ export function QuestionPrompt({
 										const isPicked = currentAnswers.includes(opt.label);
 										return (
 											<button
-												key={i}
+												key={opt.label}
 												onClick={() => selectOption(i)}
 												className={cn(
 													"w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left cursor-pointer group border transition-all duration-150 ease-out active:scale-[0.998]",
@@ -501,7 +494,7 @@ export function QuestionPrompt({
 									<div className="flex items-center justify-end">
 									<button
 										onClick={() => {
-											setTab(tab + 1);
+											setTab((currentTab) => currentTab + 1);
 											setEditing(false);
 										}}
 										disabled={currentAnswers.length === 0}

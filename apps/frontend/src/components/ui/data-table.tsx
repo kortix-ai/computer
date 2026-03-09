@@ -35,6 +35,8 @@ export interface DataTableProps<T> {
   headerActions?: React.ReactNode;
 }
 
+const EMPTY_ITEMS: readonly unknown[] = [];
+
 export function DataTable<T>({
   columns,
   data,
@@ -42,7 +44,7 @@ export function DataTable<T>({
   emptyMessage = 'No data available',
   onRowClick,
   selectable = false,
-  selectedItems = [],
+  selectedItems = EMPTY_ITEMS as T[],
   onSelectionChange,
   getItemId,
   headerActions,

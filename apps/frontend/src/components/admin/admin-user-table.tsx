@@ -28,6 +28,14 @@ interface AdminUserTableProps {
   onUserSelect?: (user: UserSummary) => void;
 }
 
+const ADMIN_USER_TABLE_SKELETON_ROWS = [
+  'admin-user-skeleton-1',
+  'admin-user-skeleton-2',
+  'admin-user-skeleton-3',
+  'admin-user-skeleton-4',
+  'admin-user-skeleton-5',
+] as const;
+
 export function AdminUserTable({ onUserSelect }: AdminUserTableProps) {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
@@ -191,8 +199,8 @@ export function AdminUserTable({ onUserSelect }: AdminUserTableProps) {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
+              {ADMIN_USER_TABLE_SKELETON_ROWS.map((rowId) => (
+                <div key={rowId} className="flex items-center space-x-4">
                   <Skeleton className="h-12 w-full" />
                 </div>
               ))}

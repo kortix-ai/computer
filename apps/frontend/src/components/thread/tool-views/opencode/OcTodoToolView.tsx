@@ -71,8 +71,8 @@ export function OcTodoToolView({
         <ScrollArea className="h-full w-full">
           <div className="p-3 space-y-px">
             {todos.length > 0 ? (
-              todos.map((todo, i) => (
-                <div key={todo.id || i} className={cn(
+              todos.map((todo) => (
+                <div key={todo.id || todo.content} className={cn(
                   'flex items-center gap-2 py-1',
                   todo.status === 'completed' && 'opacity-40',
                 )}>

@@ -141,6 +141,10 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
   const deleteMutation = useDeleteTrigger();
   const toggleMutation = useToggleTrigger();
   const runMutation = useRunTrigger();
+  const settingsTabId = `task-settings-tab-${trigger.triggerId}`;
+  const executionsTabId = `task-executions-tab-${trigger.triggerId}`;
+  const settingsPanelId = `task-settings-panel-${trigger.triggerId}`;
+  const executionsPanelId = `task-executions-panel-${trigger.triggerId}`;
   const { data: agents = [], isLoading: agentsLoading } = useSandboxAgents(sandboxId);
   const { data: executions = [] } = useTriggerExecutions(
     tab === 'executions' ? trigger.triggerId : '',
@@ -264,14 +268,19 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
             </div>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close task details">
           <X className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b">
+      <div className="flex border-b" role="tablist" aria-label="Task details tabs">
         <button
+          type="button"
+          id={settingsTabId}
+          role="tab"
+          aria-selected={tab === 'settings'}
+          aria-controls={settingsPanelId}
           onClick={() => setTab('settings')}
           className={cn(
             "flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors",
@@ -283,6 +292,11 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
           Settings
         </button>
         <button
+          type="button"
+          id={executionsTabId}
+          role="tab"
+          aria-selected={tab === 'executions'}
+          aria-controls={executionsPanelId}
           onClick={() => setTab('executions')}
           className={cn(
             "flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors",
@@ -296,7 +310,12 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 pb-12">
+      <div
+        className="flex-1 overflow-y-auto p-4 pb-12"
+        role="tabpanel"
+        id={tab === 'settings' ? settingsPanelId : executionsPanelId}
+        aria-labelledby={tab === 'settings' ? settingsTabId : executionsTabId}
+      >
         {tab === 'settings' ? (
           <div className="space-y-5">
             {/* Name */}
@@ -311,7 +330,7 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
 
             {/* Schedule — visual builder */}
             <div className="space-y-2">
-              <Label>Schedule</Label>
+              <div className="text-sm font-medium leading-none">Schedule Builder</div>
               <ScheduleBuilder
                 value={cronExpr}
                 onChange={(v) => { setCronExpr(v); markDirty(); }}
@@ -321,12 +340,12 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
 
             {/* Timezone */}
             <div className="space-y-2">
-              <Label>Timezone</Label>
+              <Label htmlFor="edit-timezone">Timezone</Label>
               <Select
                 value={timezone}
                 onValueChange={(v) => { setTimezone(v); markDirty(); }}
               >
-                <SelectTrigger>
+                <SelectTrigger id="edit-timezone">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -351,12 +370,12 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
 
             {/* Session Mode */}
             <div className="space-y-2">
-              <Label>Session Mode</Label>
+              <Label htmlFor="edit-session-mode">Session Mode</Label>
               <Select
                 value={sessionMode}
                 onValueChange={(v) => { setSessionMode(v as SessionMode); markDirty(); }}
               >
-                <SelectTrigger>
+                <SelectTrigger id="edit-session-mode">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -510,10 +529,11 @@ function ExecutionItem({
   const canOpenSession = !!execution.sessionId;
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'rounded-lg border p-3 text-sm transition-colors',
-        canOpenSession ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default'
+        'w-full rounded-lg border p-3 text-sm text-left transition-colors',
+        canOpenSession ? 'cursor-pointer hover:bg-muted/30' : 'cursor-pointer hover:bg-muted/30'
       )}
       onClick={() => {
         if (execution.sessionId) {
@@ -522,6 +542,7 @@ function ExecutionItem({
         }
         setExpanded(!expanded);
       }}
+      aria-expanded={canOpenSession ? undefined : expanded}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -549,6 +570,6 @@ function ExecutionItem({
           {execution.errorMessage}
         </div>
       )}
-    </div>
+    </button>
   );
 }

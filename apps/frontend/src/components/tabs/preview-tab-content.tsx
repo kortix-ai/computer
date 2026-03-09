@@ -63,7 +63,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   }, [port, originalUrl]);
 
   // Navigation history
-  const [history, setHistory] = useState<string[]>([rawPreviewUrl].filter(Boolean));
+  const [history, setHistory] = useState<string[]>(() => [rawPreviewUrl].filter(Boolean));
   const [historyIndex, setHistoryIndex] = useState(0);
 
   // Server URL for proxy rewriting
@@ -101,6 +101,11 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
       }
     }
   }, [originalUrl, port, isAddressEditing, isExternalBrowsing]);
+
+  useEffect(() => {
+    if (previewUrl) return;
+    addressInputRef.current?.focus();
+  }, [previewUrl]);
 
   // Refresh the iframe when the tab is re-opened (refreshCounter bumped by openTab)
   const prevCounterRef = useRef(refreshCounter);
@@ -353,13 +358,13 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
       <div className="flex flex-col h-full bg-background">
         {/* Toolbar */}
         <div className="flex items-center gap-1.5 h-10 px-2 border-b bg-muted/30 shrink-0">
-          <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
+          <Button variant="ghost" size="icon" className="h-7 w-7" disabled aria-label="Go back" >
             <ArrowLeft className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
+          <Button variant="ghost" size="icon" className="h-7 w-7" disabled aria-label="Go forward" >
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
+          <Button variant="ghost" size="icon" className="h-7 w-7" disabled aria-label="Refresh preview" >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
 
@@ -370,6 +375,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
               <input
                 ref={addressInputRef}
                 type="text"
+                aria-label="Preview URL"
                 value={addressValue}
                 onChange={(e) => setAddressValue(e.target.value)}
                 onFocus={() => {
@@ -380,7 +386,6 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
                 onBlur={() => setIsAddressEditing(false)}
                 placeholder="Type a URL or localhost:PORT..."
                 className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
-                autoFocus
               />
             </div>
           </form>
@@ -415,6 +420,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
           onClick={handleBack}
           disabled={!canGoBack}
           title="Back"
+          aria-label="Go back"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
         </Button>
@@ -427,6 +433,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
           onClick={handleForward}
           disabled={!canGoForward}
           title="Forward"
+          aria-label="Go forward"
         >
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
@@ -438,6 +445,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
           className="h-7 w-7"
           onClick={handleRefresh}
           title="Refresh"
+          aria-label="Refresh preview"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
         </Button>
@@ -449,6 +457,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
             <input
               ref={addressInputRef}
               type="text"
+              aria-label="Preview URL"
               value={displayUrl}
               onChange={(e) => setAddressValue(e.target.value)}
               onFocus={() => {
@@ -490,6 +499,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
           className="h-7 w-7"
           onClick={handleOpenExternal}
           title="Open in browser"
+          aria-label="Open preview in browser"
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </Button>

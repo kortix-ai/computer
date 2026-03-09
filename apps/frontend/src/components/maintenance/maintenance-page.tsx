@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { useApiHealth } from '@/hooks/usage/use-health';
@@ -10,8 +10,6 @@ import { AnimatedBg } from '@/components/ui/animated-bg';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 
 export function MaintenancePage() {
-  const [lastChecked, setLastChecked] = useState<Date | null>(null);
-
   const { data: healthData, isLoading: isCheckingHealth, refetch } = useApiHealth();
 
   const checkHealth = async () => {
@@ -22,14 +20,8 @@ export function MaintenancePage() {
       }
     } catch (error) {
       console.error('API health check failed:', error);
-    } finally {
-      setLastChecked(new Date());
     }
   };
-
-  useEffect(() => {
-    setLastChecked(new Date());
-  }, []);
 
   return (
     <div className="w-full relative overflow-hidden min-h-screen">

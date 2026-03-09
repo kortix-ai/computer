@@ -26,6 +26,7 @@ export function DateTimePicker({ date, setDate, label }: DateTimePickerProps) {
   );
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeInputId = `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-time`;
 
   const handleDateSelect = (selectedDate: Date | undefined) => {
     if (selectedDate) {
@@ -51,7 +52,7 @@ export function DateTimePicker({ date, setDate, label }: DateTimePickerProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label>{label}</Label>
+        <div className="text-sm font-medium leading-none">{label}</div>
         <span className="text-[10px] text-muted-foreground">{timezone}</span>
       </div>
       <Popover>
@@ -75,8 +76,9 @@ export function DateTimePicker({ date, setDate, label }: DateTimePickerProps) {
             initialFocus
           />
           <div className="border-t p-3">
-            <Label className="text-xs text-muted-foreground">Time</Label>
+            <Label htmlFor={timeInputId} className="text-xs text-muted-foreground">Time</Label>
             <Input
+              id={timeInputId}
               type="time"
               value={timeValue}
               onChange={handleTimeChange}

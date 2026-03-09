@@ -595,9 +595,9 @@ export function DLQTable({
             <div className="flex-1 overflow-y-auto space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Entry ID
-                  </label>
+                  </p>
                   <div className="flex items-center gap-2">
                     <code className="text-sm font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
                       {detailEntry.entry_id}
@@ -613,9 +613,9 @@ export function DLQTable({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Run ID
-                  </label>
+                  </p>
                   <div className="flex items-center gap-2">
                     <code className="text-sm font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
                       {detailEntry.run_id}
@@ -634,39 +634,39 @@ export function DLQTable({
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Type
-                  </label>
+                  </p>
                   <div>{getTypeBadge(detailEntry.write_type)}</div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Attempts
-                  </label>
+                  </p>
                   <Badge variant="outline" className="border-red-500/30 text-red-400">
                     {detailEntry.attempt_count}
                   </Badge>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Failed At
-                  </label>
+                  </p>
                   <p className="text-sm">{formatTime(detailEntry.failed_at)}</p>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Created At
-                </label>
+                </p>
                 <p className="text-sm">{formatTime(detailEntry.created_at)}</p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Error Message
-                  </label>
+                  </p>
                   <Button
                     size="sm"
                     variant="ghost"

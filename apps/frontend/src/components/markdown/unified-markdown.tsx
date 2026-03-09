@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import NextImage from 'next/image';
 import Link from 'next/link';
 import { Streamdown, defaultRemarkPlugins, defaultRehypePlugins } from 'streamdown';
 type PluggableList = any[];
@@ -513,14 +514,14 @@ function ClickableInlineCode({ children }: { children: React.ReactNode }) {
 
   if (isFile) {
     return (
-      <code
-        className="px-1.5 py-0.5 rounded-md text-[13px] font-mono bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/50 text-foreground cursor-pointer hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:border-blue-700/50 dark:hover:text-blue-400 transition-colors"
+      <button
+        type="button"
+        className="inline-flex px-1.5 py-0.5 rounded-md text-[13px] font-mono bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/50 text-foreground cursor-pointer hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:border-blue-700/50 dark:hover:text-blue-400 transition-colors"
         onClick={() => openPreview(text)}
         title={`Click to preview ${text}`}
-        role="button"
       >
-        {children}
-      </code>
+        <code>{children}</code>
+      </button>
     );
   }
 
@@ -845,10 +846,12 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
       const resolvedSrc = proxy(src) ?? src;
       return (
         <span className="block my-5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <NextImage
             src={resolvedSrc}
             alt={alt || ''}
+            width={800}
+            height={600}
+            unoptimized
             className={cn(
               "max-w-full h-auto rounded-xl",
               "border border-border/40",

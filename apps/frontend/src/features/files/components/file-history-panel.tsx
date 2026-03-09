@@ -28,6 +28,8 @@ import type { GitCommit } from '../types';
 import { createTwoFilesPatch } from 'diff';
 import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
 
+const FILE_HISTORY_LOADING_GROUP_SLOTS = ['history-group-1', 'history-group-2', 'history-group-3', 'history-group-4', 'history-group-5', 'history-group-6'] as const;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -110,21 +112,83 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
     return startIdx >= 0 ? lines.slice(startIdx) : lines;
   }, [patch]);
 
+  const diffEntries = useMemo(() => {
+    let leftNum = 0;
+    let rightNum = 0;
+
+    return diffLines.map((line) => {
+      if (line.startsWith('@@')) {
+        const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (match) {
+          leftNum = parseInt(match[1], 10) - 1;
+          rightNum = parseInt(match[2], 10) - 1;
+        }
+
+        return {
+          line,
+          codeLine: '',
+          key: `hunk:${leftNum + 1}:${rightNum + 1}:${line}`,
+        };
+      }
+
+      if (line.startsWith('+++') || line.startsWith('---')) {
+        return {
+          line,
+          codeLine: '',
+          key: `header:${line}`,
+        };
+      }
+
+      if (line.startsWith('+')) {
+        rightNum += 1;
+        return {
+          line,
+          codeLine: line.substring(1),
+          key: `add:${leftNum}:${rightNum}:${line.substring(1)}`,
+        };
+      }
+
+      if (line.startsWith('-')) {
+        leftNum += 1;
+        return {
+          line,
+          codeLine: line.substring(1),
+          key: `del:${leftNum}:${rightNum}:${line.substring(1)}`,
+        };
+      }
+
+      if (line === '') {
+        leftNum += 1;
+        rightNum += 1;
+        return {
+          line,
+          codeLine: '',
+          key: `ctx:${leftNum}:${rightNum}:`,
+        };
+      }
+
+      leftNum += 1;
+      rightNum += 1;
+      const content = line.startsWith(' ') ? line.substring(1) : line;
+      return {
+        line,
+        codeLine: content,
+        key: `ctx:${leftNum}:${rightNum}:${content}`,
+      };
+    });
+  }, [diffLines]);
+
   // Extract code content (without +/-/space prefix) for highlighting
   const codeLines = useMemo(
-    () =>
-      diffLines.map((line) => {
-        if (line.startsWith('@@') || line.startsWith('+++') || line.startsWith('---') || line === '') return '';
-        return line.length > 0 ? line.substring(1) : '';
-      }),
-    [diffLines],
+    () => diffEntries.map((entry) => entry.codeLine),
+    [diffEntries],
   );
 
   const highlighted = useDiffHighlight(codeLines, filename);
 
   return (
     <pre className="p-3 font-mono text-xs leading-[1.6] overflow-x-auto select-text">
-      {diffLines.map((line, i) => {
+      {diffEntries.map(({ key, line }, i) => {
         const isAdd = line.startsWith('+') && !line.startsWith('+++');
         const isDel = line.startsWith('-') && !line.startsWith('---');
         const isHunk = line.startsWith('@@');
@@ -137,7 +201,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
 
         if (isHunk || isHeader || line === '') {
           return (
-            <div key={i} className={cls}>
+            <div key={key} className={cls}>
               {line || ' '}
             </div>
           );
@@ -149,7 +213,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         if (highlightedTokens) {
           const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={i} className={cls}>
+            <div key={key} className={cls}>
               <span
                 className={cn(
                   isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -165,7 +229,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
 
         return (
           <div
-            key={i}
+            key={key}
             className={cn(
               cls,
               isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -422,8 +486,8 @@ export function FileHistoryPanel() {
         {/* Loading */}
         {isLoading && (
           <div className="p-3 space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="space-y-2">
+            {FILE_HISTORY_LOADING_GROUP_SLOTS.map((slot) => (
+              <div key={slot} className="space-y-2">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-12 w-full rounded-lg" />
               </div>

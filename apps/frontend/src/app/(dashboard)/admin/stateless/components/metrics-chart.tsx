@@ -303,8 +303,8 @@ export function DonutChart({
                     dataKey="value"
                     nameKey="name"
                   >
-                    {data.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} stroke="transparent" />
+                    {data.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} stroke="transparent" />
                     ))}
                   </Pie>
                 </PieChart>
@@ -321,8 +321,8 @@ export function DonutChart({
               )}
             </div>
             <div className="flex-1 space-y-2">
-              {data.map((entry, index) => (
-                <div key={index} className="flex items-center justify-between text-sm">
+              {data.map((entry) => (
+                <div key={entry.name} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded-full"

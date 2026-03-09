@@ -1,6 +1,7 @@
 "use client";
 
 import { createTwoFilesPatch } from "diff";
+import NextImage from "next/image";
 import { QuestionPrompt } from "@/components/session/question-prompt";
 import { SubSessionModal } from "@/components/session/sub-session-modal";
 import {
@@ -126,6 +127,43 @@ import {
 	type ToolPart,
 	type TriggerTitle,
 } from "@/ui";
+
+// ============================================================================
+// Shared next/image helpers for tool renderers
+// ============================================================================
+
+function ToolFaviconImg({ src, className }: { src: string; className: string }) {
+	const [visible, setVisible] = React.useState(true);
+	if (!visible) return null;
+	return (
+		<NextImage
+			src={src}
+			alt=""
+			width={16}
+			height={16}
+			unoptimized
+			className={className}
+			onError={() => setVisible(false)}
+		/>
+	);
+}
+
+function ToolPreviewImg({ src, alt, className }: { src: string; alt: string; className: string }) {
+	const [visible, setVisible] = React.useState(true);
+	if (!visible) return null;
+	return (
+		<NextImage
+			src={src}
+			alt={alt}
+			width={640}
+			height={480}
+			unoptimized
+			sizes="(max-width: 768px) 100vw, 640px"
+			className={className}
+			onError={() => setVisible(false)}
+		/>
+	);
+}
 
 // ============================================================================
 // Shared CSS overrides — strip CodeBlock's nested border/bg/padding inside
@@ -872,12 +910,14 @@ export function BasicTool({
 										{trigger.subtitle}
 									</TextShimmer>
 								) : (
-									<span
+									<button
+										type="button"
 										className={cn(
 											"text-muted-foreground text-xs truncate font-mono",
 											onSubtitleClick &&
-												"cursor-pointer hover:text-foreground underline-offset-2 hover:underline",
+												"cursor-pointer hover:text-foreground underline-offset-2 hover:underline text-left",
 										)}
+										disabled={!onSubtitleClick}
 										onClick={
 											onSubtitleClick
 												? (e) => {
@@ -892,14 +932,14 @@ export function BasicTool({
 												{trigger.subtitle}
 											</TextShimmer>
 										) : trigger.subtitle}
-									</span>
+									</button>
 								)
 						)}
 								{trigger.args &&
 									trigger.args.length > 0 &&
-									trigger.args.map((arg, i) => (
+									trigger.args.map((arg) => (
 										<span
-											key={i}
+											key={arg}
 											className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap"
 										>
 											{arg}
@@ -971,14 +1011,68 @@ function InlineDiffView({
 
 	const diffLines = useMemo(() => patch.split("\n").slice(4), [patch]);
 
+	const diffEntries = useMemo(() => {
+		let leftNum = 0;
+		let rightNum = 0;
+
+		return diffLines.map((line) => {
+			if (line.startsWith("@@")) {
+				const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+				if (match) {
+					leftNum = parseInt(match[1], 10) - 1;
+					rightNum = parseInt(match[2], 10) - 1;
+				}
+
+				return {
+					line,
+					codeLine: "",
+					key: `hunk:${leftNum + 1}:${rightNum + 1}:${line}`,
+				};
+			}
+
+			if (line.startsWith("+")) {
+				rightNum += 1;
+				return {
+					line,
+					codeLine: line.substring(1),
+					key: `add:${leftNum}:${rightNum}:${line.substring(1)}`,
+				};
+			}
+
+			if (line.startsWith("-")) {
+				leftNum += 1;
+				return {
+					line,
+					codeLine: line.substring(1),
+					key: `del:${leftNum}:${rightNum}:${line.substring(1)}`,
+				};
+			}
+
+			if (line === "") {
+				leftNum += 1;
+				rightNum += 1;
+				return {
+					line,
+					codeLine: "",
+					key: `ctx:${leftNum}:${rightNum}:`,
+				};
+			}
+
+			leftNum += 1;
+			rightNum += 1;
+			const content = line.startsWith(" ") ? line.substring(1) : line;
+			return {
+				line,
+				codeLine: content,
+				key: `ctx:${leftNum}:${rightNum}:${content}`,
+			};
+		});
+	}, [diffLines]);
+
 	// Extract code content (without +/-/space prefix) for highlighting
 	const codeLines = useMemo(
-		() =>
-			diffLines.map((line) => {
-				if (line.startsWith("@@") || line === "") return "";
-				return line.length > 0 ? line.substring(1) : "";
-			}),
-		[diffLines],
+		() => diffEntries.map((entry) => entry.codeLine),
+		[diffEntries],
 	);
 
 	const highlighted = useDiffHighlight(codeLines, filename);
@@ -987,7 +1081,7 @@ function InlineDiffView({
 
 	return (
 		<pre className="p-2 font-mono text-[11px] leading-relaxed overflow-x-auto">
-			{diffLines.map((line, i) => {
+			{diffEntries.map(({ key, line }, i) => {
 				const isAdd = line.startsWith("+");
 				const isDel = line.startsWith("-");
 				const isHunk = line.startsWith("@@");
@@ -999,7 +1093,7 @@ function InlineDiffView({
 
 				if (isHunk || line === "") {
 					return (
-						<div key={i} className={cls}>
+						<div key={key} className={cls}>
 							{line}
 						</div>
 					);
@@ -1011,7 +1105,7 @@ function InlineDiffView({
 				if (highlightedTokens) {
 					const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
 					return (
-						<div key={i} className={cls}>
+						<div key={key} className={cls}>
 							<span
 								className={cn(
 									isAdd && "text-emerald-500",
@@ -1027,7 +1121,7 @@ function InlineDiffView({
 
 				return (
 					<div
-						key={i}
+						key={key}
 						className={cn(
 							cls,
 							isAdd && "text-emerald-500",
@@ -1121,13 +1215,13 @@ function DiagnosticsDisplay({ diagnostics, filePath }: { diagnostics: Diagnostic
 
 	return (
 		<div className="space-y-1 px-2 pb-2">
-			{diagnostics.map((d, i) => {
+			{diagnostics.map((d) => {
 				const isError = d.severity === 1;
 				const isWarning = d.severity === 2;
 				return (
 					<button
 						type="button"
-						key={i}
+						key={`${d.range.start.line}:${d.range.start.character}:${d.message}`}
 						className={cn(
 							"flex items-start gap-1.5 text-[10px] transition-colors cursor-pointer text-left w-full group",
 							isError && "text-red-500 hover:text-red-400",
@@ -1184,12 +1278,12 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 
 	return (
 		<div className="space-y-1.5 p-2.5">
-			{sections.map((section, i) => {
+			{sections.map((section) => {
 				switch (section.type) {
 					case "warning":
 						return (
 							<div
-								key={i}
+								key={`warning:${section.text}`}
 								className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-yellow-500/5 border border-yellow-500/15"
 							>
 								<AlertTriangle className="size-3 flex-shrink-0 mt-0.5 text-yellow-500" />
@@ -1202,7 +1296,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 					case "error":
 						return (
 							<div
-								key={i}
+								key={`error:${section.errorType || ""}:${section.summary}`}
 								className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/60"
 							>
 								<Ban className="size-3 flex-shrink-0 mt-0.5 text-muted-foreground/70" />
@@ -1221,7 +1315,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 
 					case "traceback":
 						return (
-							<div key={i}>
+							<div key={`traceback:${section.lines[0] || section.lines.length}`}>
 								<button
 									onClick={() => setShowTrace((v) => !v)}
 								 className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
@@ -1240,18 +1334,18 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 								{showTrace && (
 									<div className="mt-1 rounded-md bg-muted/20 border border-border/30 overflow-hidden">
 										<pre className="p-2.5 font-mono text-[10px] leading-relaxed text-muted-foreground/60 whitespace-pre-wrap break-all max-h-64 overflow-auto">
-											{section.lines.map((line, li) => {
-												// Highlight File "..." lines within the trace
-												if (/^\s+File "/.test(line)) {
-													return (
-														<span key={li} className="text-muted-foreground/80">
+										{section.lines.map((line) => {
+											// Highlight File "..." lines within the trace
+											if (/^\s+File "/.test(line)) {
+												return (
+													<span key={line} className="text-muted-foreground/80">
 															{line}
 															{"\n"}
 														</span>
 													);
 												}
 												return (
-													<span key={li}>
+													<span key={line}>
 														{line}
 														{"\n"}
 													</span>
@@ -1266,7 +1360,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 					case "install":
 						return (
 							<div
-								key={i}
+								key={`install:${section.text}`}
 								className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-emerald-500/5 border border-emerald-500/15"
 							>
 								<CheckCircle className="size-3 flex-shrink-0 text-emerald-500" />
@@ -1279,7 +1373,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 					case "info":
 						return (
 							<div
-								key={i}
+								key={`info:${section.text}`}
 								className="flex items-center gap-2 px-2.5 py-1 text-[11px] text-muted-foreground font-mono"
 							>
 								<span className="size-1 rounded-full bg-muted-foreground/30 flex-shrink-0" />
@@ -1290,7 +1384,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 					case "plain":
 						return (
 							<pre
-								key={i}
+								key={`plain:${section.text}`}
 							 className="px-2.5 py-1 font-mono text-[11px] leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
 							>
 								{section.text}
@@ -1394,8 +1488,8 @@ function GetMemTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 											</span>
 										</div>
 										<ul className="space-y-1">
-											{report.facts.map((fact, index) => (
-												<li key={`${report.id}-${index}`} className="flex items-start gap-1.5 text-[12px] leading-relaxed text-foreground/90">
+											{report.facts.map((fact) => (
+												<li key={`${report.id}:${fact}`} className="flex items-start gap-1.5 text-[12px] leading-relaxed text-foreground/90">
 													<span className="mt-[6px] size-1.5 rounded-full bg-emerald-500/90 flex-shrink-0" />
 													<span>{fact}</span>
 												</li>
@@ -1917,14 +2011,14 @@ function InlineSessionMessagesList({
 						</div>
 						{msg.tools && (
 							<div className="mt-1 flex items-center gap-1 flex-wrap">
-								{msg.tools.split(",").map((t, i) => {
+								{msg.tools.split(",").map((t) => {
 									const trimmedTool = t.trim();
 									const nameMatch = trimmedTool.match(/^(\w+)\s*\((\w+)\)/);
 									const name = nameMatch?.[1] || trimmedTool;
 									const toolStatus = nameMatch?.[2] || "";
 									return (
 										<span
-											key={i}
+											key={`${name}:${toolStatus}`}
 											className={cn(
 												"text-[9px] px-1 py-0.5 rounded border",
 												toolStatus === "completed"
@@ -2497,9 +2591,9 @@ function ReadTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 			/>
 			{loaded.length > 0 && (
 				<div className="mt-1 space-y-0.5 pl-2">
-					{loaded.map((filepath, i) => (
+					{loaded.map((filepath) => (
 						<div
-							key={i}
+							key={filepath}
 							className="flex items-center gap-1.5 text-xs text-muted-foreground"
 						>
 							<span className="text-emerald-500">+</span>
@@ -2598,14 +2692,15 @@ function InlineFileList({
 }) {
 	return (
 		<div className="py-0.5">
-			{paths.map((fp, i) => {
+			{paths.map((fp) => {
 				const dp = toDisplayPath(fp);
 				const name = getFilename(dp);
 				const dir = getDirectory(dp);
 				return (
-					<div
-						key={i}
-						className="flex items-center gap-2 px-3 py-1 cursor-pointer hover:bg-muted/50 transition-colors group"
+					<button
+						type="button"
+						key={fp}
+						className="flex w-full items-center gap-2 px-3 py-1 text-left cursor-pointer hover:bg-muted/50 transition-colors group"
 						onClick={() => onFileClick(fp)}
 						title={dp}
 					>
@@ -2620,7 +2715,7 @@ function InlineFileList({
 								</span>
 							)}
 						</span>
-					</div>
+					</button>
 				);
 			})}
 		</div>
@@ -2653,10 +2748,18 @@ function InlineGrepResults({
 				const isExpanded = expandedIndex === i;
 
 				return (
-					<div key={i}>
+					<div key={group.filePath}>
 						<div
+							role="button"
+							tabIndex={0}
 							className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors group"
 							onClick={() => setExpandedIndex(isExpanded ? null : i)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									setExpandedIndex(isExpanded ? null : i);
+								}
+							}}
 						>
 							<ChevronRight
 							 className={cn(
@@ -2667,12 +2770,21 @@ function InlineGrepResults({
 							<FileText className="size-3 text-muted-foreground/50 flex-shrink-0" />
 							<span className="text-[11px] min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
 								<span
-								 className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-blue-500 transition-colors"
-								 onClick={(e) => {
+									role="button"
+									tabIndex={0}
+									 className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-blue-500 transition-colors"
+									 onClick={(e) => {
 										e.stopPropagation();
 										onFileClick(group.filePath);
 									}}
-								 title={group.filePath}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											e.stopPropagation();
+											onFileClick(group.filePath);
+										}
+									}}
+									 title={group.filePath}
 								>
 									{name}
 								</span>
@@ -2688,9 +2800,9 @@ function InlineGrepResults({
 						</div>
 						{isExpanded && (
 							<div className="border-t border-border/20 bg-muted/10">
-								{group.matches.map((match, j) => (
+								{group.matches.map((match) => (
 									<div
-										key={j}
+										key={`${match.line}:${match.content}`}
 										className="flex items-start gap-0 border-b last:border-b-0 border-border/10"
 									>
 										<span className="text-[10px] font-mono text-muted-foreground/50 w-10 text-right pr-2 py-1 flex-shrink-0 select-none">
@@ -2854,9 +2966,9 @@ function WebFetchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 					<span className="text-muted-foreground text-xs truncate font-mono">
 						{url}
 					</span>
-					{args.map((arg, i) => (
+					{args.map((arg) => (
 						<span
-							key={i}
+							key={arg}
 							className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap"
 						>
 							{arg}
@@ -3137,7 +3249,7 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 
 						return (
 							<div
-								key={qi}
+								key={qr.query}
 								className={cn(qi > 0 && "border-t border-border/30")}
 							>
 								{/* Query header (only in batch mode) */}
@@ -3185,12 +3297,12 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 														Sources
 													</div>
 												)}
-												{qr.sources.map((src, si) => {
+												{qr.sources.map((src) => {
 													const favicon = wsFavicon(src.url);
 													const domain = wsDomain(src.url);
 												 return (
 														<a
-															key={si}
+															key={src.url}
 															href={src.url}
 															target="_blank"
 															rel="noopener noreferrer"
@@ -3198,21 +3310,14 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 														>
 															{/* Favicon */}
 															<div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
-																{favicon ? (
-																	// eslint-disable-next-line @next/next/no-img-element
-																	<img
-																		src={favicon}
-																		alt=""
-																	 className="size-4 rounded"
-																	 onError={(e) => {
-																			(
-																				e.target as HTMLImageElement
-																			).style.display = "none";
-																		}}
-																	/>
-																) : (
-																	<Globe className="size-3 text-muted-foreground/50" />
-																)}
+															{favicon ? (
+																<ToolFaviconImg
+																	src={favicon}
+																	className="size-4 rounded"
+																/>
+															) : (
+																<Globe className="size-3 text-muted-foreground/50" />
+															)}
 															</div>
 															<div className="min-w-0 flex-1">
 																<div className="text-[11px] font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
@@ -3372,7 +3477,7 @@ function ScrapeWebpageTool({
 					className="max-h-[400px] overflow-y-auto overflow-x-hidden p-2"
 				>
 					<div className="space-y-0.5">
-						{scrapeData.results.map((result, idx) => {
+						{scrapeData.results.map((result) => {
 							const favicon = result.url ? wsFavicon(result.url) : null;
 							const resultDomain = result.url ? wsDomain(result.url) : "";
 							const snippet = result.content
@@ -3384,7 +3489,7 @@ function ScrapeWebpageTool({
 
 							return (
 								<a
-									key={idx}
+									key={result.url || result.title || result.content}
 									href={result.url}
 									target="_blank"
 									rel="noopener noreferrer"
@@ -3392,19 +3497,14 @@ function ScrapeWebpageTool({
 								>
 									{/* Favicon */}
 									<div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
-										{favicon ? (
-											// eslint-disable-next-line @next/next/no-img-element
-											<img
-												src={favicon}
-												alt=""
-											 className="size-4 rounded"
-											 onError={(e) => {
-													(e.target as HTMLImageElement).style.display = "none";
-												}}
-											/>
-										) : (
-											<Globe className="size-3 text-muted-foreground/50" />
-										)}
+									{favicon ? (
+										<ToolFaviconImg
+											src={favicon}
+											className="size-4 rounded"
+										/>
+									) : (
+										<Globe className="size-3 text-muted-foreground/50" />
+									)}
 									</div>
 									<div className="min-w-0 flex-1">
 										<div className="text-[11px] font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
@@ -3555,29 +3655,25 @@ function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 			{imageResults.length > 0 ? (
 				<div data-scrollable className="p-2 max-h-80 overflow-auto scrollbar-hide">
 					<div className="grid grid-cols-3 gap-1.5">
-						{imageResults.slice(0, 9).map((img: any, i: number) => {
+						{imageResults.slice(0, 9).map((img: any) => {
 							const imgUrl = img.url || img.imageUrl || img.image_url || "";
 							if (!imgUrl) return null;
 							const title = img.title || "";
 							return (
 								<a
-									key={i}
+									key={imgUrl}
 									href={imgUrl}
 									target="_blank"
 									rel="noopener noreferrer"
 								 className="relative group overflow-hidden rounded border border-border/30 bg-muted/20 aspect-square"
 									title={title}
 								>
-									{/* eslint-disable-next-line @next/next/no-img-element */}
-									<img
-										src={imgUrl}
-										alt={title}
-									 className="object-cover w-full h-full group-hover:opacity-80 transition-opacity"
-									 onError={(e) => {
-											(e.target as HTMLImageElement).style.display = "none";
-										}}
-									/>
-									<div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black/50 to-transparent flex items-end p-1">
+								<ToolPreviewImg
+									src={imgUrl}
+									alt={title}
+									className="object-cover w-full h-full group-hover:opacity-80 transition-opacity"
+								/>
+								<div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black/50 to-transparent flex items-end p-1">
 										<span className="text-[9px] text-white truncate">
 											{title}
 										</span>
@@ -3688,14 +3784,13 @@ function ImageGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 		>
 			{(imagePath || directUrl) ? (
 				<div className="p-2">
-					{displayImageSrc ? (
-						/* eslint-disable-next-line @next/next/no-img-element */
-						<img
-							src={displayImageSrc}
-							alt={String(prompt || 'Generated image')}
-						 className="rounded border border-border/30 max-h-64 object-contain"
-						/>
-					) : isImageLoading ? (
+				{displayImageSrc ? (
+					<ToolPreviewImg
+						src={displayImageSrc}
+						alt={String(prompt || 'Generated image')}
+						className="rounded border border-border/30 max-h-64 object-contain"
+					/>
+				) : isImageLoading ? (
 						<div className="rounded border border-border/30 bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
 							Loading image preview...
 						</div>
@@ -4379,8 +4474,8 @@ function IntegrationListTool({ part, defaultOpen, forceOpen, locked }: ToolProps
 		>
 			{integrations.length > 0 ? (
 				<div className="divide-y divide-border/30">
-					{integrations.map((intg, i) => (
-						<div key={i} className="flex items-center gap-2.5 px-3 py-2">
+					{integrations.map((intg) => (
+						<div key={intg.app} className="flex items-center gap-2.5 px-3 py-2">
 							<div className="size-6 rounded bg-muted/60 flex items-center justify-center flex-shrink-0">
 								<Layers className="size-3 text-muted-foreground/60" />
 							</div>
@@ -4525,8 +4620,8 @@ function IntegrationSearchTool({ part, defaultOpen, forceOpen, locked }: ToolPro
 		>
 			{apps.length > 0 ? (
 				<div className="divide-y divide-border/30">
-					{apps.map((app, i) => (
-						<div key={i} className="flex items-start gap-2.5 px-3 py-2">
+					{apps.map((app) => (
+						<div key={app.slug} className="flex items-start gap-2.5 px-3 py-2">
 							<div className="size-6 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5">
 								<Globe className="size-3 text-muted-foreground/60" />
 							</div>
@@ -4609,7 +4704,7 @@ function IntegrationActionsTool({ part, defaultOpen, forceOpen, locked }: ToolPr
 							action.description;
 
 						return (
-							<div key={i}>
+							<div key={action.key}>
 								<button
 									type="button"
 									className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors cursor-pointer text-left"
@@ -4640,8 +4735,8 @@ function IntegrationActionsTool({ part, defaultOpen, forceOpen, locked }: ToolPr
 											<div>
 												<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1">Required</div>
 												<div className="flex flex-wrap gap-1">
-													{action.required_params.map((p, pi) => (
-														<span key={pi} className="text-[9px] px-1.5 py-0.5 rounded bg-muted/60 font-mono text-foreground/70">{p}</span>
+													{action.required_params.map((p) => (
+														<span key={`required:${p}`} className="text-[9px] px-1.5 py-0.5 rounded bg-muted/60 font-mono text-foreground/70">{p}</span>
 													))}
 												</div>
 											</div>
@@ -4650,8 +4745,8 @@ function IntegrationActionsTool({ part, defaultOpen, forceOpen, locked }: ToolPr
 											<div>
 												<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1">Optional</div>
 												<div className="flex flex-wrap gap-1">
-													{action.optional_params.map((p, pi) => (
-														<span key={pi} className="text-[9px] px-1.5 py-0.5 rounded bg-muted/40 font-mono text-muted-foreground/60">{p}</span>
+													{action.optional_params.map((p) => (
+														<span key={`optional:${p}`} className="text-[9px] px-1.5 py-0.5 rounded bg-muted/40 font-mono text-muted-foreground/60">{p}</span>
 													))}
 												</div>
 											</div>
@@ -5123,8 +5218,8 @@ export function ToolError({
 
 				{/* Validation issues */}
 				<div className="px-3 py-2.5 space-y-2.5">
-					{validationIssues.map((issue, i) => (
-						<div key={i} className="space-y-1.5">
+					{validationIssues.map((issue) => (
+						<div key={issue.path.join(".") || issue.message} className="space-y-1.5">
 							{/* Path + message */}
 							<div className="flex items-start gap-2">
 								<CircleAlert className="size-3 flex-shrink-0 text-muted-foreground/60 mt-0.5" />
@@ -5147,9 +5242,9 @@ export function ToolError({
 										Expected one of:
 									</div>
 									<div className="flex flex-wrap gap-1">
-										{issue.values.map((val, vi) => (
+										{issue.values.map((val) => (
 											<span
-												key={vi}
+												key={val}
 											 className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/40 text-muted-foreground/70 font-mono"
 											>
 												{val}

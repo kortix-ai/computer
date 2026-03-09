@@ -281,15 +281,16 @@ function FilePathList({
 }) {
   return (
     <div className="py-1">
-      {paths.map((fp, i) => {
+      {paths.map((fp) => {
         const dp = toDisplayPath(fp);
         const name = getFilename(dp);
         const dir = getDirectory(dp);
 
         return (
-          <div
-            key={i}
-            className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-muted transition-colors group"
+          <button
+            key={fp}
+            type="button"
+            className="flex w-full items-center gap-2.5 px-4 py-1.5 text-left hover:bg-muted transition-colors group"
             onClick={() => onFileClick(fp)}
             title={dp}
           >
@@ -304,7 +305,7 @@ function FilePathList({
                 </span>
               )}
             </span>
-          </div>
+          </button>
         );
       })}
     </div>
@@ -336,13 +337,15 @@ function GrepResultList({
 
         return (
           <div
-            key={i}
+            key={group.filePath}
             className="rounded-lg border border-border overflow-hidden bg-card"
           >
             {/* File header row */}
-            <div
-              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors group"
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted transition-colors group"
               onClick={() => setExpandedIndex(isExpanded ? null : i)}
+              aria-expanded={isExpanded}
             >
               {isExpanded ? (
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
@@ -351,8 +354,9 @@ function GrepResultList({
               )}
               <FileText className="h-3.5 w-3.5 text-amber-500/70 dark:text-amber-400/70 flex-shrink-0" />
               <span className="text-xs min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
-                <span
-                  className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                <button
+                  type="button"
+                  className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     onFileClick(group.filePath);
@@ -360,7 +364,7 @@ function GrepResultList({
                   title={dp}
                 >
                   {name}
-                </span>
+                </button>
                 {dir && (
                   <span className="text-muted-foreground/40 truncate text-[11px]">
                     {dir}
@@ -370,17 +374,17 @@ function GrepResultList({
               <Badge
                 variant="outline"
                 className="h-5 py-0 text-[10px] flex-shrink-0 text-muted-foreground"
-              >
-                {group.matches.length}
-              </Badge>
-            </div>
+                >
+                  {group.matches.length}
+                </Badge>
+            </button>
 
             {/* Expanded match list */}
             {isExpanded && (
               <div className="border-t border-border">
-                {group.matches.map((match, j) => (
+                {group.matches.map((match) => (
                   <div
-                    key={j}
+                    key={`${group.filePath}:${match.line}:${match.content}`}
                     className="flex items-start gap-0 border-b last:border-b-0 border-border/60"
                   >
                     <span className="text-[11px] font-mono text-amber-600/70 dark:text-amber-400/50 w-12 text-right pr-3 py-1.5 flex-shrink-0 select-none">

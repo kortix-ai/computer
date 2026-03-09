@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { LazyMotion, domAnimation, m, AnimatePresence } from 'framer-motion';
 import {
   Code2,
   Search,
@@ -141,78 +141,80 @@ export function PersonalisedSuggestions({ onSuggestionClick }: PersonalisedSugge
   const items = suggestions && suggestions.length > 0 ? suggestions : fallbackSuggestions;
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-      <div className="w-full max-w-[540px] px-6 pointer-events-auto">
-        <AnimatePresence mode="wait">
-          {isLoading ? (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="flex flex-col items-center"
-            >
-              <p className="text-sm text-muted-foreground/40">{greeting}</p>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="content"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="flex flex-col items-center gap-5"
-            >
-              {/* Greeting */}
-              <motion.h2
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-                className="text-base font-medium text-foreground/50 tracking-tight"
+    <LazyMotion features={domAnimation}>
+      <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+        <div className="w-full max-w-[540px] px-6 pointer-events-auto">
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <m.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex flex-col items-center"
               >
-                {greeting}
-              </motion.h2>
+                <p className="text-sm text-muted-foreground/40">{greeting}</p>
+              </m.div>
+            ) : (
+              <m.div
+                key="content"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col items-center gap-5"
+              >
+                {/* Greeting */}
+                <m.h2
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                  className="text-base font-medium text-foreground/50 tracking-tight"
+                >
+                  {greeting}
+                </m.h2>
 
-              {/* Suggestions */}
-              <div className="flex flex-col items-center gap-2 w-full">
-                {items.map((item, i) => {
-                  const Icon = iconMap[item.icon] || Sparkles;
-                  return (
-                    <motion.button
-                      key={`${item.text}-${i}`}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.3,
-                        delay: i * 0.05,
-                        ease: [0.25, 0.1, 0.25, 1],
-                      }}
-                      onClick={() => onSuggestionClick(item.text)}
-                      className={cn(
-                        'group flex items-center gap-3 w-full px-4 py-2.5 rounded-xl',
-                        'text-[13px] leading-normal text-left',
-                        'bg-background/60 backdrop-blur-md',
-                        'border border-border/40',
-                        'transition-all duration-200',
-                        'hover:bg-background/80 hover:border-border/70',
-                        'active:scale-[0.98]',
-                        'cursor-pointer select-none',
-                      )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors duration-200" />
-                      <span className="flex-1 text-muted-foreground group-hover:text-foreground/80 transition-colors duration-200 truncate">
-                        {item.text}
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/0 group-hover:text-muted-foreground/30 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-200" />
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                {/* Suggestions */}
+                <div className="flex flex-col items-center gap-2 w-full">
+                  {items.map((item, i) => {
+                    const Icon = iconMap[item.icon] || Sparkles;
+                    return (
+                      <m.button
+                        key={item.text}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          duration: 0.3,
+                          delay: i * 0.05,
+                          ease: [0.25, 0.1, 0.25, 1],
+                        }}
+                        onClick={() => onSuggestionClick(item.text)}
+                        className={cn(
+                          'group flex items-center gap-3 w-full px-4 py-2.5 rounded-xl',
+                          'text-[13px] leading-normal text-left',
+                          'bg-background/60 backdrop-blur-md',
+                          'border border-border/40',
+                          'transition-all duration-200',
+                          'hover:bg-background/80 hover:border-border/70',
+                          'active:scale-[0.98]',
+                          'cursor-pointer select-none',
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors duration-200" />
+                        <span className="flex-1 text-muted-foreground group-hover:text-foreground/80 transition-colors duration-200 truncate">
+                          {item.text}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/0 group-hover:text-muted-foreground/30 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-200" />
+                      </m.button>
+                    );
+                  })}
+                </div>
+              </m.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
-    </div>
+    </LazyMotion>
   );
 }

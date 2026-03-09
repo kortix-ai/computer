@@ -299,9 +299,9 @@ export default function StatelessAdminPage() {
                       {dashboard.alerts.length} Alert{dashboard.alerts.length > 1 ? "s" : ""} Detected
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {dashboard.alerts.map((alert, i) => (
+                      {dashboard.alerts.map((alert) => (
                         <Badge
-                          key={i}
+                          key={`${alert.level}:${alert.metric}`}
                           variant="outline"
                           className={
                             alert.level === "critical"

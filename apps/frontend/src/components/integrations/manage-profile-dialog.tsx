@@ -34,6 +34,8 @@ import {
   type IntegrationConnection,
 } from '@/hooks/integrations';
 
+const LINKED_SANDBOX_SKELETON_SLOTS = ['sandbox-1', 'sandbox-2', 'sandbox-3'] as const;
+
 export const ManageProfileDialog = ({
   open,
   onOpenChange,
@@ -265,8 +267,8 @@ export const ManageProfileDialog = ({
 
             {loadingInstances ? (
               <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl border">
+                {LINKED_SANDBOX_SKELETON_SLOTS.map((slot) => (
+                  <div key={slot} className="flex items-center gap-3 p-3 rounded-xl border">
                     <Skeleton className="h-7 w-7 rounded-md" />
                     <Skeleton className="h-4 w-40 flex-1" />
                     <Skeleton className="h-7 w-16" />

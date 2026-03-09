@@ -49,13 +49,17 @@ function Slider({
           )}
         />
       </SliderPrimitive.Track>
-      {Array.from({ length: _values.length }, (_, index) => (
-        <SliderPrimitive.Thumb
-          data-slot="slider-thumb"
-          key={index}
-          className="cursor-pointer border-primary bg-background ring-ring/50 block size-4 shrink-0 rounded-full border shadow-sm transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
-        />
-      ))}
+      {_values.map((value, thumbIndex) => {
+        const duplicateCount = _values.slice(0, thumbIndex).filter((existingValue) => existingValue === value).length + 1;
+
+        return (
+          <SliderPrimitive.Thumb
+            data-slot="slider-thumb"
+            key={`${value}-${duplicateCount}`}
+            className="cursor-pointer border-primary bg-background ring-ring/50 block size-4 shrink-0 rounded-full border shadow-sm transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+          />
+        );
+      })}
     </SliderPrimitive.Root>
   );
 }

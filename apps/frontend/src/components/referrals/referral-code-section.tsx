@@ -19,6 +19,7 @@ interface ReferralCodeSectionProps {
 export function ReferralCodeSection({ referralCode, isLoading }: ReferralCodeSectionProps) {
   const t = useTranslations('settings.referrals');
   const [copiedLink, setCopiedLink] = useState(false);
+  const referralLinkInputId = 'referral-link';
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -68,27 +69,30 @@ export function ReferralCodeSection({ referralCode, isLoading }: ReferralCodeSec
   return (
     <div className="space-y-3">
       <div>
-        <label className="text-xs sm:text-sm font-medium text-foreground mb-2 block">
+        <label htmlFor={referralLinkInputId} className="text-xs sm:text-sm font-medium text-foreground mb-2 block">
           {t('referralLink')}
         </label>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Input
+              id={referralLinkInputId}
               value={referralCode?.referral_url || ''}
               readOnly
               className="text-xs sm:text-sm font-mono pr-10"
             />
-            <div
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => copyToClipboard(referralCode?.referral_url || '')}
-            >
-              {copiedLink ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
-            </div>
-          </div>
+             <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => copyToClipboard(referralCode?.referral_url || '')}
+                aria-label="Copy referral link"
+              >
+                {copiedLink ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                 <Copy className="h-4 w-4" />
+               )}
+             </button>
+           </div>
           <Button
             variant="default"
             className="h-10 px-2 sm:px-3 flex-shrink-0 w-[72px] sm:w-auto"

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { LazyMotion, domAnimation, m } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { StepWrapper } from '../shared/step-wrapper';
 import { UnifiedAgentCard, type BaseAgentData } from '@/components/ui/unified-agent-card';
@@ -97,72 +97,73 @@ export const WorkforceSelectionStep = () => {
 
   return (
     <StepWrapper>
-      <div className="space-y-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center"
-        >
-          <h2 className="text-3xl font-medium">
-            Choose Your AI Workers
-          </h2>
-        </motion.div>
-
-        {/* AI Workers */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-        >
-          {allAgents.map((agent, index) => {
-            // Convert AIAgent to BaseAgentData
-            const convertToBaseAgentData = (agent: AIAgent): BaseAgentData => ({
-              id: agent.id,
-              name: agent.name,
-              description: agent.description,
-              role: agent.role,
-              icon: agent.icon,
-              capabilities: agent.capabilities,
-              tags: agent.tags || [],
-              created_at: new Date().toISOString(),
-            });
-
-            return (
-              <UnifiedAgentCard
-                key={agent.id}
-                variant="onboarding"
-                data={convertToBaseAgentData(agent)}
-                actions={{
-                  onToggle: toggleAgent,
-                }}
-                state={{
-                  isSelected: selectedAgents.includes(agent.id),
-                  isRecommended: recommendedIds.includes(agent.id),
-                }}
-                delay={index * 0.1}
-              />
-            );
-          })}
-        </motion.div>
-
-        {/* Simple selection summary */}
-        {selectedAgents.length > 0 && (
-          <motion.div
+      <LazyMotion features={domAnimation}>
+        <div className="space-y-8">
+          {/* Header */}
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+            transition={{ duration: 0.5 }}
             className="text-center"
           >
-            <Badge variant="outline" className="px-4 py-2">
-              {selectedAgents.length} worker{selectedAgents.length !== 1 ? 's' : ''} selected
-            </Badge>
-          </motion.div>
-        )}
-      </div>
+            <h2 className="text-3xl font-medium">
+              Choose Your AI Workers
+            </h2>
+          </m.div>
+
+          {/* AI Workers */}
+          <m.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+          >
+            {allAgents.map((agent, index) => {
+              // Convert AIAgent to BaseAgentData
+              const convertToBaseAgentData = (agent: AIAgent): BaseAgentData => ({
+                id: agent.id,
+                name: agent.name,
+                description: agent.description,
+                role: agent.role,
+                icon: agent.icon,
+                capabilities: agent.capabilities,
+                tags: agent.tags || [],
+                created_at: new Date().toISOString(),
+              });
+
+              return (
+                <UnifiedAgentCard
+                  key={agent.id}
+                  variant="onboarding"
+                  data={convertToBaseAgentData(agent)}
+                  actions={{
+                    onToggle: toggleAgent,
+                  }}
+                  state={{
+                    isSelected: selectedAgents.includes(agent.id),
+                    isRecommended: recommendedIds.includes(agent.id),
+                  }}
+                  delay={index * 0.1}
+                />
+              );
+            })}
+          </m.div>
+
+          {/* Simple selection summary */}
+          {selectedAgents.length > 0 && (
+            <m.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="text-center"
+            >
+              <Badge variant="outline" className="px-4 py-2">
+                {selectedAgents.length} worker{selectedAgents.length !== 1 ? 's' : ''} selected
+              </Badge>
+            </m.div>
+          )}
+        </div>
+      </LazyMotion>
     </StepWrapper>
   );
 };
-

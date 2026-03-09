@@ -72,8 +72,8 @@ export function SimpleFooter() {
 
           {/* Link columns */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 md:gap-16">
-            {siteConfig.footerLinks.map((column, i) => (
-              <div key={i} className="flex flex-col gap-3">
+            {siteConfig.footerLinks.map((column) => (
+              <div key={column.title} className="flex flex-col gap-3">
                 <p className="text-xs font-semibold text-foreground uppercase tracking-widest">
                   {column.title}
                 </p>

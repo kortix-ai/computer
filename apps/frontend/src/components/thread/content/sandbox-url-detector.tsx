@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   ExternalLink,
   Globe,
@@ -38,36 +39,26 @@ interface SandboxUrlDetectorProps {
 type ReachabilityStatus = 'checking' | 'reachable' | 'unreachable';
 
 function usePortReachability(proxyUrl: string): ReachabilityStatus {
-  const [status, setStatus] = useState<ReachabilityStatus>('checking');
+  const query = useQuery({
+    queryKey: ['sandbox-port-reachability', proxyUrl],
+    queryFn: async () => {
+      // no-cors gives an opaque response (status 0) but succeeds if the
+      // server is listening. If the port is down, fetch throws a TypeError.
+      await fetch(proxyUrl, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(4000),
+      });
+      return true;
+    },
+    refetchInterval: 10_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function probe() {
-      try {
-        // no-cors gives an opaque response (status 0) but succeeds if the
-        // server is listening. If the port is down, fetch throws a TypeError.
-        await fetch(proxyUrl, {
-          method: 'HEAD',
-          mode: 'no-cors',
-          cache: 'no-store',
-          signal: AbortSignal.timeout(4000),
-        });
-        if (!cancelled) setStatus('reachable');
-      } catch {
-        if (!cancelled) setStatus('unreachable');
-      }
-    }
-
-    probe();
-    const interval = setInterval(probe, 10_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [proxyUrl]);
-
-  return status;
+  if (query.isPending) return 'checking';
+  return query.isError ? 'unreachable' : 'reachable';
 }
 
 // ---------------------------------------------------------------------------

@@ -145,7 +145,7 @@ function SearchSkeletons({
   return (
     <div className="space-y-0.5">
       {Array.from({ length: count }).map((_, i) => (
-        <ContentResultSkeleton key={i} />
+        <ContentResultSkeleton key={`content-result-skeleton-${i}`} />
       ))}
     </div>
   );
@@ -779,21 +779,23 @@ export function CommandPalette() {
               )}
 
               {/* No results — only when truly nothing matches (including nav) */}
-              {showNoResults && (
-                <div className="flex flex-col items-center gap-2 py-10" cmdk-empty="">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted/50">
-                    <Search className="h-4 w-4 text-muted-foreground/40" />
-                  </div>
-                  <div className="text-center">
-                    <span className="text-sm text-muted-foreground/70">
-                      No results for &ldquo;{query.trim()}&rdquo;
-                    </span>
-                    <p className="text-[11px] text-muted-foreground/40 mt-0.5">
-                      Try a different search term
-                    </p>
-                  </div>
-                </div>
-              )}
+               {showNoResults && (
+                 <CommandEmpty>
+                   <div className="flex flex-col items-center gap-2 py-10">
+                     <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted/50">
+                       <Search className="h-4 w-4 text-muted-foreground/40" />
+                     </div>
+                     <div className="text-center">
+                       <span className="text-sm text-muted-foreground/70">
+                         No results for &ldquo;{query.trim()}&rdquo;
+                       </span>
+                       <p className="text-[11px] text-muted-foreground/40 mt-0.5">
+                         Try a different search term
+                       </p>
+                     </div>
+                   </div>
+                 </CommandEmpty>
+               )}
 
               {/* ── Sessions ── */}
               {hasSessionResults && (
@@ -872,16 +874,17 @@ export function CommandPalette() {
                   forceMount
                 >
                   {hasTextResults &&
-                    filteredTextResults.map((match, index) => {
+                    filteredTextResults.map((match) => {
                       const FileIcon = getFileIcon(match.path);
                       const fileName = match.path.split('/').pop() || match.path;
                       const dirPath = match.path.split('/').slice(0, -1).join('/');
                       const linePreview = match.lines.trim().slice(0, 120);
+                      const textResultKey = `text-${match.path}-${match.line_number}-${match.lines.trim()}`;
 
                       return (
                         <CommandItem
-                          key={`text-${match.path}-${match.line_number}-${index}`}
-                          value={`text-${match.path}-${match.line_number}-${index}`}
+                          key={textResultKey}
+                          value={textResultKey}
                           onSelect={() => handleSelectTextResult(match)}
                         >
                           <FileIcon className="h-4 w-4 flex-shrink-0 mt-0.5" />

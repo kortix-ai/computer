@@ -153,14 +153,19 @@ function renderShellHighlighted(text: string) {
 
 function renderSshConfigHighlighted(config: string) {
   const lines = config.split('\n');
+  const lineCounts = new Map<string, number>();
+
   return lines.map((line, index) => {
+    const occurrence = (lineCounts.get(line) ?? 0) + 1;
+    lineCounts.set(line, occurrence);
+
     if (!line.trim()) {
-      return <React.Fragment key={`cfg-${index}`}>{index < lines.length - 1 ? '\n' : null}</React.Fragment>;
+      return <React.Fragment key={`cfg-${occurrence}`}>{index < lines.length - 1 ? '\n' : null}</React.Fragment>;
     }
     const match = line.match(/^(\s*)(\S+)(\s+)(.+)$/);
     if (!match) {
       return (
-        <React.Fragment key={`cfg-${index}`}>
+        <React.Fragment key={`cfg-${line}-${occurrence}`}>
           <span className="text-zinc-200">{line}</span>
           {index < lines.length - 1 ? '\n' : null}
         </React.Fragment>
@@ -168,7 +173,7 @@ function renderSshConfigHighlighted(config: string) {
     }
     const [, indent, key, spacing, value] = match;
     return (
-      <React.Fragment key={`cfg-${index}`}>
+      <React.Fragment key={`cfg-${key}-${value}-${occurrence}`}>
         <span>{indent}</span>
         <span className="text-cyan-300">{key}</span>
         <span>{spacing}</span>
@@ -401,8 +406,8 @@ function DialogInstanceRow({
             <div className="basis-full mt-0.5 text-[10px] text-muted-foreground/70 space-y-0.5 max-w-[280px]">
               <p className="font-medium">{sandboxUpdate.changelog.title}</p>
               <ul className="list-disc list-inside">
-                {sandboxUpdate.changelog.changes.slice(0, 3).map((c, i) => (
-                  <li key={i} className="truncate">{c.text}</li>
+                {sandboxUpdate.changelog.changes.slice(0, 3).map((c) => (
+                  <li key={`${c.type}:${c.text}`} className="truncate">{c.text}</li>
                 ))}
                 {sandboxUpdate.changelog.changes.length > 3 && (
                   <li className="text-muted-foreground/50">+{sandboxUpdate.changelog.changes.length - 3} more</li>
@@ -441,7 +446,7 @@ function DialogInstanceRow({
           )}
 
           {confirmDelete && (
-            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1.5" role="presentation" onMouseDown={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 disabled={isDeleting}
@@ -496,6 +501,8 @@ export function InstanceManagerDialog({
   const [sandboxProgress, setSandboxProgress] = React.useState<SandboxCreateProgress | null>(null);
   // Track the cloud sandbox's current version (from /kortix/health, fetched by DialogInstanceRow)
   const [sandboxVersion, setSandboxVersion] = React.useState<string | null>(null);
+  const instanceAddressInputId = 'instance-address';
+  const displayNameInputId = 'instance-display-name';
 
   // SSH state
   const [isGeneratingSSH, setIsGeneratingSSH] = React.useState(false);
@@ -1164,10 +1171,11 @@ export function InstanceManagerDialog({
             <div className="flex flex-col gap-3">
               {/* URL */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground">
+                <label htmlFor={instanceAddressInputId} className="text-[11px] font-medium text-muted-foreground">
                   Instance Address
                 </label>
                 <input
+                  id={instanceAddressInputId}
                   ref={urlInputRef}
                   placeholder="http://localhost:8008/v1/p/kortix-sandbox/8000"
                   value={formUrl}
@@ -1182,10 +1190,11 @@ export function InstanceManagerDialog({
 
               {/* Label */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground">
+                <label htmlFor={displayNameInputId} className="text-[11px] font-medium text-muted-foreground">
                   Display Name <span className="text-muted-foreground/40">(optional)</span>
                 </label>
                 <input
+                  id={displayNameInputId}
                   placeholder="My dev instance"
                   value={formLabel}
                   onChange={(e) => setFormLabel(e.target.value)}
@@ -1422,7 +1431,7 @@ export function InstanceManagerDialog({
                   <div className="mt-3 space-y-3">
                     {/* One-liner */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">One-liner (Setup + Connect)</label>
+                      <p className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">One-liner (Setup + Connect)</p>
                       <div className="flex items-center gap-1.5">
                         <code className="flex-1 min-w-0 text-[10px] font-mono bg-[#0b1020] border border-[#1f2a44] rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-all select-all text-zinc-200 shadow-inner">
                           {renderShellHighlighted(oneLiner)}
@@ -1435,7 +1444,7 @@ export function InstanceManagerDialog({
 
                     {/* Private Key */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">Private Key</label>
+                      <p className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">Private Key</p>
                       <div className="relative">
                         <pre className="max-w-full text-[10px] font-mono bg-muted/20 border border-border/40 rounded-md px-2.5 py-2 whitespace-pre-wrap break-all select-all text-foreground/60 overflow-x-hidden max-h-[140px] overflow-y-auto">
                           {pk}
@@ -1453,7 +1462,7 @@ export function InstanceManagerDialog({
 
                     {/* Public Key */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">Public Key</label>
+                      <p className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">Public Key</p>
                       <div className="flex items-center gap-1.5">
                         <code className="flex-1 min-w-0 text-[10px] font-mono bg-muted/30 border border-border/40 rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-all select-all text-foreground/70">
                           {sshResult.public_key}

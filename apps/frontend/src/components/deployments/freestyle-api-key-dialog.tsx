@@ -27,6 +27,7 @@ export function FreestyleApiKeyDialog({
   onOpenChange,
   onSaved,
 }: FreestyleApiKeyDialogProps) {
+  const inputFieldId = 'freestyle-api-key-field';
   const [apiKey, setApiKey] = useState('');
   const setSecret = useSetSecret();
   const queryClient = useQueryClient();
@@ -72,10 +73,11 @@ export function FreestyleApiKeyDialog({
 
         <div className="space-y-4 py-2">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
+            <label htmlFor={inputFieldId} className="block text-sm font-medium text-foreground mb-1.5">
               API Key <span className="text-red-500">*</span>
             </label>
             <input
+              id={inputFieldId}
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}

@@ -300,9 +300,9 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
         {/* Weekday chips */}
         {state.frequency === 'weekly' && (
           <div className="flex items-center gap-1">
-            {WEEKDAY_BUTTONS.map(({ value: day, label }, idx) => (
+            {WEEKDAY_BUTTONS.map(({ value: day, label }) => (
               <button
-                key={`${day}-${idx}`}
+                key={day}
                 type="button"
                 onClick={() => toggleWeekday(day)}
                 className={cn(

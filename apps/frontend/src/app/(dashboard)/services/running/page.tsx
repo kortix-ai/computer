@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { redirect } from 'next/navigation';
 import { useTabStore } from '@/stores/tab-store';
 
 /**
@@ -16,23 +16,19 @@ import { useTabStore } from '@/stores/tab-store';
  * via the sidebar action).
  */
 export default function RunningServicesPage() {
-  const router = useRouter();
   const { tabs, setActiveTab } = useTabStore();
-  const handledRef = useRef(false);
+  const tabId = 'services:running';
+  const existingTab = tabs[tabId];
 
   useEffect(() => {
-    if (handledRef.current) return;
-    handledRef.current = true;
-
-    const tabId = 'services:running';
-    const existingTab = tabs[tabId];
-
     if (existingTab) {
       setActiveTab(tabId);
-    } else {
-      router.replace('/dashboard');
     }
-  }, [tabs, setActiveTab, router]);
+  }, [existingTab, setActiveTab, tabId]);
+
+  if (!existingTab) {
+    redirect('/dashboard');
+  }
 
   return null;
 }

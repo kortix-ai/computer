@@ -14,6 +14,15 @@ import { Star, Mail, ExternalLink } from 'lucide-react';
 import { useAdminFeedbackList } from '@/hooks/admin/use-admin-feedback';
 import type { FeedbackWithUser } from '@/hooks/admin/use-admin-feedback';
 
+const STAR_SLOTS = [1, 2, 3, 4, 5] as const;
+const FEEDBACK_TABLE_SKELETON_ROWS = [
+  'feedback-table-skeleton-1',
+  'feedback-table-skeleton-2',
+  'feedback-table-skeleton-3',
+  'feedback-table-skeleton-4',
+  'feedback-table-skeleton-5',
+] as const;
+
 export function AdminFeedbackTable() {
   const router = useRouter();
   const [page, setPage] = useState(1);
@@ -48,13 +57,13 @@ export function AdminFeedbackTable() {
     
     return (
       <div className="flex items-center gap-1">
-        {[...Array(5)].map((_, i) => {
-          if (i < fullStars) {
-            return <Star key={i} className="h-4 w-4 fill-yellow-500 text-yellow-500" />;
-          } else if (i === fullStars && hasHalfStar) {
-            return <Star key={i} className="h-4 w-4 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
+        {STAR_SLOTS.map((starSlot) => {
+          if (starSlot <= fullStars) {
+            return <Star key={starSlot} className="h-4 w-4 fill-yellow-500 text-yellow-500" />;
+          } else if (starSlot === fullStars + 1 && hasHalfStar) {
+            return <Star key={starSlot} className="h-4 w-4 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
           } else {
-            return <Star key={i} className="h-4 w-4 text-muted-foreground/30" />;
+            return <Star key={starSlot} className="h-4 w-4 text-muted-foreground/30" />;
           }
         })}
         <span className="ml-1 text-sm font-medium">{rating.toFixed(1)}</span>
@@ -174,7 +183,7 @@ export function AdminFeedbackTable() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1 space-y-2">
-          <Label className="text-sm font-medium text-muted-foreground">Filter by Rating</Label>
+          <div className="text-sm font-medium text-muted-foreground">Filter by Rating</div>
           <Select value={ratingFilter} onValueChange={(value) => { setRatingFilter(value); setPage(1); }}>
             <SelectTrigger>
               <SelectValue placeholder="All ratings" />
@@ -192,7 +201,7 @@ export function AdminFeedbackTable() {
         </div>
 
         <div className="flex-1 space-y-2">
-          <Label className="text-sm font-medium text-muted-foreground">Filter by Feedback Text</Label>
+          <div className="text-sm font-medium text-muted-foreground">Filter by Feedback Text</div>
           <Select value={hasTextFilter} onValueChange={(value) => { setHasTextFilter(value); setPage(1); }}>
             <SelectTrigger>
               <SelectValue placeholder="All feedback" />
@@ -206,7 +215,7 @@ export function AdminFeedbackTable() {
         </div>
 
         <div className="flex-1 space-y-2">
-          <Label className="text-sm font-medium text-muted-foreground">Sort By</Label>
+          <div className="text-sm font-medium text-muted-foreground">Sort By</div>
           <Select value={sortBy} onValueChange={(value) => { setSortBy(value); setPage(1); }}>
             <SelectTrigger>
               <SelectValue />
@@ -220,7 +229,7 @@ export function AdminFeedbackTable() {
         </div>
 
         <div className="flex-1 space-y-2">
-          <Label className="text-sm font-medium text-muted-foreground">Order</Label>
+          <div className="text-sm font-medium text-muted-foreground">Order</div>
           <Select value={sortOrder} onValueChange={(value) => { setSortOrder(value as 'asc' | 'desc'); setPage(1); }}>
             <SelectTrigger>
               <SelectValue />
@@ -245,8 +254,8 @@ export function AdminFeedbackTable() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
+              {FEEDBACK_TABLE_SKELETON_ROWS.map((rowId) => (
+                <div key={rowId} className="flex items-center space-x-4">
                   <Skeleton className="h-12 w-full" />
                 </div>
               ))}
@@ -276,4 +285,3 @@ export function AdminFeedbackTable() {
     </div>
   );
 }
-

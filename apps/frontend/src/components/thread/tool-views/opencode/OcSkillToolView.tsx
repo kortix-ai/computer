@@ -140,8 +140,8 @@ function SkillFiles({ files }: { files: string[] }) {
       </button>
       {open && (
         <div className="border-t border-border/30 px-3 py-2 space-y-1">
-          {files.map((f, i) => (
-            <div key={i} className="text-[11px] font-mono text-muted-foreground truncate">{f}</div>
+          {files.map((f) => (
+            <div key={f} className="text-[11px] font-mono text-muted-foreground truncate">{f}</div>
           ))}
         </div>
       )}

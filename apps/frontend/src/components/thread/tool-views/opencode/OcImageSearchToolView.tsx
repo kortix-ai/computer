@@ -1,8 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useMemo, useState } from 'react';
 import {
-  Image as ImageIcon,
   CheckCircle,
   AlertCircle,
   ExternalLink,
@@ -130,6 +130,28 @@ function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max) + '...' : str;
 }
 
+function SearchResultImage({ src, alt }: { src: string; alt: string }) {
+  const [imageSrc, setImageSrc] = useState(src);
+  const [isFallback, setIsFallback] = useState(false);
+
+  return (
+    <Image
+      src={imageSrc}
+      alt={alt}
+      width={320}
+      height={208}
+      unoptimized
+      className={`object-cover w-full h-32 group-hover:opacity-90 transition-opacity ${isFallback ? 'p-4' : ''}`}
+      onError={() => {
+        if (!isFallback) {
+          setImageSrc(IMAGE_FALLBACK_SVG);
+          setIsFallback(true);
+        }
+      }}
+    />
+  );
+}
+
 export function OcImageSearchToolView({
   toolCall,
   toolResult,
@@ -173,7 +195,7 @@ export function OcImageSearchToolView({
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
       <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
-          <ToolViewIconTitle icon={ImageIcon} title="Image Search" subtitle={headerSubtitle} />
+          <ToolViewIconTitle icon={Search} title="Image Search" subtitle={headerSubtitle} />
           {totalImages > 0 && (
             <Badge
               variant="outline"
@@ -191,13 +213,13 @@ export function OcImageSearchToolView({
             {/* Batch query tabs */}
             {isBatch && batchItems.length > 1 && (
               <div className="flex flex-wrap gap-1.5 mb-3">
-                {batchItems.map((bi, idx) => {
-                  const isActive = idx === safeQueryIndex;
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setCurrentQueryIndex(idx)}
+	                {batchItems.map((bi, idx) => {
+	                  const isActive = idx === safeQueryIndex;
+	                  return (
+	                    <button
+	                      key={bi.query}
+	                      type="button"
+	                      onClick={() => setCurrentQueryIndex(idx)}
                       className={`
                         inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
                         ${isActive
@@ -230,7 +252,7 @@ export function OcImageSearchToolView({
             {/* Single batch header */}
             {isBatch && batchItems.length === 1 && currentBatch && (
               <div className="flex items-center gap-2 mb-3 px-1">
-                <ImageIcon className="size-3.5 text-violet-500 dark:text-violet-400 flex-shrink-0" />
+                <Search className="size-3.5 text-violet-500 dark:text-violet-400 flex-shrink-0" />
                 <span className="text-xs text-muted-foreground truncate">
                   &quot;{currentBatch.query}&quot;
                 </span>
@@ -245,7 +267,7 @@ export function OcImageSearchToolView({
             {/* Single query info (non-batch) */}
             {!isBatch && query && (
               <div className="flex items-center gap-2 mb-3 px-1">
-                <ImageIcon className="size-3.5 text-violet-500 dark:text-violet-400 flex-shrink-0" />
+                <Search className="size-3.5 text-violet-500 dark:text-violet-400 flex-shrink-0" />
                 <span className="text-xs text-muted-foreground truncate">
                   &quot;{query}&quot;
                 </span>
@@ -270,7 +292,7 @@ export function OcImageSearchToolView({
             {/* No images state */}
             {!isError && !isStreaming && currentImages.length === 0 && (
               <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-                <ImageIcon className="size-8 opacity-40" />
+                <Search className="size-8 opacity-40" />
                 <span className="text-xs">No images found</span>
                 {query && (
                   <span className="text-[10px] opacity-60">
@@ -283,9 +305,9 @@ export function OcImageSearchToolView({
             {/* Image grid */}
             {currentImages.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {currentImages.map((img, idx) => {
-                  const imageUrl = getImageUrl(img);
-                  if (!imageUrl) return null;
+	                {currentImages.map((img, idx) => {
+	                  const imageUrl = getImageUrl(img);
+	                  if (!imageUrl) return null;
                   const hasDimensions =
                     img.width && img.height && img.width > 0 && img.height > 0;
                   const orientation = hasDimensions
@@ -297,7 +319,7 @@ export function OcImageSearchToolView({
                     : null;
 
                   return (
-                    <TooltipProvider key={idx}>
+	                    <TooltipProvider key={imageUrl}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <a
@@ -306,17 +328,9 @@ export function OcImageSearchToolView({
                             rel="noopener noreferrer"
                             className="group relative overflow-hidden rounded-lg border border-border bg-muted hover:border-violet-300 dark:hover:border-violet-700 transition-colors shadow-sm hover:shadow-md"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <SearchResultImage
                               src={imageUrl}
                               alt={img.title || `Image ${idx + 1}`}
-                              className="object-cover w-full h-32 group-hover:opacity-90 transition-opacity"
-                              loading="lazy"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = IMAGE_FALLBACK_SVG;
-                                target.classList.add('p-4');
-                              }}
                             />
                             {/* Metadata badges */}
                             <div className="absolute top-0 left-0 right-0 p-1 flex justify-between items-start">

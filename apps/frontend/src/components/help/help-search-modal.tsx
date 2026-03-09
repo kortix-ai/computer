@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Coins, HelpCircle } from 'lucide-react';
 import {
@@ -45,6 +45,13 @@ export function HelpSearchModal({ open, onOpenChange }: HelpSearchModalProps) {
     const router = useRouter();
     const isMobile = useIsMobile();
 
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (!nextOpen) {
+            setSearch('');
+        }
+        onOpenChange(nextOpen);
+    };
+
     const filtered = search
         ? helpPages.filter((page) => {
             const searchLower = search.toLowerCase();
@@ -71,12 +78,8 @@ export function HelpSearchModal({ open, onOpenChange }: HelpSearchModalProps) {
         router.push(url);
     };
 
-    useEffect(() => {
-        if (!open) setSearch('');
-    }, [open]);
-
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="max-w-2xl p-0 overflow-hidden bg-background">
                 <Command className="bg-background border-0" shouldFilter={false}>
                     <div className="px-4 py-3 border-b">
@@ -128,4 +131,3 @@ export function HelpSearchModal({ open, onOpenChange }: HelpSearchModalProps) {
         </Dialog>
     );
 }
-

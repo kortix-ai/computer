@@ -123,6 +123,9 @@ export interface UnifiedAgentCardProps {
   currentUserId?: string;
 }
 
+const EMPTY_ACTIONS: AgentCardActions = {};
+const EMPTY_STATE: AgentCardState = {};
+
 // Avatar component
 const CardAvatar: React.FC<{ 
   data: BaseAgentData;
@@ -280,9 +283,9 @@ const IntegrationLogos: React.FC<{ data: BaseAgentData; maxLogos?: number }> = (
   
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      {displayIntegrations.map((integration, index) => (
+      {displayIntegrations.map((integration) => (
         <IntegrationLogo
-          key={`int-${index}`}
+          key={integration.qualified_name || integration.toolkit_slug || integration.display_name}
           qualifiedName={integration.qualified_name}
           displayName={integration.display_name}
           customType={integration.custom_type}
@@ -325,8 +328,8 @@ const CapabilitiesList: React.FC<{ capabilities?: string[]; maxCapabilities?: nu
 export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   variant,
   data,
-  actions = {},
-  state = {},
+  actions = EMPTY_ACTIONS,
+  state = EMPTY_STATE,
   className,
   size = 'md',
   delay = 0,
@@ -361,6 +364,17 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   const handleConfirmDelete = () => {
     setShowDeleteDialog(false);
     onDeleteAction?.(data);
+  };
+
+  const handleCardKeyDown = (
+    e: React.KeyboardEvent<HTMLElement>,
+    action?: () => void,
+  ) => {
+    if (!action || e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      action();
+    }
   };
   
   // Render different variants
@@ -405,7 +419,10 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
         'hover:border-primary/20',
         className
       )}
+      role="button"
+      tabIndex={0}
       onClick={() => onClick?.(data)}
+      onKeyDown={(e) => handleCardKeyDown(e, () => onClick?.(data))}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       <div className="h-full relative flex flex-col overflow-hidden w-full p-4 gap-2">
@@ -439,7 +456,11 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
             : 'border border-border hover:border-muted-foreground/30',
           className
         )}
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
         onClick={() => onToggle?.(data.id)}
+        onKeyDown={(e) => handleCardKeyDown(e, () => onToggle?.(data.id))}
       >
         <CardContent className="p-4 space-y-3">
           {/* Header with name and selection */}
@@ -538,7 +559,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     const renderActions = () => {
       if (variant === 'marketplace') {
         return (
-          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-2" role="presentation" onClick={(e) => e.stopPropagation()}>
             <Button 
               onClick={(e) => {
                 e.stopPropagation();
@@ -625,7 +646,13 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     };
     
     return (
-      <div className={cardClassName} onClick={() => onClick?.(data)}>
+      <div
+        className={cardClassName}
+        role="button"
+        tabIndex={0}
+        onClick={() => onClick?.(data)}
+        onKeyDown={(e) => handleCardKeyDown(e, () => onClick?.(data))}
+      >
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="relative p-6 flex flex-col flex-1">
           <div className="flex items-start justify-between mb-4">

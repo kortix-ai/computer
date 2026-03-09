@@ -28,22 +28,75 @@ import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highli
 function DiffLines({ patch, filename }: { patch: string; filename: string }) {
   const diffLines = useMemo(() => patch.split('\n').slice(4), [patch]);
 
+  const diffEntries = useMemo(() => {
+    let leftNum = 0;
+    let rightNum = 0;
+
+    return diffLines.map((line) => {
+      if (line.startsWith('@@')) {
+        const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (match) {
+          leftNum = parseInt(match[1], 10) - 1;
+          rightNum = parseInt(match[2], 10) - 1;
+        }
+
+        return {
+          line,
+          codeLine: '',
+          key: `hunk:${leftNum + 1}:${rightNum + 1}:${line}`,
+        };
+      }
+
+      if (line.startsWith('+')) {
+        rightNum += 1;
+        return {
+          line,
+          codeLine: line.substring(1),
+          key: `add:${leftNum}:${rightNum}:${line.substring(1)}`,
+        };
+      }
+
+      if (line.startsWith('-')) {
+        leftNum += 1;
+        return {
+          line,
+          codeLine: line.substring(1),
+          key: `del:${leftNum}:${rightNum}:${line.substring(1)}`,
+        };
+      }
+
+      if (line === '') {
+        leftNum += 1;
+        rightNum += 1;
+        return {
+          line,
+          codeLine: '',
+          key: `ctx:${leftNum}:${rightNum}:`,
+        };
+      }
+
+      leftNum += 1;
+      rightNum += 1;
+      const content = line.startsWith(' ') ? line.substring(1) : line;
+      return {
+        line,
+        codeLine: content,
+        key: `ctx:${leftNum}:${rightNum}:${content}`,
+      };
+    });
+  }, [diffLines]);
+
   // Extract code content (without +/-/space prefix) for highlighting
   const codeLines = useMemo(
-    () =>
-      diffLines.map((line) => {
-        if (line.startsWith('@@') || line === '') return '';
-        // Strip the +/-/space prefix
-        return line.length > 0 ? line.substring(1) : '';
-      }),
-    [diffLines],
+    () => diffEntries.map((entry) => entry.codeLine),
+    [diffEntries],
   );
 
   const highlighted = useDiffHighlight(codeLines, filename);
 
   return (
     <pre className="p-3 font-mono text-[11px] leading-[1.6] select-text whitespace-pre-wrap break-all">
-      {diffLines.map((line, i) => {
+      {diffEntries.map(({ key, line }, i) => {
         const isAdd = line.startsWith('+');
         const isDel = line.startsWith('-');
         const isHunk = line.startsWith('@@');
@@ -56,7 +109,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         // For hunk headers or empty lines, render plain
         if (isHunk || line === '') {
           return (
-            <div key={i} className={cls}>
+            <div key={key} className={cls}>
               {line || ' '}
             </div>
           );
@@ -68,7 +121,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         if (highlightedTokens) {
           const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={i} className={cls}>
+            <div key={key} className={cls}>
               <span
                 className={cn(
                   isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -85,7 +138,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         // Fallback: no highlighting available
         return (
           <div
-            key={i}
+            key={key}
             className={cn(
               cls,
               isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -218,7 +271,7 @@ function SideBySideDiff({ patch, filename }: { patch: string; filename: string }
             const isLeftHunk = row.left.content.startsWith('@@');
 
             return (
-              <tr key={i}>
+              <tr key={`${row.left.num ?? 'n'}:${row.left.type}:${row.left.content}|${row.right.num ?? 'n'}:${row.right.type}:${row.right.content}`}>
                 {/* Left side (old) */}
                 <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
                   {row.left.num ?? ''}
@@ -474,6 +527,7 @@ function DiffSummaryBar({
 
 const EDIT_TOOLS = new Set(['edit', 'morph_edit']);
 const PATCH_TOOLS = new Set(['apply_patch']);
+const SESSION_DIFF_LOADING_WIDTHS = [120, 160, 200, 240] as const;
 
 function extractDiffsFromMessages(
   messages: Array<{ info: { role: string }; parts: Array<any> }> | undefined,
@@ -585,10 +639,10 @@ export function SessionDiffViewer({ sessionId, isFullscreen, onToggleFullscreen 
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-5">
+            {SESSION_DIFF_LOADING_WIDTHS.map((width) => (
+              <div key={`session-diff-loading-${width}`} className="flex items-center gap-3 px-5">
                 <div className="h-3 w-3 bg-muted/30 rounded animate-pulse" />
-                <div className="h-3 bg-muted/20 rounded animate-pulse" style={{ width: 120 + i * 40 }} />
+                <div className="h-3 bg-muted/20 rounded animate-pulse" style={{ width }} />
               </div>
             ))}
           </div>
@@ -640,8 +694,8 @@ export function SessionDiffViewer({ sessionId, isFullscreen, onToggleFullscreen 
       />
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-2">
-          {diffs.map((diff, i) => (
-            <FileDiffCard key={`${diff.file}-${i}`} diff={diff} viewMode={viewMode} isFullscreen={isFullscreen} />
+          {diffs.map((diff) => (
+            <FileDiffCard key={diff.file} diff={diff} viewMode={viewMode} isFullscreen={isFullscreen} />
           ))}
         </div>
       </ScrollArea>

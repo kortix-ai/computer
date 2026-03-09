@@ -44,6 +44,30 @@ import { useAdminUserList, useRefreshUserData, type UserSummary } from '@/hooks/
 
 import { UserEmailLink, MetricCard, ThreadBrowser, RetentionTab, ARRSimulator } from './components';
 
+const OVERVIEW_TASKS_SKELETON_KEYS = [
+  'overview-tasks-skeleton-1',
+  'overview-tasks-skeleton-2',
+  'overview-tasks-skeleton-3',
+  'overview-tasks-skeleton-4',
+  'overview-tasks-skeleton-5',
+] as const;
+
+const ENGAGEMENT_SKELETON_KEYS = [
+  'engagement-skeleton-1',
+  'engagement-skeleton-2',
+  'engagement-skeleton-3',
+  'engagement-skeleton-4',
+] as const;
+
+const FINANCIALS_SKELETON_KEYS = [
+  'financials-skeleton-1',
+  'financials-skeleton-2',
+  'financials-skeleton-3',
+  'financials-skeleton-4',
+  'financials-skeleton-5',
+  'financials-skeleton-6',
+] as const;
+
 // Get current date in Berlin timezone
 function getBerlinToday(): Date {
   const now = new Date();
@@ -317,7 +341,7 @@ export default function AdminAnalyticsPage() {
                   {(summaryLoading || engagementLoading || taskLoading || funnelLoading) ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-5 gap-4">
-                        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+                        {OVERVIEW_TASKS_SKELETON_KEYS.map((key) => <Skeleton key={key} className="h-20" />)}
                       </div>
                       <Skeleton className="h-24" />
                     </div>
@@ -440,7 +464,7 @@ export default function AdminAnalyticsPage() {
                 <div className="p-5">
                   {engagementLoading ? (
                     <div className="grid grid-cols-4 gap-4">
-                      {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+                      {ENGAGEMENT_SKELETON_KEYS.map((key) => <Skeleton key={key} className="h-20" />)}
                     </div>
                   ) : (
                     <div className="grid grid-cols-4 gap-4">
@@ -540,8 +564,8 @@ export default function AdminAnalyticsPage() {
                               <h4 className="font-medium text-sm mb-2">Web Subscribers</h4>
                               {conversionFunnel.web_subscriber_emails?.length > 0 ? (
                                 <ul className="space-y-1">
-                                  {conversionFunnel.web_subscriber_emails.map((email, idx) => (
-                                    <li key={idx} className="text-sm">
+                                  {conversionFunnel.web_subscriber_emails.map((email) => (
+                                    <li key={email} className="text-sm">
                                       <UserEmailLink email={email} onUserClick={handleUserEmailClick} />
                                     </li>
                                   ))}
@@ -562,8 +586,8 @@ export default function AdminAnalyticsPage() {
                               <h4 className="font-medium text-sm mb-2">App Subscribers</h4>
                               {conversionFunnel.app_subscriber_emails?.length > 0 ? (
                                 <ul className="space-y-1">
-                                  {conversionFunnel.app_subscriber_emails.map((email, idx) => (
-                                    <li key={idx} className="text-sm">
+                                  {conversionFunnel.app_subscriber_emails.map((email) => (
+                                    <li key={email} className="text-sm">
                                       <UserEmailLink email={email} onUserClick={handleUserEmailClick} />
                                     </li>
                                   ))}
@@ -601,8 +625,8 @@ export default function AdminAnalyticsPage() {
                       <PopoverContent className="w-72 max-h-60 overflow-y-auto">
                         <h4 className="font-medium text-sm mb-2">Paying Users</h4>
                         <ul className="space-y-1">
-                          {profitability.paying_user_emails.map((email, idx) => (
-                            <li key={idx} className="text-sm">
+                          {profitability.paying_user_emails.map((email) => (
+                            <li key={email} className="text-sm">
                               <UserEmailLink email={email} onUserClick={handleUserEmailClick} />
                             </li>
                           ))}
@@ -616,7 +640,7 @@ export default function AdminAnalyticsPage() {
                   {profitabilityLoading ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-6 gap-4">
-                        {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+                        {FINANCIALS_SKELETON_KEYS.map((key) => <Skeleton key={key} className="h-20" />)}
                       </div>
                       <Skeleton className="h-32" />
                     </div>
@@ -779,14 +803,14 @@ export default function AdminAnalyticsPage() {
                                   <div className="text-right">{tierViewMode === 'revenue' ? 'Revenue' : tierViewMode === 'cost' ? 'Cost' : 'Profit'}</div>
                                 </div>
                                 {/* Rows */}
-                                {filteredTiers.map((tier, idx) => {
+                                {filteredTiers.map((tier) => {
                                   const userCount = getUserCount(tier);
                                   const userPercent = totalUsers > 0 ? ((userCount / totalUsers) * 100).toFixed(0) : '0';
                                   const value = tierViewMode === 'revenue' ? tier.total_revenue : tierViewMode === 'cost' ? tier.total_actual_cost : tier.gross_profit;
                                   const valuePercent = totalValue > 0 ? ((value / totalValue) * 100).toFixed(0) : '0';
                                   return (
                                     <div
-                                      key={idx}
+                                      key={tier.tier}
                                       className="grid grid-cols-3 gap-2 text-xs py-1.5 px-2 rounded hover:bg-muted/50 transition-colors"
                                     >
                                       <div className="font-medium truncate flex items-center gap-1">

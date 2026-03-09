@@ -19,6 +19,10 @@ interface PaginationProps {
   position?: 'top' | 'bottom' | 'standalone';
 }
 
+type VisiblePageItem =
+  | { type: 'page'; page: number; key: string }
+  | { type: 'ellipsis'; key: 'ellipsis-left' | 'ellipsis-right' };
+
 export const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
@@ -38,8 +42,8 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   const getVisiblePages = () => {
     const delta = 1;
-    const range = [];
-    const rangeWithDots = [];
+    const range: number[] = [];
+    const rangeWithDots: Array<number | '...'> = [];
 
     rangeWithDots.push(1);
 
@@ -62,7 +66,25 @@ export const Pagination: React.FC<PaginationProps> = ({
       rangeWithDots.push(totalPages);
     }
 
-    return rangeWithDots.filter((page, index, arr) => arr.indexOf(page) === index);
+    const uniquePages = rangeWithDots.filter((page, index, arr) => arr.indexOf(page) === index);
+
+    let ellipsisCount = 0;
+
+    return uniquePages.map((page): VisiblePageItem => {
+      if (page === '...') {
+        ellipsisCount += 1;
+        return {
+          type: 'ellipsis',
+          key: ellipsisCount === 1 ? 'ellipsis-left' : 'ellipsis-right',
+        };
+      }
+
+      return {
+        type: 'page',
+        page,
+        key: `page-${page}`,
+      };
+    });
   };
 
   const handleJumpToPage = () => {
@@ -240,26 +262,26 @@ export const Pagination: React.FC<PaginationProps> = ({
           </Button>
           {totalPages > 1 ? (
             <div className="flex items-center space-x-1">
-              {visiblePages.map((page, index) => (
-                <React.Fragment key={index}>
-                  {page === '...' ? (
-                    <div className="flex h-8 w-8 items-center justify-center">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </div>
-                  ) : (
-                    <Button
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => onPageChange(page as number)}
-                      disabled={isLoading}
-                      className="h-8 w-8 p-0"
-                      title={`Page ${page}`}
-                    >
-                      {page}
-                    </Button>
-                  )}
-                </React.Fragment>
-              ))}
+              {visiblePages.map((item) => (
+                <React.Fragment key={item.key}>
+                  {item.type === 'ellipsis' ? (
+                     <div className="flex h-8 w-8 items-center justify-center">
+                       <MoreHorizontal className="h-4 w-4" />
+                     </div>
+                   ) : (
+                     <Button
+                       variant={currentPage === item.page ? "default" : "outline"}
+                       size="sm"
+                       onClick={() => onPageChange(item.page)}
+                       disabled={isLoading}
+                       className="h-8 w-8 p-0"
+                       title={`Page ${item.page}`}
+                     >
+                       {item.page}
+                     </Button>
+                   )}
+                 </React.Fragment>
+               ))}
             </div>
           ) : (
             <div className="flex items-center px-3">

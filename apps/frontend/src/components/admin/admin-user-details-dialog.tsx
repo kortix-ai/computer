@@ -51,6 +51,8 @@ import {
 import type { UserSummary } from '@/hooks/admin/use-admin-users';
 import { formatCredits, dollarsToCredits, formatCreditsWithSign } from '@kortix/shared';
 
+const USER_PANEL_LOADING_SLOTS = ['panel-1', 'panel-2', 'panel-3'] as const;
+
 interface AdminUserDetailsDialogProps {
   user: UserSummary | null;
   isOpen: boolean;
@@ -317,8 +319,8 @@ export function AdminUserDetailsDialog({
                   <CardContent>
                     {threadsLoading ? (
                       <div className="space-y-2">
-                        {[...Array(3)].map((_, i) => (
-                          <Skeleton key={i} className="h-16 w-full" />
+                        {USER_PANEL_LOADING_SLOTS.map((slot) => (
+                          <Skeleton key={`threads-${slot}`} className="h-16 w-full" />
                         ))}
                       </div>
                     ) : userThreads && userThreads.data.length > 0 ? (
@@ -407,8 +409,8 @@ export function AdminUserDetailsDialog({
                   <CardContent>
                     {transactionsLoading ? (
                       <div className="space-y-2">
-                        {[...Array(3)].map((_, i) => (
-                          <Skeleton key={i} className="h-16 w-full" />
+                        {USER_PANEL_LOADING_SLOTS.map((slot) => (
+                          <Skeleton key={`transactions-${slot}`} className="h-16 w-full" />
                         ))}
                       </div>
                     ) : userTransactions && userTransactions.data?.length > 0 ? (
@@ -476,8 +478,8 @@ export function AdminUserDetailsDialog({
                   <CardContent>
                     {activityLoading ? (
                       <div className="space-y-2">
-                        {[...Array(3)].map((_, i) => (
-                          <Skeleton key={i} className="h-16 w-full" />
+                        {USER_PANEL_LOADING_SLOTS.map((slot) => (
+                          <Skeleton key={`activity-${slot}`} className="h-16 w-full" />
                         ))}
                       </div>
                     ) : userActivity && userActivity.data?.length > 0 ? (
@@ -575,7 +577,7 @@ export function AdminUserDetailsDialog({
                         />
                       </div>
                       <div>
-                        <Label htmlFor="refund-reason mb-2">Refund Reason</Label>
+                        <Label htmlFor="refund-reason">Refund Reason</Label>
                         <Textarea
                           id="refund-reason"
                           placeholder="Service outage compensation"

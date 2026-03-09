@@ -1,5 +1,6 @@
 'use client';
 
+import NextImage from 'next/image';
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ArrowUp,
@@ -48,6 +49,11 @@ import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
 
 export type { ProviderListResponse };
+
+const EMPTY_AGENTS: Agent[] = [];
+const EMPTY_COMMANDS: Command[] = [];
+const EMPTY_MODELS: FlatModel[] = [];
+const EMPTY_VARIANTS: string[] = [];
 
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -220,7 +226,7 @@ function AgentSelector({
   const displayName = currentAgent?.name || 'Agent';
 
   return (
-    <div className="relative" ref={ref} onKeyDown={handleKeyDown}>
+    <div className="relative" ref={ref} role="presentation" onKeyDown={handleKeyDown}>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -558,11 +564,10 @@ function AttachmentPreview({
         const Icon = getFileTypeIcon(type);
 
         return (
-          <div key={i} className="relative group">
+          <div key={`${af.file.name}:${af.localUrl}`} className="relative group">
             {af.isImage ? (
               <div className="h-[54px] w-[54px] rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/20">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={af.localUrl} alt={af.file.name} className="h-full w-full object-cover" />
+                <NextImage src={af.localUrl} alt={af.file.name} width={54} height={54} unoptimized className="h-full w-full object-cover" />
               </div>
             ) : (
               <div className="flex items-center rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-sidebar h-[54px] w-fit min-w-[200px] max-w-[300px]">
@@ -670,7 +675,7 @@ function SlashCommandPopover({
 // @ Mention Types & Popover
 // ============================================================================
 
-export interface MentionItem {
+interface MentionItem {
   kind: 'file' | 'agent' | 'session';
   label: string;
   value?: string;
@@ -860,13 +865,13 @@ function TodoChip({ sessionId }: { sessionId: string }) {
       {/* Expanded task list */}
       {expanded && (
         <div className="border-t border-border/30 max-h-[160px] overflow-y-auto scrollbar-hide px-3 py-1.5 space-y-px">
-          {sorted.map((todo: any, i: number) => {
+          {sorted.map((todo: any) => {
             const done = todo.status === 'completed';
             const cancelled = todo.status === 'cancelled';
             const active = todo.status === 'in_progress';
             if (cancelled) return null;
             return (
-              <div key={todo.id || i} className={cn(
+              <div key={todo.id ?? `${todo.status}:${todo.content}`} className={cn(
                 'flex items-center gap-2 py-0.5',
                 done && 'opacity-40',
               )}>
@@ -949,15 +954,15 @@ export function SessionChatInput({
   onSend,
   isBusy = false,
   onStop,
-  agents = [],
+  agents = EMPTY_AGENTS,
   selectedAgent = null,
   onAgentChange,
-  commands = [],
+  commands = EMPTY_COMMANDS,
   onCommand,
-  models = [],
+  models = EMPTY_MODELS,
   selectedModel = null,
   onModelChange,
-  variants = [],
+  variants = EMPTY_VARIANTS,
   selectedVariant = null,
   onVariantChange,
   messages,
@@ -1817,9 +1822,9 @@ export function SessionChatInput({
                   className="absolute inset-0 pointer-events-none px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto text-[16px] sm:text-[15px] whitespace-pre-wrap break-words text-foreground"
                   style={{ wordBreak: 'break-word', lineHeight: 'normal' }}
                 >
-                  {highlightSegments.map((seg, i) => (
+                  {highlightSegments.map((seg) => (
                     <span
-                      key={i}
+                      key={`${seg.kind}:${seg.text}`}
                       className={cn(
                         seg.kind === 'file' && 'text-blue-500 font-medium',
                         seg.kind === 'agent' && 'text-purple-500 font-medium',
@@ -1848,7 +1853,6 @@ export function SessionChatInput({
                   'relative w-full bg-transparent border-none shadow-none focus-visible:ring-0 px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto resize-none rounded-[24px] text-[16px] sm:text-[15px] outline-none placeholder:text-muted-foreground disabled:opacity-50',
                   highlightSegments && 'caret-foreground text-transparent',
                 )}
-                autoFocus={shouldAutoFocus}
               />
             </div>
           </div>
@@ -1878,7 +1882,7 @@ export function SessionChatInput({
                       "inline-flex items-center justify-center h-8 w-8 rounded-xl transition-colors",
                       lockForQuestion
                         ? "text-muted-foreground/40 cursor-not-allowed"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer",
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/80 cursor-pointer",
                     )}
                   >
                     <Paperclip className="h-4 w-4" strokeWidth={2} />

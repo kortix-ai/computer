@@ -215,6 +215,8 @@ function SidePanelIframePreview({ url, title }: { url: string; title?: string })
 function ScaledExternalIframe({ url, title }: { url: string; title?: string }) {
   const vpRef = useRef<HTMLDivElement>(null);
   const [vpScale, setVpScale] = useState(0);
+  const iframeTitle = title?.trim() ? title : url;
+
   useEffect(() => {
     const el = vpRef.current;
     if (!el) return;
@@ -242,7 +244,7 @@ function ScaledExternalIframe({ url, title }: { url: string; title?: string }) {
         {vpScale > 0 && (
           <iframe
             src={url}
-            title={title || url}
+            title={iframeTitle}
             className="border-0 bg-white"
             style={{
               width: '1920px',

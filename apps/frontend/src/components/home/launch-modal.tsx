@@ -1,10 +1,11 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { LazyMotion, domAnimation, m, AnimatePresence } from 'framer-motion';
 import { X, Check, Terminal, Copy } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import Image from 'next/image';
 import { trackCtaSignup } from '@/lib/analytics/gtm';
 
 interface LaunchModalProps {
@@ -27,9 +28,9 @@ export function LaunchModal({ open, onClose }: LaunchModalProps) {
   return (
     <AnimatePresence>
       {open && (
-        <>
+        <LazyMotion features={domAnimation}>
           {/* Backdrop */}
-          <motion.div
+          <m.div
             className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -39,14 +40,14 @@ export function LaunchModal({ open, onClose }: LaunchModalProps) {
           />
 
           {/* Modal */}
-          <motion.div
+          <m.div
             className="fixed inset-0 z-[101] flex items-center justify-center p-4 sm:p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <motion.div
+            <m.div
               className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-background rounded-2xl border border-border"
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
@@ -66,10 +67,12 @@ export function LaunchModal({ open, onClose }: LaunchModalProps) {
                 {/* ── Left: Product visual ── */}
                 <div className="flex flex-col items-center justify-center p-8 sm:p-10 md:p-12 bg-muted/20 md:rounded-l-2xl md:border-r border-border/50">
                   <div className="relative w-full max-w-[320px]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src="/kortixbox.png"
                       alt="Kortix Computer"
+                      width={320}
+                      height={320}
+                      sizes="(max-width: 768px) 100vw, 320px"
                       className="w-full h-auto object-contain select-none"
                       draggable={false}
                     />
@@ -145,9 +148,9 @@ export function LaunchModal({ open, onClose }: LaunchModalProps) {
                   </div>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        </>
+            </m.div>
+          </m.div>
+        </LazyMotion>
       )}
     </AnimatePresence>
   );

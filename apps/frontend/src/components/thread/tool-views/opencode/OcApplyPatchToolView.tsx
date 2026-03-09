@@ -130,11 +130,13 @@ export function OcApplyPatchToolView({
                 const hasDiff = file.type !== 'delete' && (file.before || file.after);
 
                 return (
-                  <div key={i} className={i > 0 ? 'border-t border-border/60' : ''}>
+                  <div key={file.relativePath} className={i > 0 ? 'border-t border-border/60' : ''}>
                     {/* File header */}
-                    <div
-                      className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-muted transition-colors"
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left hover:bg-muted transition-colors"
                       onClick={() => setExpandedFile(isExpanded ? null : i)}
+                      aria-expanded={hasDiff ? isExpanded : undefined}
                     >
                       {hasDiff ? (
                         isExpanded ? (
@@ -151,15 +153,16 @@ export function OcApplyPatchToolView({
                       </Badge>
 
                       <span className="text-xs min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
-                        <span
-                          className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-primary transition-colors"
+                        <button
+                          type="button"
+                          className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 hover:text-primary transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             openFile(file.relativePath);
                           }}
                         >
                           {name}
-                        </span>
+                        </button>
                         {dir && (
                           <span className="text-muted-foreground/40 truncate text-[10px]">{dir}</span>
                         )}
@@ -169,7 +172,7 @@ export function OcApplyPatchToolView({
                         {file.additions > 0 && <span className="text-emerald-500">+{file.additions}</span>}
                         {file.deletions > 0 && <span className="text-red-500">-{file.deletions}</span>}
                       </div>
-                    </div>
+                    </button>
 
                     {/* Expanded diff */}
                     {isExpanded && hasDiff && (
@@ -230,14 +233,68 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
     return lines;
   }, [patch]);
 
+  const diffEntries = useMemo(() => {
+    let leftNum = 0;
+    let rightNum = 0;
+
+    return diffLines.map((line) => {
+      if (line.startsWith('@@')) {
+        const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (match) {
+          leftNum = parseInt(match[1], 10) - 1;
+          rightNum = parseInt(match[2], 10) - 1;
+        }
+
+        return {
+          line,
+          codeLine: '',
+          key: `hunk:${leftNum + 1}:${rightNum + 1}:${line}`,
+        };
+      }
+
+      if (line.startsWith('+')) {
+        rightNum += 1;
+        return {
+          line,
+          codeLine: line.substring(1),
+          key: `add:${leftNum}:${rightNum}:${line.substring(1)}`,
+        };
+      }
+
+      if (line.startsWith('-')) {
+        leftNum += 1;
+        return {
+          line,
+          codeLine: line.substring(1),
+          key: `del:${leftNum}:${rightNum}:${line.substring(1)}`,
+        };
+      }
+
+      if (line === '') {
+        leftNum += 1;
+        rightNum += 1;
+        return {
+          line,
+          codeLine: '',
+          key: `ctx:${leftNum}:${rightNum}:`,
+        };
+      }
+
+      leftNum += 1;
+      rightNum += 1;
+      const content = line.startsWith(' ') ? line.substring(1) : line;
+      return {
+        line,
+        codeLine: content,
+        key: `ctx:${leftNum}:${rightNum}:${content}`,
+      };
+    });
+  }, [diffLines]);
+
   // Extract code content (without +/-/space prefix) for highlighting
   const codeLines = useMemo(
-    () =>
-      diffLines.map((line) => {
-        if (line.startsWith('@@') || line === '') return '';
-        return line.length > 0 ? line.substring(1) : '';
-      }),
-    [diffLines],
+    () => diffEntries.map((entry) => entry.codeLine),
+    [diffEntries],
   );
 
   const highlighted = useDiffHighlight(codeLines, filePath);
@@ -245,7 +302,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
   return (
     <div className="border-t border-border/30 bg-muted/30 overflow-auto max-h-96">
       <pre className="p-3 font-mono text-[11px] leading-[1.6] select-text whitespace-pre-wrap break-all">
-        {diffLines.map((line, i) => {
+        {diffEntries.map(({ key, line }, i) => {
           const isAdd = line.startsWith('+');
           const isDel = line.startsWith('-');
           const isHunk = line.startsWith('@@');
@@ -257,7 +314,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
 
           if (isHunk || line === '') {
             return (
-              <div key={i} className={cls}>
+              <div key={key} className={cls}>
                 {line || ' '}
               </div>
             );
@@ -269,7 +326,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
           if (highlightedTokens) {
             const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
             return (
-              <div key={i} className={cls}>
+              <div key={key} className={cls}>
                 <span
                   className={cn(
                     isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -285,7 +342,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
 
           return (
             <div
-              key={i}
+              key={key}
               className={cn(
                 cls,
                 isAdd && 'text-emerald-600 dark:text-emerald-400',

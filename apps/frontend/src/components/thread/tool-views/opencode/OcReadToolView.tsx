@@ -181,9 +181,11 @@ function SingleFileRow({
 
   return (
     <div className="rounded-lg border border-border overflow-hidden bg-card">
-      <div
-        className={`flex items-center gap-2.5 px-3 py-2.5 ${hasContent ? 'cursor-pointer hover:bg-muted' : ''} transition-colors`}
+      <button
+        type="button"
+        className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${hasContent ? 'hover:bg-muted' : ''} transition-colors`}
         onClick={hasContent ? onToggle : undefined}
+        aria-expanded={hasContent ? expanded : undefined}
       >
         {hasContent ? (
           expanded ? (
@@ -195,13 +197,14 @@ function SingleFileRow({
           <FileText className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400 flex-shrink-0" />
         )}
         <span className="text-xs min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
-          <span
-            className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+          <button
+            type="button"
+            className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
             onClick={(e) => { e.stopPropagation(); onOpenFile(); }}
             title={displayPath}
           >
             {filename}
-          </span>
+          </button>
           {dir && <span className="text-muted-foreground/40 truncate text-[11px]">{dir}</span>}
         </span>
         {hasContent && (
@@ -209,7 +212,7 @@ function SingleFileRow({
             {expanded ? 'collapse' : 'expand'}
           </span>
         )}
-      </div>
+      </button>
       {expanded && hasContent && (
         <div className="border-t border-border">
           <CodeHighlight
@@ -234,15 +237,16 @@ function MultiFileList({
 }) {
   return (
     <div className="py-1">
-      {paths.map((fp, i) => {
+      {paths.map((fp) => {
         const dp = toDisplayPath(fp);
         const fname = getFilename(dp);
         const dir = getDirectory(dp);
 
         return (
-          <div
-            key={i}
-            className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-muted transition-colors group"
+          <button
+            key={fp}
+            type="button"
+            className="flex w-full items-center gap-2.5 px-4 py-1.5 text-left hover:bg-muted transition-colors group"
             onClick={() => onFileClick(fp)}
             title={dp}
           >
@@ -251,7 +255,7 @@ function MultiFileList({
               <span className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0">{fname}</span>
               {dir && <span className="text-muted-foreground/40 truncate text-[11px]">{dir}</span>}
             </span>
-          </div>
+          </button>
         );
       })}
     </div>

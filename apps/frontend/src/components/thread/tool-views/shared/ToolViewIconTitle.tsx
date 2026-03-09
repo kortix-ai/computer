@@ -36,13 +36,14 @@ export function ToolViewIconTitle({
       </div>
       <div className="min-w-0 flex-1 overflow-hidden">
         {onTitleClick ? (
-          <div
+          <button
+            type="button"
             className="text-base font-medium text-foreground truncate cursor-pointer hover:text-primary transition-colors"
             onClick={onTitleClick}
             title={subtitle || undefined}
           >
             {title}
-          </div>
+          </button>
         ) : (
           <div className="text-base font-medium text-foreground truncate">
             {title}
@@ -57,4 +58,3 @@ export function ToolViewIconTitle({
     </div>
   );
 }
-

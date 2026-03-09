@@ -1,11 +1,16 @@
-'use client';
-
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Globe, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AnimatedBg } from '@/components/ui/animated-bg';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
+
+export const metadata: Metadata = {
+  title: 'Not available in your country',
+  description:
+    'Learn why Kortix is unavailable in your region and how to contact support.',
+};
 
 export default function CountryError() {
   return (

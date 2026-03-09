@@ -216,34 +216,54 @@ export const AppWindow = memo(function AppWindow({
         <>
           <div 
             className="absolute top-0 left-0 w-2 h-full cursor-ew-resize z-[100] pointer-events-auto" 
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize window from left edge"
             onMouseDown={(e) => handleResize(e, 'w')}
           />
           <div 
             className="absolute top-0 right-0 w-2 h-full cursor-ew-resize z-[100] pointer-events-auto" 
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize window from right edge"
             onMouseDown={(e) => handleResize(e, 'e')}
           />
           <div 
             className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize z-[100] pointer-events-auto" 
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize window from bottom edge"
             onMouseDown={(e) => handleResize(e, 's')}
           />
           <div 
             className="absolute top-0 left-0 w-full h-2 cursor-ns-resize z-[100] pointer-events-auto" 
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize window from top edge"
             onMouseDown={(e) => handleResize(e, 'n')}
           />
           <div 
             className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize z-[100] pointer-events-auto" 
+            role="separator"
+            aria-label="Resize window from top left corner"
             onMouseDown={(e) => handleResize(e, 'nw')}
           />
           <div 
             className="absolute top-0 right-0 w-4 h-4 cursor-nesw-resize z-[100] pointer-events-auto" 
+            role="separator"
+            aria-label="Resize window from top right corner"
             onMouseDown={(e) => handleResize(e, 'ne')}
           />
           <div 
             className="absolute bottom-0 left-0 w-4 h-4 cursor-nesw-resize z-[100] pointer-events-auto" 
+            role="separator"
+            aria-label="Resize window from bottom left corner"
             onMouseDown={(e) => handleResize(e, 'sw')}
           />
           <div 
             className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-[100] pointer-events-auto" 
+            role="separator"
+            aria-label="Resize window from bottom right corner"
             onMouseDown={(e) => handleResize(e, 'se')}
           />
         </>
