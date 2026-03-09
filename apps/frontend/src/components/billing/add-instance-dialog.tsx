@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Server, Loader2, MapPin, Cpu, HardDrive, MemoryStick } from 'lucide-react';
 import {
   Dialog,
@@ -48,8 +49,10 @@ export function AddInstanceDialog() {
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Listen for custom event to open
   useEffect(() => {
@@ -78,6 +81,8 @@ export function AddInstanceDialog() {
       fetchTypes(location);
       setSelected(null);
       setStep('select');
+      setError(null);
+      setPortalUrl(null);
     }
   }, [open, location, fetchTypes]);
 
@@ -85,23 +90,33 @@ export function AddInstanceDialog() {
     if (!selected) return;
     setCreating(true);
     setError(null);
+    setPortalUrl(null);
     try {
-      await createInstance({
+      const result = await createInstance({
         provider: 'hetzner',
         hetznerServerType: selected,
         location,
         backgroundProvisioning: true,
       });
-      toast.success('Instance provisioning started. It should be ready in 2-3 minutes.');
-      // Force-refresh billing/instances state immediately and then again shortly
-      // after, so provisioning rows appear without requiring manual refresh.
+      // Invalidate so the instances list is fresh when the user returns
       invalidateAccountState(queryClient, true, true);
-      setTimeout(() => invalidateAccountState(queryClient, true, true), 2500);
-      setTimeout(() => invalidateAccountState(queryClient, true, true), 10000);
       setOpen(false);
+      // Redirect to the provisioning loader page
+      const sandboxId = result?.data?.sandbox_id;
+      if (sandboxId) {
+        router.push(`/setting-up?mode=instance&sandbox_id=${sandboxId}`);
+      } else {
+        toast.success('Instance provisioning started. It should be ready in 2-3 minutes.');
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to create instance');
-      toast.error(err?.message || 'Failed to create instance');
+      const code = err?.code ?? err?.data?.code;
+      if (code === 'no_payment_method') {
+        const url = err?.data?.portal_url ?? null;
+        setPortalUrl(url);
+        setError(err?.message || 'No payment method on file.');
+      } else {
+        setError(err?.message || 'Failed to create instance');
+      }
     } finally {
       setCreating(false);
     }
@@ -225,6 +240,23 @@ export function AddInstanceDialog() {
                   </div>
                 ) : (
                   <p className="text-xs text-destructive">No machine selected. Go back and choose a server type.</p>
+                )}
+
+                {/* Payment / billing errors */}
+                {error && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                    <p className="text-xs text-destructive">{error}</p>
+                    {portalUrl && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full text-xs h-8"
+                        onClick={() => window.open(portalUrl, '_blank')}
+                      >
+                        Set up payment method →
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}

@@ -1,6 +1,7 @@
 export * from './pricing';
 export * from './credit-purchase';
 export * from './credit-transactions';
+export { default as BillingHistory } from './billing-history';
 export * from './subscription-cancellation-card';
 export * from './scheduled-downgrade-card';
 export { TierBadge } from './tier-badge';

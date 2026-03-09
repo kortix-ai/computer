@@ -58,12 +58,14 @@ import { CreditBalanceDisplay, CreditPurchaseModal } from '@/components/billing/
 import { ScheduledDowngradeCard } from '@/components/billing/scheduled-downgrade-card';
 import { 
     useAccountState,
+    accountStateKeys,
     accountStateSelectors,
     useCreatePortalSession,
     useCancelSubscription,
     useReactivateSubscription,
     invalidateAccountState,
 } from '@/hooks/billing';
+import { billingApi } from '@/lib/api/billing';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -94,6 +96,7 @@ import { ReferralsTab } from '@/components/referrals/referrals-tab';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Keyboard, CheckCircle2, HelpCircle, ShieldCheck, Volume2, EyeOff, Globe } from 'lucide-react';
 import CreditTransactions from '@/components/billing/credit-transactions';
+import BillingHistory from '@/components/billing/billing-history';
 import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
 import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
@@ -1408,14 +1411,31 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
 
     const billingActive = isBillingEnabled();
 
-    // Use unified account state hook
+    // Use unified account state hook.
+    // When any instance is provisioning, poll every 5s so the status
+    // badge updates automatically without the user having to reopen Settings.
     const {
         data: accountState,
         isLoading: isLoadingSubscription,
         error: subscriptionError,
         refetch: refetchSubscription
-    } = useAccountState({
+    } = useQuery<AccountState>({
+        queryKey: accountStateKeys.state(),
+        queryFn: () => billingApi.getAccountState(false),
         enabled: !!session && !authLoading,
+        staleTime: 1000 * 60 * 2,
+        gcTime: 1000 * 60 * 15,
+        refetchOnWindowFocus: false,
+        refetchOnMount: true,
+        // Poll every 5s while any instance is still provisioning; stop otherwise.
+        refetchInterval: (query) => {
+            const data = query.state.data as AccountState | undefined;
+            const hasProvisioning = data?.instances?.some(
+                (i: any) => i.status === 'provisioning'
+            );
+            return hasProvisioning ? 5000 : false;
+        },
+        refetchIntervalInBackground: false,
     });
     
     // Get commitment info from account state
@@ -1875,14 +1895,14 @@ function CreditsHelpAlert() {
 
 function TransactionsTab() {
     return (
-        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 min-w-0 max-w-full overflow-x-hidden">
+        <div className="p-4 sm:p-6 pb-12 sm:pb-6 space-y-4 min-w-0 max-w-full overflow-x-hidden">
             <div>
-                <h3 className="text-lg font-semibold mb-1">Transactions</h3>
+                <h3 className="text-lg font-semibold mb-0.5">Billing History</h3>
                 <p className="text-sm text-muted-foreground">
-                    View your credit transaction history including renewals, purchases, and usage.
+                    All payments — plan grants, credit top-ups, auto top-ups, and compute usage.
                 </p>
             </div>
-            <CreditTransactions />
+            <BillingHistory />
         </div>
     );
 }

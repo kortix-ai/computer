@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useServerStore } from '@/stores/server-store';
 import { useProviders } from '@/hooks/platform/use-sandbox';
-import { getSandbox, getSandboxUrl } from '@/lib/platform-client';
+import { getSandbox, getSandboxUrl, listSandboxes } from '@/lib/platform-client';
 import { authenticatedFetch } from '@/lib/auth-token';
 
 // Lazy load heavy components
@@ -54,6 +54,10 @@ export default function SettingUpPage() {
   const [isSavingAutoTopup, setIsSavingAutoTopup] = useState(false);
   const [subscriptionSuccess, setSubscriptionSuccess] = useState(false);
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
+  // mode=instance: provisioning an additional instance (skip subscription/auto-topup steps)
+  const [instanceMode, setInstanceMode] = useState(false);
+  const [instanceModeId, setInstanceModeId] = useState<string | null>(null);
+  const [paramsReady, setParamsReady] = useState(false);
   const isRunning = useRef(false);
   const runSeqRef = useRef(0);
   const autoStartedRef = useRef(false);
@@ -63,6 +67,11 @@ export default function SettingUpPage() {
     const params = new URLSearchParams(window.location.search);
     setSubscriptionSuccess(params.get('subscription') === 'success');
     setCheckoutSessionId(params.get('session_id'));
+    if (params.get('mode') === 'instance' && params.get('sandbox_id')) {
+      setInstanceMode(true);
+      setInstanceModeId(params.get('sandbox_id'));
+    }
+    setParamsReady(true);
   }, []);
 
   const isHetznerDefault = providersInfo?.default === 'hetzner';
@@ -146,6 +155,69 @@ export default function SettingUpPage() {
 
     return false;
   }, [isHetznerDefault, getHetznerProvisioningProgress]);
+
+  /**
+   * Poll a specific additional instance (by sandbox_id) until it's active + healthy.
+   * Used when mode=instance (add-instance flow).
+   */
+  const pollAdditionalInstanceReady = useCallback(async (
+    sandboxId: string,
+    isCurrentRun: () => boolean,
+    timeoutMs = 660000,
+  ): Promise<boolean> => {
+    const started = Date.now();
+    const deadline = started + timeoutMs;
+
+    while (Date.now() < deadline && isCurrentRun()) {
+      const elapsedSec = Math.floor((Date.now() - started) / 1000);
+      setSandboxProgress(Math.max(2, Math.min(96, getHetznerProvisioningProgress(elapsedSec))));
+
+      try {
+        // Poll account-state instances to find this sandbox's status
+        const acctRes = await backendApi.get<any>('/billing/account-state', { showErrors: false, timeout: 10000 });
+        if (acctRes.success && Array.isArray(acctRes.data?.instances)) {
+          const inst = acctRes.data.instances.find((i: any) => i.sandbox_id === sandboxId);
+          if (inst?.status === 'error') {
+            throw new Error('Instance provisioning failed. Please try again.');
+          }
+          if (inst?.status === 'active') {
+            // DB says active — find it in sandbox list and health-check it
+            try {
+              const all = await listSandboxes();
+              const sandbox = all.find((s) => s.sandbox_id === sandboxId);
+              if (sandbox?.external_id) {
+                const sandboxUrl = getSandboxUrl(sandbox);
+                const healthRes = await authenticatedFetch(
+                  `${sandboxUrl}/kortix/health`,
+                  { signal: AbortSignal.timeout(5000) },
+                  { retryOnAuthError: false },
+                );
+                if (healthRes.ok) {
+                  const health = await healthRes.json().catch(() => null) as { version?: string } | null;
+                  const version = typeof health?.version === 'string' ? health.version : '';
+                  if (version && version !== '0.0.0') {
+                    setSandboxProgress(100);
+                    return true;
+                  }
+                }
+              }
+            } catch {
+              // Not reachable yet — keep polling
+            }
+          }
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('provisioning failed')) throw err;
+      }
+
+      if (elapsedSec > 0 && elapsedSec % 60 === 0) {
+        console.log(`[setting-up/instance] ${elapsedSec}s elapsed, still waiting...`);
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+
+    return false;
+  }, [getHetznerProvisioningProgress]);
 
   const waitForPaidActivation = useCallback(async (isCurrentRun: () => boolean, timeoutMs = 60000): Promise<boolean> => {
     const deadline = Date.now() + timeoutMs;
@@ -269,6 +341,22 @@ export default function SettingUpPage() {
     setErrorMessage('');
 
     try {
+      // ── Instance mode: provisioning an additional Hetzner instance ──────────
+      // Skip subscription/auto-topup steps — just wait for the sandbox to be ready.
+      if (instanceMode && instanceModeId) {
+        setStep('sandbox');
+        setPlanTier('pro');
+        setSandboxProgress(0);
+
+        const ready = await pollAdditionalInstanceReady(instanceModeId, isCurrentRun);
+        if (!isCurrentRun()) return;
+        if (!ready) {
+          throw new Error('Instance is still provisioning. It can take up to ~10 minutes on first boot. Please check your instances in Settings.');
+        }
+        continueToDashboard();
+        return;
+      }
+
       // Step 1: Check account status
       if (!isCurrentRun()) return;
       setStep('checking');
@@ -385,13 +473,13 @@ export default function SettingUpPage() {
         isRunning.current = false;
       }
     }
-  }, [user, isHetznerDefault, pollSandboxReady, continueToDashboard, subscriptionSuccess, waitForPaidActivation]);
+  }, [user, isHetznerDefault, pollSandboxReady, pollAdditionalInstanceReady, continueToDashboard, subscriptionSuccess, waitForPaidActivation, instanceMode, instanceModeId]);
 
   useEffect(() => {
-    if (!user || autoStartedRef.current) return;
+    if (!user || !paramsReady || autoStartedRef.current) return;
     autoStartedRef.current = true;
     runSetup();
-  }, [user, runSetup]);
+  }, [user, paramsReady, runSetup]);
 
   const handleRetry = () => {
     setStep('checking');
@@ -415,7 +503,9 @@ export default function SettingUpPage() {
                   ? 'Connect Your Instance'
                   : step === 'auto_topup'
                     ? 'Optional Auto-Topup'
-                    : 'Setting Up Your Account'}
+                    : instanceMode
+                      ? 'Provisioning Instance'
+                      : 'Setting Up Your Account'}
               </h1>
 
               <p className="text-[16px] text-foreground/60 text-center leading-relaxed">
@@ -423,7 +513,9 @@ export default function SettingUpPage() {
                   ? 'Free plan users bring their own compute. Add one instance to continue.'
                   : step === 'auto_topup'
                     ? 'Configure automatic credit reloads now, or skip and do it later in billing settings.'
-                    : 'We\'re creating your workspace and preparing everything you need to get started.'}
+                    : instanceMode
+                      ? 'Your new Hetzner instance is being provisioned. This usually takes 2-3 minutes.'
+                      : 'We\'re creating your workspace and preparing everything you need to get started.'}
               </p>
 
               {(step === 'connect' || step === 'auto_topup') && errorMessage && (
@@ -434,11 +526,13 @@ export default function SettingUpPage() {
                 <CardContent className="p-6">
                   <div className="flex flex-col gap-4">
                     {(
-                      planTier === 'pro'
-                        ? (['checking', 'subscription', 'sandbox', 'auto_topup'] as const)
-                        : planTier === 'free'
-                          ? (['checking', 'subscription', 'connect'] as const)
-                          : (['checking', 'subscription', 'sandbox'] as const)
+                      instanceMode
+                        ? (['sandbox'] as const)
+                        : planTier === 'pro'
+                          ? (['checking', 'subscription', 'sandbox', 'auto_topup'] as const)
+                          : planTier === 'free'
+                            ? (['checking', 'subscription', 'connect'] as const)
+                            : (['checking', 'subscription', 'sandbox'] as const)
                     ).map((s) => {
                       const info = stepInfo[s];
                       const isActive = s === step;

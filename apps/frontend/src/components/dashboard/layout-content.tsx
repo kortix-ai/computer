@@ -463,15 +463,18 @@ export default function DashboardLayoutContent({
 					return;
 				}
 			} catch {
-				// Sandbox not reachable — treat as not onboarded
-				router.replace("/onboarding");
+				// Sandbox not reachable — don't redirect, ConnectingScreen handles this
+				setOnboardingChecked(true);
 				return;
 			}
 
-			// 2. Onboarding NOT complete — check if setup wizard was done (DB).
-			//    If setup is also not done, redirect to /auth to show the wizard.
-			//    The auth page will fetch the wizard step from the backend directly.
-			try {
+		// 2. Onboarding NOT complete — check if setup wizard was done (DB).
+		//    If setup is also not done, redirect to /auth to show the wizard.
+		//    The auth page will fetch the wizard step from the backend directly.
+		//    Only applies to self-hosted (isSelfHosted()); cloud users skip this.
+		try {
+			const { isSelfHosted } = await import("@/lib/config");
+			if (isSelfHosted()) {
 				const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8008/v1";
 				const setupRes = await authenticatedFetch(`${backendUrl}/setup/setup-status`, undefined, { retryOnAuthError: false });
 				if (setupRes.ok) {
@@ -483,9 +486,10 @@ export default function DashboardLayoutContent({
 						return;
 					}
 				}
-			} catch {
-				// Setup check failed — fall through to onboarding
 			}
+		} catch {
+			// Setup check failed — fall through to onboarding
+		}
 
 			// 3. Setup done but onboarding not — go to onboarding
 			router.replace("/onboarding");

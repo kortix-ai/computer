@@ -183,48 +183,144 @@ export function createCloudSandboxRouter(
           return c.json({ success: false, error: 'Additional instances require a paid plan' }, 403);
         }
 
-        if (!account?.stripeSubscriptionId) {
-          return c.json({ success: false, error: 'No active subscription found' }, 400);
+        if (account?.stripeSubscriptionId) {
+          // Look up server type price from Hetzner
+          const loc = requestedOrDefaultLocation;
+          const serverTypes = await fetchServerTypes(loc);
+          const selectedType = serverTypes.find((st) => st.name === requestedOrDefaultServerType);
+
+          if (!selectedType) {
+            return c.json({ success: false, error: `Server type not found: ${requestedHetznerServerType}` }, 400);
+          }
+
+          const monthlyPrice = Math.round(selectedType.priceMonthly * COMPUTE_PRICE_MARKUP * 100); // cents
+
+          const stripe = getStripe();
+          const customer = await getCustomerByAccountId(accountId);
+          if (!customer) {
+            return c.json({ success: false, error: 'No billing customer found' }, 400);
+          }
+
+          // ── Payment method check ────────────────────────────────────────────
+          // Verify the Stripe customer has a default payment method before we
+          // create the subscription item (which immediately invoices them).
+          // Better to fail fast here than to provision a server and then have
+          // Stripe mark the subscription past_due because there's no card.
+          let defaultPaymentMethodId: string | null = null;
+          try {
+            const stripeCustomer = await stripe.customers.retrieve(customer.id, {
+              expand: ['invoice_settings.default_payment_method'],
+            });
+            if (!('deleted' in stripeCustomer) || !stripeCustomer.deleted) {
+              const defaultPm = stripeCustomer.invoice_settings?.default_payment_method;
+              if (typeof defaultPm === 'string') {
+                defaultPaymentMethodId = defaultPm;
+              } else if (defaultPm && typeof defaultPm === 'object' && 'id' in defaultPm) {
+                defaultPaymentMethodId = (defaultPm as { id: string }).id;
+              }
+            }
+          } catch (pmErr) {
+            console.warn('[PLATFORM] Could not retrieve customer payment method status:', pmErr);
+          }
+
+          // Fall back to checking if any card is attached
+          if (!defaultPaymentMethodId) {
+            try {
+              const methods = await stripe.paymentMethods.list({ customer: customer.id, type: 'card', limit: 1 });
+              defaultPaymentMethodId = methods.data[0]?.id ?? null;
+            } catch {
+              // ignore
+            }
+          }
+
+          if (!defaultPaymentMethodId) {
+            // Generate a portal session URL so the frontend can direct them
+            // straight to Stripe's payment method setup screen.
+            let portalUrl: string | null = null;
+            try {
+              const portalSession = await stripe.billingPortal.sessions.create({
+                customer: customer.id,
+                return_url: `${config.FRONTEND_URL ?? 'https://app.kortix.com'}/subscription`,
+              });
+              portalUrl = portalSession.url;
+            } catch {
+              // portal URL generation is best-effort
+            }
+
+            return c.json({
+              success: false,
+              error: 'No payment method on file. Please add a default payment method before adding an instance.',
+              code: 'no_payment_method',
+              portal_url: portalUrl,
+            }, 402);
+          }
+
+          // ── Create Stripe subscription item ────────────────────────────────
+          // proration_behavior: 'always_invoice' creates an immediate invoice
+          // for the pro-rated amount. The subscription's default payment method
+          // (or the customer's default) is charged automatically.
+          const subItem = await stripe.subscriptionItems.create({
+            subscription: account.stripeSubscriptionId,
+            price_data: {
+              currency: 'usd',
+              product: getComputeProductId(),
+              unit_amount: monthlyPrice,
+              recurring: { interval: 'month' },
+            },
+            quantity: 1,
+            proration_behavior: 'always_invoice',
+            metadata: {
+              type: 'compute_instance',
+              server_type: requestedHetznerServerType || config.HETZNER_DEFAULT_SERVER_TYPE,
+              location: loc,
+              account_id: accountId,
+            },
+          });
+
+          stripeSubscriptionItemId = subItem.id;
+          console.log(`[PLATFORM] Created Stripe sub item ${subItem.id} for additional instance (${requestedHetznerServerType}, $${(monthlyPrice / 100).toFixed(2)}/mo)`);
+
+          // ── Verify the immediate invoice was paid ──────────────────────────
+          // 'always_invoice' creates an invoice synchronously. Poll it briefly
+          // to confirm payment succeeded before we provision the server.
+          // Stripe usually processes it within a second or two.
+          try {
+            const invoiceList = await stripe.invoices.list({
+              subscription: account.stripeSubscriptionId,
+              limit: 1,
+            });
+            const latestInvoice = invoiceList.data[0];
+            if (latestInvoice && latestInvoice.status === 'open') {
+              // Invoice exists but payment hasn't cleared — pay it now
+              const paid = await stripe.invoices.pay(latestInvoice.id);
+              if (paid.status !== 'paid') {
+                // Roll back the subscription item
+                await stripe.subscriptionItems.del(subItem.id);
+                return c.json({
+                  success: false,
+                  error: 'Payment failed. Please check your payment method and try again.',
+                  code: 'payment_failed',
+                }, 402);
+              }
+            } else if (latestInvoice && latestInvoice.status === 'uncollectible') {
+              await stripe.subscriptionItems.del(subItem.id);
+              return c.json({
+                success: false,
+                error: 'Payment could not be collected. Please update your payment method.',
+                code: 'payment_failed',
+              }, 402);
+            }
+            // status === 'paid' or 'void' or undefined — all fine to proceed
+          } catch (invoiceErr) {
+            console.warn('[PLATFORM] Invoice verification failed (non-fatal, proceeding):', invoiceErr);
+            // Don't block provisioning if invoice check itself errors —
+            // Stripe will handle failed payments via webhook/dunning.
+          }
+        } else {
+          // No Stripe subscription (e.g. manually-granted tier for dev/testing).
+          // Tier check already passed above — skip Stripe item creation and provision directly.
+          console.log('[PLATFORM] No stripeSubscriptionId — skipping Stripe item creation, provisioning directly');
         }
-
-        // Look up server type price from Hetzner
-        const loc = requestedOrDefaultLocation;
-        const serverTypes = await fetchServerTypes(loc);
-        const selectedType = serverTypes.find((st) => st.name === requestedOrDefaultServerType);
-
-        if (!selectedType) {
-          return c.json({ success: false, error: `Server type not found: ${requestedHetznerServerType}` }, 400);
-        }
-
-        const monthlyPrice = Math.round(selectedType.priceMonthly * COMPUTE_PRICE_MARKUP * 100); // cents
-
-        const stripe = getStripe();
-        const customer = await getCustomerByAccountId(accountId);
-        if (!customer) {
-          return c.json({ success: false, error: 'No billing customer found' }, 400);
-        }
-
-        // Add a subscription item with inline price_data
-        const subItem = await stripe.subscriptionItems.create({
-          subscription: account.stripeSubscriptionId,
-          price_data: {
-            currency: 'usd',
-            product: getComputeProductId(),
-            unit_amount: monthlyPrice,
-            recurring: { interval: 'month' },
-          },
-          quantity: 1,
-          proration_behavior: 'always_invoice',
-          metadata: {
-            type: 'compute_instance',
-            server_type: requestedHetznerServerType || config.HETZNER_DEFAULT_SERVER_TYPE,
-            location: loc,
-            account_id: accountId,
-          },
-        });
-
-        stripeSubscriptionItemId = subItem.id;
-        console.log(`[PLATFORM] Created Stripe sub item ${subItem.id} for additional instance (${requestedHetznerServerType}, $${(monthlyPrice / 100).toFixed(2)}/mo)`);
       }
 
       const provider = getProvider(providerName);

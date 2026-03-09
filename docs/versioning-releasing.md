@@ -6,6 +6,9 @@ Current released version is `0.7.14`. The next release should be `0.7.15`.
 
 Update this section after every release so the next person knows what version to use.
 
+> **Hetzner snapshot:** After releasing, run `./sandbox/build-hetzner-snapshot.sh 0.7.15`
+> to build the Hetzner snapshot for the new version (see [Hetzner Snapshot](#hetzner-snapshot) below).
+
 ## Overview
 
 Kortix Computer uses **one version number** across all artifacts. The release
@@ -480,4 +483,97 @@ Validate scripts (syntax check):
 ```bash
 bash -n scripts/release/sandbox/release.sh && echo OK
 bash -n scripts/release/sandbox/push.sh && echo OK
+```
+
+---
+
+## Hetzner Snapshot
+
+Hetzner sandboxes boot from a pre-built snapshot (VPS image) that already has
+Docker installed and the `kortix/computer` image pre-pulled for fast cold starts.
+
+### Naming convention
+
+```
+kortix-computer-v{VERSION}     e.g. kortix-computer-v0.7.15
+```
+
+Same format as the Daytona snapshot (`kortix-sandbox-v{VERSION}`), just prefixed
+with `computer` to avoid confusion. The API resolves it automatically from
+`SANDBOX_VERSION` — no env var needed.
+
+### Why always build the SMALL snapshot (cx23 / 40 GB)
+
+The snapshot disk size gates which server types users can pick in the
+**Add Instance** UI (`listServerTypes` in `hetzner.ts` filters `disk >= snapshotDisk`).
+Building on `cx23` (40 GB disk, the smallest non-deprecated x86 type) means ALL
+Hetzner server types ≥ 40 GB are shown — from cx23 up to the biggest ccx63.
+
+**Never build on a larger server** — a 80 GB snapshot would hide cx23 and other
+small machines from the UI.
+
+### How to build
+
+**Prerequisites:**
+- `HETZNER_API_KEY` set (or in `kortix-api/.env`)
+- `kortix/computer:{VERSION}` already published on Docker Hub
+- `curl`, `jq`, `ssh`, `ssh-keygen` on PATH
+
+```bash
+# Build snapshot for v0.7.15
+./sandbox/build-hetzner-snapshot.sh 0.7.15
+
+# Dry run (validates Docker Hub image exists, checks for existing snapshot)
+./sandbox/build-hetzner-snapshot.sh --dry-run 0.7.15
+
+# Different location (default: nbg1 — Nuremberg)
+./sandbox/build-hetzner-snapshot.sh --location ash 0.7.15
+
+# Also attach your personal SSH key for debugging
+./sandbox/build-hetzner-snapshot.sh --ssh-key my-key-name 0.7.15
+```
+
+The script:
+1. Creates a temporary `cx23` server (Ubuntu 24.04)
+2. Generates + uploads a temp SSH key
+3. cloud-init: installs Docker, pulls `kortix/computer:{VERSION}`, sets up `kortix-sandbox.service`
+4. Waits for setup to finish (verified via SSH)
+5. Powers off cleanly, takes snapshot
+6. Deletes the temp server + temp SSH key
+
+Takes ~8–12 minutes total.
+
+### After the snapshot is built
+
+The script prints the snapshot ID. Update `kortix-api/.env`:
+
+```bash
+# In kortix-api/.env:
+HETZNER_SNAPSHOT_ID=<id-printed-by-script>
+```
+
+Or leave `HETZNER_SNAPSHOT_ID` unset — the API auto-resolves by description
+`kortix-computer-v{SANDBOX_VERSION}` via `HETZNER_SNAPSHOT_DESCRIPTION` in `config.ts`.
+
+### Release checklist addition
+
+After the standard `./scripts/release/sandbox/release.sh --docker 0.7.15`:
+
+```bash
+# 1. Build Hetzner snapshot (requires Docker Hub image to be published first)
+./sandbox/build-hetzner-snapshot.sh 0.7.15
+
+# 2. Update .env with new snapshot ID (printed by the script)
+# HETZNER_SNAPSHOT_ID=<new-id>
+
+# 3. Deploy API so it picks up the new snapshot
+git push
+```
+
+### Artifact tracking
+
+Add to the `artifacts[]` array in `packages/sandbox/CHANGELOG.json` after building:
+
+```json
+{ "name": "kortix-computer-v0.7.15", "target": "hetzner-snapshot" }
 ```
