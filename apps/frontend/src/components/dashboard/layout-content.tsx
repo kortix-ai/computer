@@ -586,7 +586,7 @@ export default function DashboardLayoutContent({
 					<Suspense fallback={null}>
 						<OnboardingProvider>
 							<TabBar />
-							<div className="flex-1 min-h-0 flex flex-col md:border-l md:border-r md:border-border/50 overflow-hidden">
+							<div className="flex-1 min-h-0 flex flex-col md:border md:border-b-0 md:border-border/50 overflow-hidden md:rounded-t-xl">
 								<SessionTabsContainer>{children}</SessionTabsContainer>
 							</div>
 						</OnboardingProvider>

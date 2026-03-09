@@ -478,14 +478,14 @@ function TabItem({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'group p-2 relative flex items-center text-xs select-none cursor-pointer',
-        'transition-[height,color] duration-200 ease-out',
+        'group relative flex items-center text-xs select-none cursor-pointer h-full',
+        'transition-colors duration-150',
         isDashboard
           ? 'w-9 md:w-10 justify-center px-0'
           : 'gap-2 pl-3 pr-2 max-w-[200px] min-w-[100px]',
         isActive
-          ? 'h-[36px] md:h-[40px] text-foreground'
-          : 'h-[28px] md:h-[32px] mb-[4px] rounded-[8px] text-muted-foreground hover:text-foreground',
+          ? 'text-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
       )}
     >
       {/* Drag-over indicator */}
@@ -494,6 +494,11 @@ function TabItem({
       )}
       {isDragOver && dragSide === 'right' && (
         <div className="absolute right-0 top-2 bottom-2 w-[2px] bg-primary rounded-full z-10 animate-in fade-in-0 duration-150" />
+      )}
+
+      {/* Active tab indicator */}
+      {isActive && (
+        <div className="absolute bottom-0 inset-x-1 h-[2px] bg-primary rounded-full" />
       )}
 
       {/* Icon with status */}
@@ -1038,19 +1043,20 @@ export function TabBar() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setActiveTab, handleClose]);
 
-  // Scroll active tab into view when it changes
+  // Scroll active tab into view when it changes or tabs are added/removed
   useEffect(() => {
     if (!activeTabId || !scrollRef.current) return;
-    const container = scrollRef.current;
-    const activeEl = container.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
-    if (activeEl) {
-      const containerRect = container.getBoundingClientRect();
-      const tabRect = activeEl.getBoundingClientRect();
-      if (tabRect.left < containerRect.left || tabRect.right > containerRect.right) {
+    // Use rAF to ensure layout has settled after tab add/remove
+    const raf = requestAnimationFrame(() => {
+      const container = scrollRef.current;
+      if (!container) return;
+      const activeEl = container.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
+      if (activeEl) {
         activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       }
-    }
-  }, [activeTabId]);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [activeTabId, orderedTabs.length]);
 
   // ---------------------------------------------------------------------------
   // Scroll fade: hide the gradient when scrolled fully right (or no overflow).
@@ -1081,118 +1087,28 @@ export function TabBar() {
     window.history.pushState(null, '', '/dashboard');
   }, [setActiveTab]);
 
-  // ─── Morph border: measure active tab position ─────────────────────────
-  const springConfig = { stiffness: 500, damping: 40, mass: 0.8 };
-  const morphLeft = useSpring(0, springConfig);
-  const morphWidth = useSpring(0, springConfig);
-
-  useLayoutEffect(() => {
-    if (!activeTabId || !scrollRef.current || !tabBarRef.current) return;
-    const el = scrollRef.current.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
-    if (!el) return;
-    const barRect = tabBarRef.current.getBoundingClientRect();
-    const tRect = el.getBoundingClientRect();
-    morphLeft.set(tRect.left - barRect.left);
-    morphWidth.set(tRect.width);
-  }, [activeTabId, orderedTabs, morphLeft, morphWidth]);
-
-  const R = 12; // top corner radius — matches content area's rounded-tl-xl (12px)
-  const ER = 10; // ear radius
-  const SVG_H = 46;
-
-  // Single continuous path: floor → left ear (concave) → tab walls → top corners → right ear (concave) → floor
-  // The concave ears are achieved by drawing the FILL path with cubic beziers that curve OUTWARD
-  const morphPath = useTransform(
-    [morphLeft, morphWidth],
-    ([l, w]: number[]) => {
-      const barW = (tabBarRef.current?.offsetWidth ?? 2000);
-      const tabL = l as number;
-      const tabR = tabL + (w as number);
-      const f = SVG_H; // floor y
-      const t = 8;     // top y — enough room so the border stroke isn't clipped by overflow-hidden
-      // Clamp the left ear so it doesn't go off-screen
-      const leftEarStart = Math.max(0, tabL - ER);
-      const hasLeftEar = tabL > ER;
-      const hasRightEar = tabR + ER < barW;
-      const rightEarEnd = Math.min(barW, tabR + ER);
-
-      const parts: string[] = [];
-
-      // Floor line from left edge to left ear
-      parts.push(`M -1,${f + 1}`); // start below floor to avoid gap
-      parts.push(`L -1,${f}`);
-      parts.push(`L ${leftEarStart},${f}`);
-
-      if (hasLeftEar) {
-        // Left concave ear
-        parts.push(`C ${tabL},${f} ${tabL},${f} ${tabL},${f - ER}`);
-      } else {
-        // No room for ear — go straight up
-        parts.push(`L ${tabL},${f}`);
-        parts.push(`L ${tabL},${f - ER}`);
-      }
-
-      // Left wall up → top-left corner → top edge → top-right corner → right wall down
-      parts.push(`L ${tabL},${t + R}`);
-      parts.push(`Q ${tabL},${t} ${tabL + R},${t}`);
-      parts.push(`L ${tabR - R},${t}`);
-      parts.push(`Q ${tabR},${t} ${tabR},${t + R}`);
-      parts.push(`L ${tabR},${f - ER}`);
-
-      if (hasRightEar) {
-        // Right concave ear
-        parts.push(`C ${tabR},${f} ${tabR},${f} ${rightEarEnd},${f}`);
-      } else {
-        parts.push(`L ${tabR},${f}`);
-        parts.push(`L ${rightEarEnd},${f}`);
-      }
-
-      // Floor line to right edge
-      parts.push(`L ${barW + 1},${f}`);
-      parts.push(`L ${barW + 1},${f + 1}`); // below floor to avoid gap
-
-      return parts.join(' ');
-    },
-  );
-
   // Always render the bar so the bg-sidebar strip above the content curve is consistent
   if (orderedTabs.length === 0) {
-    return <div className="flex-shrink-0 bg-sidebar h-[42px] md:h-[46px]" />;
+    return <div className="flex-shrink-0 bg-sidebar h-[38px] md:h-[40px]" />;
   }
 
   return (
     <>
       <div
         ref={tabBarRef}
-        className="flex-shrink-0 flex items-end bg-sidebar h-[42px] md:h-[46px] relative"
+        className="flex-shrink-0 flex items-stretch bg-sidebar h-[38px] md:h-[40px] relative"
         role="tablist"
       >
-        {/* Morphing border SVG — positioned over the full tab bar width, overflow visible so floor stroke isn't clipped */}
-        {activeTabId && (
-          <svg
-            className="absolute bottom-0 left-0 w-full pointer-events-none z-30"
-            style={{ height: SVG_H }}
-            overflow="visible"
-            preserveAspectRatio="none"
-          >
-            <motion.path
-              d={morphPath}
-              className="fill-background stroke-border/50"
-              strokeWidth={1}
-            />
-          </svg>
-        )}
-
         <div
           ref={scrollRef}
           onWheel={handleWheel}
-          className="flex-1 flex items-end overflow-x-auto px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative z-40"
+          className="flex-1 flex items-stretch overflow-x-auto px-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative"
         >
           {orderedTabs.map((tab, index) => {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;
             const busy = tab.type === 'session' && pending === 0 && (debouncedBusy[tab.id] || statuses[tab.id]?.type === 'busy' || statuses[tab.id]?.type === 'retry');
             return (
-              <div key={tab.id} data-tab-id={tab.id} className={cn("flex items-end relative", tab.id === activeTabId ? "z-20" : "z-0")}>
+              <div key={tab.id} data-tab-id={tab.id} className="flex items-stretch relative">
                 <TabItem
                   tab={tab}
                   index={index}
@@ -1215,7 +1131,7 @@ export function TabBar() {
         </div>
 
         {/* Action buttons group — solid bg so tabs don't scroll behind */}
-        <div className="flex-shrink-0 flex items-center gap-px pr-1 relative z-20 bg-sidebar pl-2 h-full">
+        <div className="flex-shrink-0 flex items-center gap-px pr-1 relative bg-sidebar pl-2 h-full">
           {/* Fade edge — hidden when scrolled fully right */}
           <div ref={scrollFadeRef} className="absolute right-full top-0 bottom-0 w-3 bg-gradient-to-r from-transparent to-sidebar pointer-events-none transition-opacity duration-150" />
           {/* New tab button */}
