@@ -207,8 +207,9 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
 
   return (
     <header className={cn(
-      "w-full px-5 pt-4",
-      isAbsolute ? "" : "sticky top-0 z-50"
+      "w-full px-5 pt-4 transition-all duration-300",
+      isAbsolute ? "" : "sticky top-0 z-50",
+      hasScrolled && !isAbsolute && "bg-background/80 backdrop-blur-xl border-b border-border/40 pb-2"
     )}>
       <div className="grid grid-cols-3 items-center h-[52px]">
         {/* Left — Logo */}
@@ -266,7 +267,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
         </nav>
 
         {/* Right — Actions */}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-3">
           {/* GitHub stars */}
           <a
             href="https://github.com/kortix-ai/suna"
@@ -283,13 +284,26 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
           </a>
 
           {user ? (
-            <PowerButton href="/dashboard" label="Dashboard" />
+            <Link 
+              href="/dashboard"
+              className="inline-flex items-center justify-center h-9 px-4 text-sm font-medium text-primary-foreground bg-primary rounded-full hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              Dashboard
+            </Link>
           ) : (
-            <PowerButton
-              href={ctaLink}
-              onClick={() => trackCtaSignup()}
-              label="Launch Kortix"
-            />
+            <button
+              onClick={() => {
+                trackCtaSignup();
+                // If on homepage, trigger launch modal? 
+                // Since this component doesn't know about launch modal state, we'll just link to auth for now
+                // or replicate the launch modal trigger logic if we lift state up.
+                // For simplicity/robustness, linking to /auth or respecting the ctaLink logic:
+                router.push(ctaLink);
+              }}
+              className="inline-flex items-center justify-center h-9 px-5 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-full hover:opacity-90 transition-opacity shadow-sm"
+            >
+              Launch Kortix
+            </button>
           )}
 
           {/* Mobile Menu Button */}

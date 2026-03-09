@@ -6,6 +6,7 @@ import { trackCtaSignup } from '@/lib/analytics/gtm';
 import { isMobileDevice } from '@/lib/utils/is-mobile-device';
 import { Check, Copy, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { GithubButton } from './github-button';
 
 const INSTALL_CMD = 'curl -fsSL https://get.kortix.ai/install | bash';
 
@@ -95,11 +96,7 @@ export function HeroSection() {
               <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>
-          <Button asChild variant="outline" size="lg" className="h-12 px-8 text-base">
-            <Link href="https://github.com/kortix-ai/suna" target="_blank" rel="noopener noreferrer">
-              View on GitHub
-            </Link>
-          </Button>
+          <GithubButton />
         </div>
 
         {/* Trust signals */}
