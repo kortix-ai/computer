@@ -13,7 +13,7 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { sandboxes, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
 import { createApiKey } from '../../repositories/api-keys';
@@ -90,14 +90,26 @@ export function createCloudSandboxRouter(
     try {
       const accountId = await resolveAccountId(userId);
 
+      // Return the best available sandbox: prefer active, then provisioning,
+      // then stopped/error so the dashboard can show a recovery UI instead of
+      // a blank 404 that leaves the user stuck.
       const [sandbox] = await db
         .select()
         .from(sandboxes)
         .where(
           and(
             eq(sandboxes.accountId, accountId),
-            eq(sandboxes.status, 'active'),
+            inArray(sandboxes.status, ['active', 'provisioning', 'stopped', 'error']),
           ),
+        )
+        .orderBy(
+          sql`CASE status
+            WHEN 'active'       THEN 0
+            WHEN 'provisioning' THEN 1
+            WHEN 'stopped'      THEN 2
+            WHEN 'error'        THEN 3
+            ELSE                     4
+          END`
         )
         .limit(1);
 
