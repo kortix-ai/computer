@@ -284,6 +284,53 @@ export async function middleware(request: NextRequest) {
     // Skip billing checks when billing is not enabled (self-hosted deployments)
     const billingEnabled = process.env.NEXT_PUBLIC_BILLING_ENABLED === 'true';
     if (!billingEnabled) {
+      // For protected routes, check if setup wizard and onboarding are complete.
+      // If not, redirect back to /auth (wizard) or /onboarding.
+      // Skip this check if the user is already heading to /onboarding.
+      if (
+        PROTECTED_ROUTES.some(route => pathname.startsWith(route)) &&
+        !request.nextUrl.searchParams.has('skip_onboarding')
+      ) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || '';
+
+        if (backendUrl && accessToken) {
+          const apiBase = backendUrl.replace(/\/v1\/?$/, '');
+          try {
+            const [setupRes, onboardingRes] = await Promise.all([
+              fetch(`${apiBase}/v1/setup/setup-status`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` },
+                signal: AbortSignal.timeout(3000),
+              }),
+              fetch(`${apiBase}/v1/setup/onboarding-status`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` },
+                signal: AbortSignal.timeout(3000),
+              }),
+            ]);
+
+            if (setupRes.ok) {
+              const setupData = await setupRes.json() as { complete?: boolean };
+              if (!setupData.complete) {
+                const url = request.nextUrl.clone();
+                url.pathname = '/auth';
+                return NextResponse.redirect(url);
+              }
+            }
+
+            if (onboardingRes.ok) {
+              const onboardingData = await onboardingRes.json() as { complete?: boolean };
+              if (!onboardingData.complete) {
+                const url = request.nextUrl.clone();
+                url.pathname = '/onboarding';
+                return NextResponse.redirect(url);
+              }
+            }
+          } catch {
+            // Backend unreachable — let through, client-side guard will handle it
+          }
+        }
+      }
       return supabaseResponse;
     }
 

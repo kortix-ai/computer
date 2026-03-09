@@ -413,12 +413,36 @@ export default function DashboardLayoutContent({
 			// 1. Check onboarding first — if complete, setup is implicitly done too.
 			const instanceUrl = useServerStore.getState().getActiveServerUrl();
 
-			// Sandbox not registered yet, or platform/bootstrap requests failed.
-			// Do not deadlock the whole dashboard behind the skeleton while waiting
-			// for a server URL that may never arrive. Routes like Integrations and
-			// Settings should still render, and this effect will re-run if a sandbox
-			// is registered later.
+			// Sandbox not registered yet — check backend setup/onboarding status
+			// before allowing access. If setup wizard or onboarding isn't done,
+			// redirect the user back instead of letting them into the dashboard.
+			// If both are complete (or the check fails), allow through so routes
+			// like Settings remain accessible while the sandbox reconnects.
 			if (!instanceUrl) {
+				try {
+					const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8008/v1";
+					const [setupRes, onboardingRes] = await Promise.all([
+						authenticatedFetch(`${backendUrl}/setup/setup-status`, undefined, { retryOnAuthError: false }).catch(() => null),
+						authenticatedFetch(`${backendUrl}/setup/onboarding-status`, undefined, { retryOnAuthError: false }).catch(() => null),
+					]);
+
+					const setupData = setupRes?.ok ? await setupRes.json() : null;
+					const onboardingData = onboardingRes?.ok ? await onboardingRes.json() : null;
+
+					if (setupData && !setupData.complete) {
+						// Setup wizard not done — redirect to auth to show the wizard
+						router.replace("/auth");
+						return;
+					}
+					if (onboardingData && !onboardingData.complete) {
+						// Setup done but onboarding not — redirect to onboarding
+						router.replace("/onboarding");
+						return;
+					}
+				} catch {
+					// Backend unreachable — allow through so Settings/Integrations
+					// remain accessible; the effect will re-run when a sandbox appears.
+				}
 				setOnboardingChecked(true);
 				return;
 			}
