@@ -48,7 +48,13 @@ export function useInstallStatus() {
 
 /* ─── Step Indicator ───────────────────────────────────────────────────────── */
 
-function StepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
+function StepIndicator({
+  currentStep,
+  onStepClick,
+}: {
+  currentStep: 1 | 2 | 3 | 4;
+  onStepClick?: (step: number) => void;
+}) {
   const steps = [1, 2, 3, 4];
 
   return (
@@ -56,16 +62,21 @@ function StepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
       {steps.map((step, i) => {
         const isDone = step < currentStep;
         const isActive = step === currentStep;
+        const isClickable = isDone && !!onStepClick;
         return (
           <div key={step} className="contents">
-            <div
+            <button
+              type="button"
+              disabled={!isClickable}
+              onClick={() => isClickable && onStepClick(step)}
               className={`rounded-full transition-all duration-300 ${
                 isDone
                   ? 'w-1.5 h-1.5 bg-foreground/40'
                   : isActive
                     ? 'w-6 h-1.5 bg-foreground'
                     : 'w-1.5 h-1.5 bg-foreground/15'
-              }`}
+              } ${isClickable ? 'cursor-pointer hover:bg-foreground/70 scale-125' : 'cursor-default'}`}
+              aria-label={isClickable ? `Go to step ${step}` : undefined}
             />
             {i < steps.length - 1 && <div className="w-1" />}
           </div>
@@ -542,6 +553,13 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
     onWizardStepChange?.(3);
   }, [onWizardStepChange]);
 
+  // ── Step click: navigate back to any completed step ──
+  const handleStepClick = useCallback((step: number) => {
+    if (step >= wizardStep) return; // can only go back
+    setWizardStep(step as 1 | 2 | 3);
+    onWizardStepChange?.(step);
+  }, [wizardStep, onWizardStepChange]);
+
   // ── Tool keys done (step 3 → navigate to onboarding) ──
   const handleToolKeysContinue = useCallback(async () => {
     setCompleting(true);
@@ -773,7 +791,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
           </p>
         </div>
 
-        <StepIndicator currentStep={3} />
+        <StepIndicator currentStep={3} onStepClick={handleStepClick} />
 
         <ToolSecretsStep
           onContinue={handleToolKeysContinue}
@@ -799,7 +817,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
             </p>
           </div>
 
-          <StepIndicator currentStep={2} />
+          <StepIndicator currentStep={2} onStepClick={handleStepClick} />
 
           <div className="flex flex-col gap-2.5">
             {sandboxProviders.includes('local_docker') && (
@@ -873,7 +891,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
           </p>
         </div>
 
-        <StepIndicator currentStep={2} />
+        <StepIndicator currentStep={2} onStepClick={handleStepClick} />
 
         {!sandboxReady ? (
           sandboxError ? (
@@ -915,12 +933,10 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
             </div>
           )
         ) : (
-          <div className="h-[400px]">
-            <ProviderSettings
-              variant="setup"
-              onContinue={handleProviderContinue}
-            />
-          </div>
+          <ProviderSettings
+            variant="setup"
+            onContinue={handleProviderContinue}
+          />
         )}
       </div>
     );

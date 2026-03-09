@@ -14,7 +14,7 @@ import { ConnectProviderContent } from '@/components/providers/connect-provider-
 import { useOpenCodeProviders } from '@/hooks/opencode/use-opencode-sessions';
 import { Button } from '@/components/ui/button';
 import { KortixLoader } from '@/components/ui/kortix-loader';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ProviderLogo,
   PROVIDER_LABELS,
@@ -35,6 +35,9 @@ export function ProviderSettings({
   onProviderChange,
 }: ProviderSettingsProps) {
   const { data: providersData, isLoading, isError, refetch } = useOpenCodeProviders();
+  // Track whether the success banner was freshly triggered (just connected)
+  const prevConnectedCountRef = useRef(0);
+  const [justConnectedId, setJustConnectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!providersData || isError)) {
@@ -58,6 +61,17 @@ export function ProviderSettings({
     return (providersData.all ?? []).filter((provider) => connectedIds.has(provider.id));
   }, [providersData]);
 
+  // Detect when a new provider gets connected and flash the success banner
+  useEffect(() => {
+    const prev = prevConnectedCountRef.current;
+    const curr = connectedProviders.length;
+    if (variant === 'setup' && curr > prev && curr > 0) {
+      const newest = connectedProviders[connectedProviders.length - 1];
+      setJustConnectedId(newest.id);
+    }
+    prevConnectedCountRef.current = curr;
+  }, [connectedProviders, variant]);
+
   const canContinue = variant === 'setup' ? hasLLMProvider : true;
 
   if (connecting) {
@@ -72,7 +86,39 @@ export function ProviderSettings({
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="space-y-8">
+        <div className="space-y-3">
+          {/* ── Setup variant: connected providers success banner ── */}
+          {variant === 'setup' && connectedProviders.length > 0 && (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/60 dark:bg-emerald-950/20 px-3.5 py-3">
+              <div className="flex items-center gap-2 mb-0.5">
+                <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                  Connected
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5 mt-2">
+                {connectedProviders.map((provider) => {
+                  const isNew = justConnectedId === provider.id;
+                  return (
+                    <div
+                      key={provider.id}
+                      className={`flex items-center gap-2.5 transition-all duration-300 ${isNew ? 'opacity-100' : 'opacity-80'}`}
+                    >
+                      <ProviderLogo providerID={provider.id} name={provider.name} size="default" />
+                      <span className="text-[13px] font-medium text-foreground/80 flex-1">
+                        {PROVIDER_LABELS[provider.id] || provider.name}
+                      </span>
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        {Object.keys(provider.models ?? {}).length} models
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Settings variant: connected providers section ── */}
           {variant === 'settings' && (
             <section>
               <div className="flex items-center justify-between mb-4">
@@ -84,7 +130,7 @@ export function ProviderSettings({
               
               {connectedProviders.length > 0 ? (
                 <div className="grid gap-3">
-                  {connectedProviders.map((provider, index) => {
+                  {connectedProviders.map((provider) => {
                     const modelCount = Object.keys(provider.models ?? {}).length;
                     const source = (provider as { source?: string }).source;
                     return (
@@ -144,7 +190,7 @@ export function ProviderSettings({
       </div>
 
       {variant === 'setup' && (
-        <div className="flex-shrink-0 pt-6 mt-2 border-t border-border/40">
+        <div className="flex-shrink-0 pt-4 mt-2 border-t border-border/40">
           {!canContinue && !hasProvider && !connecting && (
             <p className="text-xs text-muted-foreground text-center mb-3">
               At least one LLM provider is required

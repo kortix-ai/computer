@@ -956,8 +956,8 @@ function SelfHostedLoginContent() {
     return (
       <div className="fixed inset-0 overflow-hidden">
         <WallpaperBackground />
-        <div className="relative z-10 flex h-full items-center justify-center px-4 py-16">
-          <div className="w-full max-w-[400px] bg-background/75 dark:bg-background/70 backdrop-blur-2xl border border-foreground/[0.08] rounded-2xl p-7">
+        <div className="relative z-10 flex h-full items-center justify-center px-4 py-8">
+          <div className="w-full max-w-[400px] max-h-[calc(100vh-4rem)] overflow-y-auto bg-background/75 dark:bg-background/70 backdrop-blur-2xl border border-foreground/[0.08] rounded-2xl p-7">
             <SelfHostedForm
               returnUrl={returnUrl}
               installed={installed}
@@ -1046,7 +1046,7 @@ function SelfHostedLoginContent() {
               exit={{ opacity: 0, y: 20, scale: 0.97 }}
               transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
             >
-              <div className="bg-background/75 dark:bg-background/70 backdrop-blur-2xl border border-foreground/[0.08] rounded-2xl p-7">
+              <div className="bg-background/75 dark:bg-background/70 backdrop-blur-2xl border border-foreground/[0.08] rounded-2xl p-7 max-h-[calc(100vh-4rem)] overflow-y-auto">
 
                 <SelfHostedForm
                   returnUrl={returnUrl}
