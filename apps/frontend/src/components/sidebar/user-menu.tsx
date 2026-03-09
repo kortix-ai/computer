@@ -49,6 +49,7 @@ import {
   type MenuItemDef,
   type SettingsTabId,
 } from '@/lib/menu-registry';
+import { PlanUpgradeCard } from './plan-upgrade-card';
 
 // ============================================================================
 // Types
@@ -164,7 +165,7 @@ export function UserMenu({ user }: UserMenuProps) {
   return (
     <>
       <SidebarMenu>
-        <SidebarMenuItem className="relative">
+        <SidebarMenuItem className="relative group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
           {billingActive && (
             <div className="absolute bottom-full left-0 right-0 mb-2 px-0 group-data-[collapsible=icon]:hidden z-50 flex flex-col gap-2">
               {/* <SpotlightCard className="bg-zinc-200/60 dark:bg-zinc-800/60 backdrop-blur-md cursor-pointer">
@@ -178,14 +179,7 @@ export function UserMenu({ user }: UserMenuProps) {
                 </div>
               </SpotlightCard> */}
               {isFreeTier && (
-                <Button
-                  onClick={() => { trackCtaUpgrade(); setShowPlanModal(true); }}
-                  variant="default"
-                  size="lg"
-                  className="w-full"
-                >
-                  {t('upgrade')}
-                </Button>
+                <PlanUpgradeCard />
               )}
             </div>
           )}

@@ -232,7 +232,7 @@ function SessionItem({
                   onRename(session.id, session.title || '');
                 }}
               >
-                <Pencil className="mr-2 h-4 w-4" />
+                <Pencil className="h-4 w-4" />
                 Rename
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -243,7 +243,7 @@ function SessionItem({
                   onCompact(session.id);
                 }}
               >
-                <Layers className="mr-2 h-4 w-4" />
+                <Layers className="h-4 w-4" />
                 Compact
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -254,7 +254,7 @@ function SessionItem({
                   onArchive(session.id);
                 }}
               >
-                <Archive className="mr-2 h-4 w-4" />
+                <Archive className="h-4 w-4" />
                 Archive
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -265,7 +265,7 @@ function SessionItem({
                   onDelete(session.id, session.title || 'Untitled');
                 }}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
+                <Trash2 className="h-4 w-4" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
