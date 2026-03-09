@@ -384,6 +384,26 @@ export async function proxyToDaytona(
   }
 
   // All retries exhausted
+  // If the sandbox no longer exists on the provider (deleted externally),
+  // auto-archive the DB row so it stops appearing as active and the proxy
+  // stops hammering a dead server on every request.
+  try {
+    const [row] = await db
+      .select({ sandboxId: sandboxes.sandboxId, status: sandboxes.status })
+      .from(sandboxes)
+      .where(and(eq(sandboxes.externalId, sandboxId), ne(sandboxes.status, 'archived')))
+      .limit(1);
+    if (row) {
+      await db
+        .update(sandboxes)
+        .set({ status: 'error', updatedAt: new Date() })
+        .where(eq(sandboxes.sandboxId, row.sandboxId));
+      console.warn(`[PREVIEW] Auto-marked sandbox ${row.sandboxId} (external: ${sandboxId}) as error after all retries failed`);
+    }
+  } catch (archiveErr) {
+    console.warn('[PREVIEW] Failed to auto-mark sandbox as error:', archiveErr);
+  }
+
   throw new HTTPException(503, {
     message: 'Sandbox is waking up. Please retry in a few seconds.',
   });
