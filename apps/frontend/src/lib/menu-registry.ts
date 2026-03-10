@@ -33,6 +33,7 @@ import {
   Compass,
   Activity,
   Rocket,
+  Sparkles,
 
   // Actions
   Plus,
@@ -357,6 +358,15 @@ export const menuRegistry: MenuItemDef[] = [
     kind: 'navigate',
     href: '/dashboard',
     tabType: 'dashboard',
+  },
+  {
+    id: 'marketplace',
+    label: 'Marketplace',
+    icon: Sparkles,
+    group: 'navigation',
+    showIn: ['commandPalette'],
+    kind: 'navigate',
+    href: '/marketplace',
   },
   {
     id: 'scheduled-tasks',
