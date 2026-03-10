@@ -45,6 +45,9 @@ COPY LICENSE /LICENSE
 # Changelog (read by version endpoint — avoids GitHub raw fetch for private repos)
 COPY packages/sandbox/CHANGELOG.json /app/CHANGELOG.json
 
+# Sandbox package.json — single source of truth for SANDBOX_VERSION
+COPY packages/sandbox/package.json /app/packages/sandbox/package.json
+
 # Copy installed node_modules and source from deps stage.
 # Root node_modules contains all hoisted deps (--shamefully-hoist).
 COPY --from=deps /app/node_modules ./node_modules

@@ -5,8 +5,9 @@ import { z } from 'zod';
 export type SandboxProviderName = 'daytona' | 'local_docker' | 'hetzner';
 export type InternalKortixEnv = 'dev' | 'staging' | 'prod';
 
-/** Single source of truth for the sandbox version. Update on each release. */
-export const SANDBOX_VERSION = '0.7.17';
+/** Single source of truth for the sandbox version — read from packages/sandbox/package.json. */
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+export const SANDBOX_VERSION: string = require('../../packages/sandbox/package.json').version;
 
 // ─── Zod Helpers ────────────────────────────────────────────────────────────
 
