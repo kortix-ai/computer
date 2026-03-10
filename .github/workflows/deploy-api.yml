@@ -17,6 +17,7 @@ jobs:
     name: Deploy to VPS
     runs-on: ubuntu-latest
     environment: production
+    if: github.ref == 'refs/heads/staging'
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
