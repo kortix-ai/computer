@@ -1,1 +1,21 @@
-encryptionsalt: v1:fvDwy32Navg=:v1:dbGPTi8q0AjY/jGG:rNG3SWFfgIsBYZWo3GB34H5x/sXD+g==
+encryptionsalt: v1:Aa2ilDJtu7c=:v1:nnNyG9/K+T8Kd7MP:S0AVOC8gH3cTcBmwGM1ntX5ZMFK7IQ==
+config:
+  aws:region: us-west-2
+  kortix-eks:clusterName: kortix-prod
+  kortix-eks:clusterVersion: "1.31"
+  kortix-eks:domain: new-api.kortix.com
+  kortix-eks:nodeInstanceType: t3.large
+  kortix-eks:nodeMinSize: "2"
+  kortix-eks:nodeDesiredSize: "3"
+  kortix-eks:nodeMaxSize: "6"
+  kortix-eks:nodeDiskSize: "50"
+  kortix-eks:appPort: "8008"
+  kortix-eks:appMinReplicas: "2"
+  kortix-eks:appMaxReplicas: "6"
+  kortix-eks:cpuTargetUtilization: "70"
+  kortix-eks:memoryTargetUtilization: "80"
+  kortix-eks:cpuRequest: 500m
+  kortix-eks:memoryRequest: 512Mi
+  kortix-eks:cpuLimit: "2"
+  kortix-eks:memoryLimit: 2G
+  kortix-eks:acmCertificateArn: arn:aws:acm:us-west-2:935064898258:certificate/3bbb799a-4d87-4171-a695-4ec575031bd2

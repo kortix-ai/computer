@@ -1,10 +1,10 @@
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
-import * as eks from "@pulumi/eks";
 import { commonTags, namespace, appName, awsRegion } from "./config";
 
 interface IamArgs {
-  cluster: eks.Cluster;
+  oidcProviderUrl: pulumi.Output<string>;
+  oidcProviderArn: pulumi.Output<string>;
 }
 
 function createIrsaRole(
@@ -17,8 +17,10 @@ function createIrsaRole(
   const assumeRolePolicy = pulumi
     .all([oidcProviderUrl, oidcProviderArn])
     .apply(([url, arn]) => {
-      const oidcSub = `${url}:sub`;
-      const oidcAud = `${url}:aud`;
+      // Strip https:// prefix for OIDC condition keys
+      const oidcHost = url.replace(/^https?:\/\//, "");
+      const oidcSub = `${oidcHost}:sub`;
+      const oidcAud = `${oidcHost}:aud`;
       return JSON.stringify({
         Version: "2012-10-17",
         Statement: [
@@ -44,15 +46,13 @@ function createIrsaRole(
 }
 
 export function createIamRoles(args: IamArgs) {
-  const oidcProviderUrl = args.cluster.core.oidcProvider!.apply((p) => p!.url);
-  const oidcProviderArn = args.cluster.core.oidcProvider!.apply((p) => p!.arn);
   const accountId = aws.getCallerIdentity().then((id) => id.accountId);
 
   // Pod role — SecretsManager read + CloudWatch Logs
   const podRole = createIrsaRole(
     "kortix-api-pod-role",
-    oidcProviderUrl,
-    oidcProviderArn,
+    args.oidcProviderUrl,
+    args.oidcProviderArn,
     namespace,
     appName,
   );
@@ -88,8 +88,8 @@ export function createIamRoles(args: IamArgs) {
   // ALB Controller role
   const albControllerRole = createIrsaRole(
     "kortix-alb-controller-role",
-    oidcProviderUrl,
-    oidcProviderArn,
+    args.oidcProviderUrl,
+    args.oidcProviderArn,
     "kube-system",
     "aws-load-balancer-controller",
   );
@@ -146,8 +146,8 @@ export function createIamRoles(args: IamArgs) {
   // ESO role — Secrets Manager access
   const esoRole = createIrsaRole(
     "kortix-eso-role",
-    oidcProviderUrl,
-    oidcProviderArn,
+    args.oidcProviderUrl,
+    args.oidcProviderArn,
     "external-secrets",
     "external-secrets",
   );

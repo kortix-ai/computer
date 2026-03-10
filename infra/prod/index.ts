@@ -23,30 +23,34 @@ const imageTag = config.get("imageTag") || "latest";
 
 const ghcrImage = "ghcr.io/kortix-ai/computer";
 
-const { vpc, albSg } = createVpc();
+const { vpc, vpcId, publicSubnetIds, privateSubnetIds, albSg } = createVpc();
 
-const { cluster } = createEksCluster({
-  vpcId: vpc.vpcId,
-  publicSubnetIds: vpc.publicSubnetIds,
-  privateSubnetIds: vpc.privateSubnetIds,
+const { cluster, kubeconfig, oidcProviderUrl, oidcProviderArn } = createEksCluster({
+  vpcId,
+  publicSubnetIds,
+  privateSubnetIds,
   albSgId: albSg.id,
 });
 
+
 const k8sProvider = new k8s.Provider("k8s-provider", {
-  kubeconfig: cluster.kubeconfigJson,
+  kubeconfig,
 });
 
 const { repo } = createEcrRepository();
 const imageUri = pulumi.interpolate`${ghcrImage}:${imageTag}`;
 
-const { podRole, albControllerRole, esoRole } = createIamRoles({ cluster });
+const { podRole, albControllerRole, esoRole } = createIamRoles({
+  oidcProviderUrl,
+  oidcProviderArn,
+});
 
 const { secret } = createSecrets();
 
 createAlbController({
   k8sProvider,
   albControllerRoleArn: albControllerRole.arn,
-  vpcId: vpc.vpcId,
+  vpcId,
 });
 
 const { clusterSecretStore } = createExternalSecrets({
@@ -54,7 +58,7 @@ const { clusterSecretStore } = createExternalSecrets({
   esoRoleArn: esoRole.arn,
 });
 
-createMonitoring({ clusterName: cluster.eksCluster.name });
+createMonitoring({ clusterName: cluster.name });
 
 const { ns } = createNamespace({ k8sProvider });
 
@@ -88,9 +92,8 @@ createIngress({
 createHpa({ k8sProvider, ns, deployment });
 createPdb({ k8sProvider, ns });
 
-export const vpcId = vpc.vpcId;
-export const eksClusterName = cluster.eksCluster.name;
-export const kubeconfig = pulumi.secret(cluster.kubeconfigJson);
+export const outputVpcId = vpc.id;
+export const eksClusterName = cluster.name;
 export const ecrRepositoryUrl = repo.repositoryUrl;
 export const secretArn = secret.arn;
 export const albDnsName = pulumi.interpolate`Check 'kubectl get ingress -n kortix' for ALB DNS after deploy`;

@@ -58,22 +58,30 @@ const SECRET_KEYS = [
   "KORTIX_ADMIN_API_KEY",
   // Internal
   "INTERNAL_SERVICE_KEY",
+  // App Config (non-secret but managed centrally)
+  "ALLOWED_SANDBOX_PROVIDERS",
+  "INTERNAL_KORTIX_ENV",
+  "KORTIX_ROUTER_INTERNAL_ENABLED",
+  "KORTIX_BILLING_INTERNAL_ENABLED",
+  "KORTIX_DEPLOYMENTS_ENABLED",
+  "CHANNELS_ENABLED",
+  "TUNNEL_ENABLED",
+  "KORTIX_URL",
+  "SANDBOX_IMAGE",
+  "FRONTEND_URL",
+  "CRON_API_URL",
+  "CHANNELS_PUBLIC_URL",
+  "INTEGRATION_AUTH_PROVIDER",
+  "PIPEDREAM_ENVIRONMENT",
+  "SESSION_PRUNING_ENABLED",
+  "SCHEDULER_ENABLED",
 ] as const;
 
 export function createSecrets() {
-  const placeholder = Object.fromEntries(
-    SECRET_KEYS.map((key) => [key, "REPLACE_ME"]),
-  );
-
   const secret = new aws.secretsmanager.Secret("kortix-api-config", {
     name: secretName,
     description: "Kortix API production secrets (JSON blob)",
     tags: commonTags,
-  });
-
-  new aws.secretsmanager.SecretVersion("kortix-api-config-initial", {
-    secretId: secret.id,
-    secretString: JSON.stringify(placeholder),
   });
 
   return { secret };
