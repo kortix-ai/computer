@@ -24,9 +24,9 @@ COPY packages/ ./packages/
 # Install pnpm and deps for this app + workspace packages it depends on.
 # --shamefully-hoist flattens node_modules (no symlinks) so COPY works on all Docker versions.
 # Include devDeps so drizzle-kit is available for schema push at runtime.
-# The second filter ensures opencode-channels' own deps (chat, @chat-adapter/*) are installed.
+# opencode-channels is now a public npm package (@kortix/opencode-channels) — no workspace filter needed.
 RUN corepack enable pnpm && \
-    pnpm install --filter ./${SERVICE}... --filter ./packages/opencode-channels... --shamefully-hoist --prod=false
+    pnpm install --filter ./${SERVICE}... --shamefully-hoist --prod=false
 
 # ---- Runner Stage ----
 FROM base AS runner
@@ -58,10 +58,6 @@ COPY --from=deps /app/packages/db/src ./packages/db/src
 COPY --from=deps /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config.ts
 COPY --from=deps /app/packages/db/package.json ./packages/db/package.json
 COPY --from=deps /app/packages/db/tsconfig.json ./packages/db/tsconfig.json
-COPY --from=deps /app/packages/opencode-channels/src ./packages/opencode-channels/src
-COPY --from=deps /app/packages/opencode-channels/package.json ./packages/opencode-channels/package.json
-COPY --from=deps /app/packages/opencode-channels/tsconfig.json ./packages/opencode-channels/tsconfig.json
-COPY --from=deps /app/packages/opencode-channels/tsconfig.build.json ./packages/opencode-channels/tsconfig.build.json
 COPY --from=deps /app/packages/agent-tunnel/src ./packages/agent-tunnel/src
 COPY --from=deps /app/packages/agent-tunnel/package.json ./packages/agent-tunnel/package.json
 
@@ -70,21 +66,6 @@ COPY infra/supabase/migrations ./infra/supabase/migrations
 
 # Copy the app (source + its node_modules if any)
 COPY --from=deps /app/${SERVICE} ./${SERVICE}
-
-# Fix opencode-channels resolution.
-# pnpm creates a workspace symlink in the app's node_modules that breaks after COPY
-# (symlink target is relative to deps stage layout). Replace with a direct copy of the
-# TS source and patch "main" to point at src/ since Bun runs TypeScript natively.
-RUN rm -f ${SERVICE}/node_modules/agent-tunnel 2>/dev/null; \
-    mkdir -p ${SERVICE}/node_modules/agent-tunnel
-COPY --from=deps /app/packages/agent-tunnel/src ./${SERVICE}/node_modules/agent-tunnel/src
-COPY --from=deps /app/packages/agent-tunnel/package.json ./${SERVICE}/node_modules/agent-tunnel/package.json
-
-RUN rm -f ${SERVICE}/node_modules/opencode-channels 2>/dev/null; \
-    mkdir -p ${SERVICE}/node_modules/opencode-channels
-COPY --from=deps /app/packages/opencode-channels/src ./${SERVICE}/node_modules/opencode-channels/src
-COPY --from=deps /app/packages/opencode-channels/package.json ./${SERVICE}/node_modules/opencode-channels/package.json
-RUN sed -i 's|"main": "dist/index.js"|"main": "src/index.ts"|;s|"types": "dist/index.d.ts"|"types": "src/index.ts"|' ${SERVICE}/node_modules/opencode-channels/package.json
 
 # Fix agent-tunnel resolution.
 # pnpm may resolve agent-tunnel to a workspace/file symlink target that does not

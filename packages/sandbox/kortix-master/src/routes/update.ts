@@ -7,8 +7,9 @@ import { coreSupervisor } from '../services/core-supervisor';
 
 const VERSION_FILE = '/opt/kortix/.version';
 const CHANGELOG_FILE = '/opt/kortix/CHANGELOG.json';
-const UPDATE_LOCK_FILE = '/tmp/.kortix-update-lock';
-const UPDATE_STATUS_FILE = '/tmp/.kortix-update-status.json';
+const KORTIX_DATA_DIR = '/workspace/.kortix';
+const UPDATE_LOCK_FILE = KORTIX_DATA_DIR + '/update-lock.json';
+const UPDATE_STATUS_FILE = KORTIX_DATA_DIR + '/update-status.json';
 
 // Directories managed by symlinks (atomic swap targets)
 const SYMLINK_DIRS = ['kortix-master', 'opencode', 'agent-browser-viewer', 'kortix', 'kortix-oc'] as const;
@@ -108,7 +109,13 @@ const DEFAULT_UPDATE_STATUS: UpdateStatus = {
   error: null,
 };
 
+async function ensureDataDir(): Promise<void> {
+  await Bun.write(UPDATE_LOCK_FILE, ""); // creates dir+file if not exists
+  await Bun.write(UPDATE_STATUS_FILE, JSON.stringify(DEFAULT_UPDATE_STATUS)); // creates dir+file if not exists
+}
+
 async function writeLock(lock: UpdateLock): Promise<void> {
+  await ensureDataDir();
   await Bun.write(UPDATE_LOCK_FILE, JSON.stringify(lock));
 }
 
@@ -142,6 +149,7 @@ async function readStatus(): Promise<UpdateStatus> {
 }
 
 async function writeStatus(next: UpdateStatus): Promise<void> {
+  await ensureDataDir();
   await Bun.write(UPDATE_STATUS_FILE, JSON.stringify(next));
 }
 

@@ -28,7 +28,7 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-KORTIX_VERSION="0.7.15"
+KORTIX_VERSION="0.7.17"
 KORTIX_LOCAL_IMAGES="${KORTIX_LOCAL_IMAGES:-0}"
 KORTIX_LOCAL_TAG="${KORTIX_LOCAL_TAG:-latest}"
 KORTIX_BUILD_LOCAL_IMAGES="${KORTIX_BUILD_LOCAL_IMAGES:-0}"
@@ -131,7 +131,7 @@ EOF
 parse_args "$@"
 
 IMAGE_TAG="$KORTIX_VERSION"
-SANDBOX_IMAGE_REPO="kortix/sandbox"
+SANDBOX_IMAGE_REPO="kortix/computer"
 if [ "$KORTIX_LOCAL_IMAGES" = "1" ]; then
   IMAGE_TAG="$KORTIX_LOCAL_TAG"
   SANDBOX_IMAGE_REPO="kortix/computer"
@@ -1186,9 +1186,8 @@ case "${1:-help}" in
     else
       echo "  ${C}Pulling latest images...${N}"
       docker compose pull
-      # Pull sandbox image (managed by API, not in compose)
-      local sb_img
-      sb_img=$(grep -m1 '^SANDBOX_IMAGE=' "$DIR/.env" 2>/dev/null | cut -d= -f2-)
+       # Pull sandbox image (managed by API, not in compose)
+       sb_img=$(grep -m1 '^SANDBOX_IMAGE=' "$DIR/.env" 2>/dev/null | cut -d= -f2-)
       [ -n "$sb_img" ] && docker pull "$sb_img" 2>/dev/null || true
     fi
     docker compose --profile vps down 2>/dev/null || docker compose down

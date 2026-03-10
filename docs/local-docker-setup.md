@@ -13,7 +13,7 @@ Four Docker images, all published to Docker Hub under `kortix/`:
 | `kortix/kortix-frontend:latest` | `apps/frontend/` | Next.js dashboard (standalone mode) |
 | `kortix/kortix-api:latest` | `services/` | Bun/Hono backend API |
 | `kortix/postgres:latest` | `services/postgres/` | PostgreSQL 16 + pg_cron + pg_net (scheduler) |
-| `kortix/computer:latest` | `packages/sandbox/` + `packages/sandbox/docker/` | AI agent sandbox (s6-overlay, OpenCode, kortix-master) |
+| `kortix/computer:latest` | `packages/sandbox/` + `packages/sandbox/docker/` | AI agent sandbox OS base (~2.87GB): s6-overlay, bun, uv, musl bun-pty .so, branding. **Kortix code (kortix-master, opencode, agent-browser, etc.) is installed at first boot** via `startup.sh` → `npm install @kortix/sandbox@{version}`. |
 
 The installer script (`scripts/get-kortix.sh`) writes `~/.kortix/docker-compose.yml` + `.env` + CLI helper, pulls the images, and starts everything.
 
@@ -32,7 +32,7 @@ The four images have different build characteristics:
 | Frontend | ~30s host build + ~10s Docker | Next.js standalone build (host) | YES — must `pnpm run build` first |
 | API | ~20-30s | `pnpm install` inside Docker | No |
 | Postgres | ~2-3min | Compiling pg_net from source | No |
-| Sandbox | ~2-5min | Large image, many layers (~4GB) | No |
+| Sandbox | ~2-5min | OS-level base image (~2.87GB, no Kortix code) | No |
 
 **Key insight:** API, Postgres, and Sandbox Docker builds do NOT depend on the frontend host build. Start all four simultaneously for maximum parallelism:
 
@@ -120,7 +120,13 @@ cd /path/to/computer
 docker build -f packages/sandbox/docker/Dockerfile -t kortix/computer:latest .
 ```
 
-Large image (~4GB) with s6-overlay, OpenCode, browser tools, etc. Takes a few minutes. Can be built **in parallel** with the frontend host build, API build, and Postgres build.
+Stable OS base image (~2.87GB). Contains: Alpine + XFCE, Node.js, bun, uv, Chromium, the musl-compiled `librust_pty.so`, s6-overlay service registration, and branding assets. Does **not** contain any Kortix-specific runtime code.
+
+**First-boot bootstrap:** When a container starts for the first time (no `/opt/kortix-master` symlink exists), `startup.sh` runs `npm install @kortix/sandbox@{KORTIX_SANDBOX_VERSION}` inside `/opt/kortix-bootstrap/`. This triggers `postinstall.sh` which deploys all Kortix code into `/opt/` and sets up the ACID symlinks. Takes ~3-6 minutes on first boot.
+
+The `KORTIX_SANDBOX_VERSION` env var pins which version to bootstrap (defaults to `latest` if unset).
+
+Can be built **in parallel** with the frontend host build, API build, and Postgres build.
 
 ---
 
@@ -252,7 +258,7 @@ docker push kortix/postgres:latest
 docker push kortix/computer:latest
 ```
 
-All four can be pushed in parallel. Sandbox is the largest (~4GB, takes longest). Push each image as soon as its build finishes — don't wait for all four.
+All four can be pushed in parallel. Sandbox is the largest (~2.87GB, takes longest). Push each image as soon as its build finishes — don't wait for all four.
 
 Requires `docker login` with the `kortix` Docker Hub credentials.
 

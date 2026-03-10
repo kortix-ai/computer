@@ -480,6 +480,45 @@ export interface SandboxUpdateResult {
   error?: string;
 }
 
+export type UpdatePhase =
+  | 'idle'
+  | 'staging'
+  | 'verifying'
+  | 'committing'
+  | 'restarting'
+  | 'validating'
+  | 'rolling_back'
+  | 'complete'
+  | 'failed';
+
+export interface SandboxUpdateStatus {
+  inProgress: boolean;
+  phase: UpdatePhase;
+  message: string;
+  targetVersion: string | null;
+  previousVersion: string | null;
+  currentVersion: string;
+  startedAt: string | null;
+  updatedAt: string | null;
+  error: string | null;
+}
+
+/**
+ * Get the current update status from a running sandbox.
+ * Used to poll progress during an in-flight update.
+ */
+export async function getSandboxUpdateStatus(
+  sandbox: SandboxInfo,
+): Promise<SandboxUpdateStatus> {
+  const url = getSandboxUrl(sandbox);
+  const token = await getSupabaseAccessToken();
+  const headers: Record<string, string> = { 'Accept': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${url}/kortix/update/status`, { headers });
+  if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
+  return res.json();
+}
+
 /**
  * Get the latest available sandbox version from the platform.
  * Platform checks npm registry (cached 5min).

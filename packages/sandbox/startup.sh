@@ -19,8 +19,8 @@ echo "[startup] Preparing Kortix sandbox..."
 mkdir -p /workspace/.agent-browser /workspace/.browser-profile /workspace/.lss \
     /workspace/.local/share/opencode /workspace/.local/share/opencode/log \
     /workspace/.local/share/opencode/storage /workspace/.local/share/opencode/snapshot \
-    /workspace/.XDG /workspace/.config /workspace/ssl \
-    /workspace/presentations
+    /workspace/.XDG /workspace/.config \
+    /workspace/.kortix
 
 # Remove stale LSS database if it has wrong ownership (e.g. created by UID 911).
 # lss-sync will rebuild a clean index on first run.
@@ -38,20 +38,52 @@ if [ ! -L /config ] && [ ! -d /config ]; then
 fi
 
 # Ensure the workspace has a default project-local OpenCode config entrypoint.
-# The actual source of truth lives in /opt/kortix-oc and /opt/opencode; this
-# symlink only gives tools and skills a stable `.opencode/...` path when they
-# run from /workspace.
+# Point .opencode to the global kortix data directory (/workspace/.kortix/.opencode)
+# This gives users a stable `.opencode/...` path that persists across sessions.
 if [ -L /workspace/.opencode ]; then
     TARGET=$(readlink /workspace/.opencode 2>/dev/null || true)
-    if [ "$TARGET" != "/opt/opencode" ]; then
+    if [ "$TARGET" != "/workspace/.kortix/.opencode" ]; then
         rm -f /workspace/.opencode
-        ln -s /opt/opencode /workspace/.opencode
+        ln -s /workspace/.kortix/.opencode /workspace/.opencode
     fi
 elif [ ! -e /workspace/.opencode ]; then
-    ln -s /opt/opencode /workspace/.opencode
+    ln -s /workspace/.kortix/.opencode /workspace/.opencode
 fi
 
 chown -R abc:abc /workspace 2>/dev/null || true
+
+# ── First-boot bootstrap ──────────────────────────────────────────────────────
+# The Docker base image no longer includes Kortix-specific code (kortix-master,
+# opencode, agent-browser, etc.). On first boot, install @kortix/sandbox from
+# npm which triggers postinstall.sh to deploy everything into /opt/.
+#
+# Subsequent boots skip this if a valid staging dir already exists.
+#
+# We detect "first boot" by checking whether the ACID symlink exists yet.
+# If /opt/kortix-master is not a symlink, nothing has been bootstrapped.
+
+if [ ! -L /opt/kortix-master ]; then
+    echo "[startup] First boot detected — bootstrapping @kortix/sandbox from npm..."
+
+    # Determine which version to install
+    # KORTIX_SANDBOX_VERSION can be set via env (e.g. docker-compose) to pin a version.
+    # Falls back to "latest".
+    SANDBOX_VERSION="${KORTIX_SANDBOX_VERSION:-latest}"
+    INSTALL_DIR="/opt/kortix-bootstrap"
+
+    mkdir -p "$INSTALL_DIR"
+    cd "$INSTALL_DIR"
+
+    echo "[startup] Installing @kortix/sandbox@$SANDBOX_VERSION..."
+    if ! npm install --no-audit --no-fund "@kortix/sandbox@$SANDBOX_VERSION" 2>&1; then
+        echo "[startup] ERROR: Failed to install @kortix/sandbox@$SANDBOX_VERSION" >&2
+        echo "[startup] Container will start but Kortix services may not be available." >&2
+    else
+        echo "[startup] Bootstrap complete."
+    fi
+
+    cd /workspace
+fi
 
 echo "[startup] Starting s6-overlay via PID namespace..."
 

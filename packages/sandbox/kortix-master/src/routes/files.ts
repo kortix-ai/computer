@@ -28,7 +28,7 @@ const filesRouter = new Hono()
 
 // ─── Security ────────────────────────────────────────────────────────────────
 
-const ALLOWED_ROOTS = ['/workspace', '/opt', '/tmp', '/home']
+const ALLOWED_ROOTS = ['/', '/workspace', '/opt', '/tmp', '/home']
 
 /**
  * Resolve and validate a file path. Returns the absolute path.

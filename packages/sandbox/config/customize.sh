@@ -16,11 +16,6 @@ fi
 
 echo "[heyagi] Applying XFCE desktop customization (Alpine)..."
 
-# ── Symlink presentations into Desktop for easy access ─────────────────────
-mkdir -p "$CONFIG_DIR/presentations"
-mkdir -p "$CONFIG_DIR/Desktop"
-ln -sfn "$CONFIG_DIR/presentations" "$CONFIG_DIR/Desktop/presentations"
-
 # ── XFCE: Wallpaper ───────────────────────────────────────────────────────
 mkdir -p "$CONFIG_DIR/.config/xfce4/xfconf/xfce-perchannel-xml"
 cat > "$CONFIG_DIR/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml" << 'EOF'

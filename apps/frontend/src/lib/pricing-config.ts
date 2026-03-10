@@ -52,6 +52,7 @@ export const pricingTiers: PricingTier[] = [
     ],
     tierKey: config.SUBSCRIPTION_TIERS.FREE_TIER.tierKey,
     upgradePlans: [],
+    hidden: true,
   },
   {
     name: 'Pro',
@@ -65,12 +66,6 @@ export const pricingTiers: PricingTier[] = [
     features: [
       '$10 in credits (1,000 credits/month)',
       '1 Cloud Instance included',
-      'All AI Models',
-      'Unlimited Chats',
-      '5 concurrent runs',
-      '20 custom AI Workers',
-      '100+ Integrations',
-      'Advanced mode',
       'Auto-topup available',
       'Add additional instances',
     ],

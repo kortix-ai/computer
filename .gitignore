@@ -54,6 +54,7 @@ infra/supabase/.temp/
 
 # Misc
 state.json
+.release-state.json
 *.db
 dump.rdb
 .aider*

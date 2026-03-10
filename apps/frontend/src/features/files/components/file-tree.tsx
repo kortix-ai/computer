@@ -20,6 +20,7 @@ import {
   CircleAlert,
   AlertTriangle,
   ExternalLink,
+  Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFilesStore } from '../store/files-store';
@@ -606,6 +607,7 @@ function TreeNodeChildren({
 
 export function FileTree() {
   const currentPath = useFilesStore((s) => s.currentPath);
+  const navigateToPath = useFilesStore((s) => s.navigateToPath);
   const clipboard = useFilesStore((s) => s.clipboard);
   const copyToClipboard = useFilesStore((s) => s.copyToClipboard);
   const cutToClipboard = useFilesStore((s) => s.cutToClipboard);
@@ -665,6 +667,11 @@ export function FileTree() {
   const fileCreateInputRef = useRef<HTMLInputElement>(null);
   const folderCreateInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Path bar navigation
+  const [pathInputActive, setPathInputActive] = useState(false);
+  const [pathInputValue, setPathInputValue] = useState('');
+  const pathInputRef2 = useRef<HTMLInputElement>(null);
 
   // Inline create states (inside a specific folder via context menu)
   const [creatingInDir, setCreatingInDir] = useState<CreatingInDir | null>(null);
@@ -888,6 +895,52 @@ export function FileTree() {
         </div>
       </div>
 
+      {/* Path bar — click to edit, Enter to navigate */}
+      <div className="flex items-center gap-1 px-2 pb-1.5 shrink-0">
+        {currentPath !== '/workspace' && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 shrink-0 text-muted-foreground/50 hover:text-foreground"
+            title="Back to /workspace"
+            onClick={() => navigateToPath('/workspace')}
+          >
+            <Home className="h-3 w-3" />
+          </Button>
+        )}
+        {pathInputActive ? (
+          <input
+            ref={pathInputRef2}
+            value={pathInputValue}
+            onChange={(e) => setPathInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const p = pathInputValue.trim() || '/workspace';
+                navigateToPath(p);
+                setPathInputActive(false);
+              }
+              if (e.key === 'Escape') {
+                setPathInputActive(false);
+              }
+            }}
+            onBlur={() => setPathInputActive(false)}
+            className="flex-1 text-xs font-mono bg-muted/40 border border-border/60 rounded px-1.5 py-0.5 outline-none min-w-0 text-foreground"
+            autoFocus
+          />
+        ) : (
+          <button
+            className="flex-1 text-left text-xs font-mono text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 rounded px-1.5 py-0.5 truncate transition-colors cursor-pointer min-w-0"
+            title="Click to navigate to path"
+            onClick={() => {
+              setPathInputValue(currentPath);
+              setPathInputActive(true);
+            }}
+          >
+            {currentPath === '/workspace' ? '~/workspace' : currentPath}
+          </button>
+        )}
+      </div>
+
       {/* Hidden file input */}
       <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileInputChange} />
 
@@ -924,9 +977,9 @@ export function FileTree() {
             </div>
           )}
 
-          {/* Root tree */}
+          {/* Root tree - use currentPath from store (defaults to /workspace, can navigate to /) */}
           <TreeNodeChildren
-            dirPath="/workspace"
+            dirPath={currentPath}
             depth={0}
             gitStatusMap={gitStatusMap}
             diagnosticCountsMap={diagnosticCountsMap}

@@ -1,5 +1,69 @@
 [
   {
+    "version": "0.7.17",
+    "date": "2026-03-09",
+    "title": "Stable OS base image — Kortix code ships via npm",
+    "description": "The Docker image (kortix/computer) is now a stable OS base that rarely changes. All Kortix-specific code (kortix-master, opencode, agent-browser, portless, opencode-channels) is installed at container boot via @kortix/sandbox postinstall. opencode-channels is now a public npm package @kortix/opencode-channels.",
+    "changes": [
+      {
+        "type": "improvement",
+        "text": "Docker image is now a stable OS base — rebuild only when OS deps change"
+      },
+      {
+        "type": "improvement",
+        "text": "All Kortix code ships via @kortix/sandbox npm postinstall on first boot"
+      },
+      {
+        "type": "feature",
+        "text": "@kortix/opencode-channels published as public npm package (npx @kortix/opencode-channels)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed @kortix/kortix-oc workspace: dep — now resolves correctly from npm"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed kortix-api multi-arch manifest — now ships amd64 + arm64"
+      }
+    ]
+  },
+  {
+    "version": "0.7.16",
+    "date": "2026-03-09",
+    "title": "Faster Docker builds, persistent kortix data dir, and file tree path navigation",
+    "description": "Switches sandbox Docker builds from pip to uv for 10-100x faster Python dependency installs, uses bun instead of npm for OpenCode materialization, introduces a persistent /workspace/.kortix data directory for update state and .opencode config, and adds a clickable path bar with home button to the file tree UI for easier filesystem navigation.",
+    "changes": [
+      {
+        "type": "improvement",
+        "text": "Switched from pip to uv for Python package installation in Docker builds, achieving 10-100x faster build times"
+      },
+      {
+        "type": "improvement",
+        "text": "Switched OpenCode materialization from npm to bun for faster dependency installs"
+      },
+      {
+        "type": "improvement",
+        "text": "Introduced /workspace/.kortix as a persistent data directory — update lock/status files now persist across container restarts instead of being lost in /tmp"
+      },
+      {
+        "type": "improvement",
+        "text": "Changed .opencode symlink target from /opt/opencode to /workspace/.kortix/.opencode so user OpenCode config persists across sessions"
+      },
+      {
+        "type": "feature",
+        "text": "Added clickable path bar to file tree with inline edit input and Home button for navigating to any filesystem path"
+      },
+      {
+        "type": "improvement",
+        "text": "Expanded file browser allowed roots to include / for full filesystem access"
+      },
+      {
+        "type": "improvement",
+        "text": "Optimized .dockerignore to exclude docs, tests, coverage, infra, and build cache directories from Docker context"
+      }
+    ]
+  },
+  {
     "version": "0.7.15",
     "date": "2026-03-06",
     "title": "Stabilize onboarding setup and health checks",

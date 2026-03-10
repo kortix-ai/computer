@@ -42,7 +42,7 @@ export function CtaSection({ onLaunch }: { onLaunch: () => void }) {
           </div>
           <div className="flex items-center gap-4 w-full max-w-xs mx-auto">
             <div className="h-px bg-border/30 flex-1" />
-            <span className="text-xs text-muted-foreground/40 uppercase tracking-widest">Or install via terminal</span>
+            <span className="text-xs text-muted-foreground/40 uppercase tracking-widest">-- or install on your machine</span>
             <div className="h-px bg-border/30 flex-1" />
           </div>
           <div className="w-full max-w-lg mx-auto">

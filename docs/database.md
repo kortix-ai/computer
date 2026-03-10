@@ -249,14 +249,15 @@ Use `generate` + `migrate` when you need reviewable migration SQL for production
 
 When running locally (`ENV_MODE=local`), a bundled PostgreSQL 16 container provides the database.
 
-### Image: `kortix/postgres`
+### Image: `kortix/computer` (sandbox) / `kortix/postgres` (database)
 
-- **Source:** `services/postgres/Dockerfile`
+The local database is a custom PostgreSQL 16 container (`kortix/postgres`):
+
 - **Base:** `postgres:16` (Debian Bookworm)
 - **Extensions:** `pg_cron` 1.6 (apt), `pg_net` 0.20.2 (compiled from source)
 - **Port:** `64322` on host → `5432` in container
 - **Volume:** `postgres-data` (persisted across restarts)
-- **Init SQL:** `services/postgres/init/00-init-kortix.sql` (runs on first start only)
+- **Schema init:** Managed by `kortix-api`'s `ensure-schema.ts` via `drizzle-kit push --force` at startup (no baked-in SQL init files)
 
 ### Scheduler Tables & Functions
 
@@ -278,7 +279,7 @@ When running locally (`ENV_MODE=local`), a bundled PostgreSQL 16 container provi
 ### Resetting the Database
 
 ```bash
-# Full reset (destroys all data, re-runs init SQL on next start)
+# Full reset (destroys all data, schema re-applied by API on next start)
 docker compose -f docker-compose.local.yml down -v
 docker compose -f docker-compose.local.yml up -d
 
@@ -338,7 +339,6 @@ bunx drizzle-kit pull --config drizzle.config.pull.ts
 | `packages/db/drizzle.config.ts` | Drizzle Kit config (targets `kortix` schema) |
 | `packages/db/drizzle.config.pull.ts` | Drizzle Kit config for legacy introspection |
 | `kortix-api/src/db/index.ts` | Example: service consuming `@kortix/db` |
-| `services/postgres/Dockerfile` | Custom PG16 image with pg_cron + pg_net |
-| `services/postgres/init/00-init-kortix.sql` | Init SQL: schema, tables, indexes, scheduler functions |
+| `kortix-api/src/ensure-schema.ts` | Startup schema push (`drizzle-kit push --force`) |
 | `kortix-api/src/cron/services/scheduler.ts` | pg_cron job management + configure_scheduler() call |
 | `kortix-api/src/cron/routes/tick.ts` | Global tick + per-trigger execution endpoints |

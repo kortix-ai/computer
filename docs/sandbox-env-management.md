@@ -95,8 +95,9 @@ PUT /v1/providers/tavily/connect  { keys: { TAVILY_API_KEY: "tvly-..." } }
   → kortix-master env.ts:
       1. secretStore.setEnv(key, value)     → encrypt to .secrets.json + process.env
       2. writeS6Env(key, value)             → write /run/s6/container_environment/{KEY}
-      3. restartService("svc-opencode-serve") → s6-svc -r (picks up new env via with-contenv)
-      4. restartService("svc-opencode-web")
+      3. restartServices()                  → kills opencode native binary via /proc NSpid
+                                              (s6 auto-restarts it with fresh env via with-contenv)
+         NOTE: opencode-channels is NOT restarted here — uses hot-reload POST /channels/reload
 ```
 
 ### C. Container boot sequence
@@ -119,8 +120,12 @@ s6-overlay cont-init.d (runs as root, in order):
 
 Then s6 starts services (all with-contenv):
   svc-kortix-master (port 8000) → also runs secretStore.loadIntoProcessEnv()
-  svc-opencode-serve (port 4096) → reads auth.json for LLM keys, env for tool keys
-  svc-opencode-web (port 3111)
+                                   → kortix-master then starts OpenCode sub-services:
+  svc-opencode-serve (port 4096) → OpenCode API server (reads auth.json for LLM keys, env for tool keys)
+  svc-opencode-web (port 3111)   → OpenCode web UI
+  svc-opencode-channels           → Slack/Telegram adapter
+  svc-lss-sync                    → semantic search indexer
+  svc-sshd                        → SSH server
 ```
 
 ### D. Agent sets env from inside a session (KORTIX-secrets skill)
@@ -192,8 +197,9 @@ docker exec kortix-sandbox s6-svc -r /run/service/svc-kortix-master
 | `packages/sandbox/config/97-secrets-to-s6-env.sh` | Init script: permissions + sync |
 | `packages/sandbox/config/kortix-env-setup.sh` | Cloud-mode proxy URL routing |
 | `packages/sandbox/s6-services/svc-kortix-master/run` | kortix-master service definition |
-| `packages/sandbox/s6-services/svc-opencode-serve/run` | OpenCode API server (port 4096) |
-| `packages/sandbox/s6-services/svc-opencode-web/run` | OpenCode web UI (port 3111) |
+| `packages/sandbox/s6-services/svc-opencode-serve/run` | OpenCode API server (port 4096) — started by kortix-master |
+| `packages/sandbox/s6-services/svc-opencode-web/run` | OpenCode web UI (port 3111) — started by kortix-master |
+| `packages/sandbox/s6-services/svc-opencode-channels/run` | Slack/Telegram channels adapter — hot-reload via POST /channels/reload |
 | `kortix-api/src/providers/routes.ts` | Backend provider API (calls sandbox /env) |
 | `kortix-api/src/providers/registry.ts` | Provider definitions (single source of truth) |
 | OpenCode `auth/index.ts` (upstream) | OpenCode auth.json read/write |

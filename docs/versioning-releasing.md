@@ -1,12 +1,12 @@
 # Releasing a New Version
 
-## Next Version: `0.7.15`
+## Next Version: `0.7.18`
 
-Current released version is `0.7.14`. The next release should be `0.7.15`.
+Current released version is `0.7.17`. The next release should be `0.7.18`.
 
 Update this section after every release so the next person knows what version to use.
 
-> **Hetzner snapshot:** After releasing, run `./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.15`
+> **Hetzner snapshot:** After releasing, run `./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.18`
 > to build the Hetzner snapshot for the new version (see [Hetzner Snapshot](#hetzner-snapshot) below).
 
 ## Overview
@@ -201,8 +201,18 @@ in `config.ts`, and the deployed API uses that to look up the Daytona snapshot. 
 snapshot doesn't exist, sandbox creation is broken for all users.
 
 The npm live-update mechanism (`postinstall.sh`) handles config/tool/skill changes on
-*running* sandboxes, but **new sandboxes** are always created from the Daytona snapshot.
+*running* sandboxes, but **new sandboxes** are always created from the Daytona snapshot
+and then bootstrapped via `startup.sh` on first boot.
 No snapshot = no new sandboxes = broken platform.
+
+> **Sandbox image is now a stable OS base (~2.87GB).** `kortix/computer` no longer
+> contains any Kortix-specific code (no `kortix-master`, `opencode`, `agent-browser`, etc.).
+> On first boot, `startup.sh` detects no ACID symlinks exist and runs
+> `npm install @kortix/sandbox@{version}` which triggers `postinstall.sh` to deploy
+> everything into `/opt/`. This means:
+>
+> - **Code-only changes**: just `npm publish @kortix/sandbox` — no Docker rebuild.
+> - **OS-level changes** (new apk packages, new bun/uv version, new `.so` file): rebuild the Docker image.
 
 ### What `--docker` does
 
@@ -320,7 +330,8 @@ publish our own fork. We control which version runs in every sandbox via exact p
 packages/sandbox/package.json
   "dependencies": {
     "opencode-ai": "1.2.10"        ← CLI version (exact pin, no ^ or ~)
-    "@kortix/kortix-oc": "workspace:0.1.1" ← local workspace pin; publishes as exact `0.1.1`
+    "@kortix/kortix-oc": "^0.1.1"  ← public npm package; use ^ to allow patch updates
+    "@kortix/opencode-channels": "^0.2.0" ← public npm package for Slack/Telegram
   }
 
 packages/kortix-oc/runtime/package.json
@@ -345,8 +356,8 @@ packages/kortix-oc/runtime/package.json
 
 | Path | When | Behavior |
 |------|------|----------|
-| **Dockerfile** (line ~107) | Docker image build | Reads pin, installs exactly that version. Falls back to `latest` only if the pinned version doesn't exist on npm yet. |
-| **postinstall.sh** (line ~73) | Live sandbox update | Reads pin, compares with current `opencode --version`, installs only if different. |
+| **Dockerfile** (stable OS base only) | Docker image build | Image no longer installs Kortix code. Kortix code bootstraps at first boot via `startup.sh` → `npm install @kortix/sandbox@{version}`. |
+| **postinstall.sh** (runs on npm install) | First-boot bootstrap + live updates | Reads pin, installs all Kortix code, handles both first-boot (direct mode) and live update (staging/ACID mode). |
 
 ### How to bump the CLI version
 
@@ -376,7 +387,7 @@ To update:
 #    "@opencode-ai/plugin": "1.2.10"  →  "@opencode-ai/plugin": "1.3.0"
 
 # 3. Update packages/sandbox/package.json
-#    "@kortix/kortix-oc": "workspace:0.1.1"  →  "workspace:0.1.2"
+#    "@kortix/kortix-oc": "^0.1.1"  →  "^0.1.2"
 
 # 4. Update apps/frontend/package.json (if SDK types changed)
 #    "@opencode-ai/sdk": "^1.2.10"  →  "@opencode-ai/sdk": "^1.3.0"
@@ -495,7 +506,7 @@ Docker installed and the `kortix/computer` image pre-pulled for fast cold starts
 ### Naming convention
 
 ```
-kortix-computer-v{VERSION}     e.g. kortix-computer-v0.7.15
+kortix-computer-v{VERSION}     e.g. kortix-computer-v0.7.18
 ```
 
 Same format as the Daytona snapshot (`kortix-sandbox-v{VERSION}`), just prefixed
@@ -520,17 +531,17 @@ small machines from the UI.
 - `curl`, `jq`, `ssh`, `ssh-keygen` on PATH
 
 ```bash
-# Build snapshot for v0.7.15
-./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.15
+# Build snapshot for v0.7.18
+./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.18
 
 # Dry run (validates Docker Hub image exists, checks for existing snapshot)
-./scripts/release/sandbox/build-hetzner-snapshot.sh --dry-run 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh --dry-run 0.7.18
 
 # Different location (default: nbg1 — Nuremberg)
-./scripts/release/sandbox/build-hetzner-snapshot.sh --location ash 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh --location ash 0.7.18
 
 # Also attach your personal SSH key for debugging
-./scripts/release/sandbox/build-hetzner-snapshot.sh --ssh-key my-key-name 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh --ssh-key my-key-name 0.7.18
 ```
 
 The script:
@@ -557,11 +568,11 @@ Or leave `HETZNER_SNAPSHOT_ID` unset — the API auto-resolves by description
 
 ### Release checklist addition
 
-After the standard `./scripts/release/sandbox/release.sh --docker 0.7.15`:
+After the standard `./scripts/release/sandbox/release.sh --docker 0.7.18`:
 
 ```bash
 # 1. Build Hetzner snapshot (requires Docker Hub image to be published first)
-./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.15
+./scripts/release/sandbox/build-hetzner-snapshot.sh 0.7.18
 
 # 2. Update .env with new snapshot ID (printed by the script)
 # HETZNER_SNAPSHOT_ID=<new-id>
@@ -575,5 +586,5 @@ git push
 Add to the `artifacts[]` array in `packages/sandbox/CHANGELOG.json` after building:
 
 ```json
-{ "name": "kortix-computer-v0.7.15", "target": "hetzner-snapshot" }
+{ "name": "kortix-computer-v0.7.18", "target": "hetzner-snapshot" }
 ```

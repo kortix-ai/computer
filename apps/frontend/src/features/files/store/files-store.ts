@@ -145,9 +145,10 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
       currentPath: normalized,
       view: 'browser',
       selectedFilePath: null,
+      panelMode: 'welcome',
     });
-    // Auto-expand the target directory in tree
-    get().expandDir(normalized);
+    // Auto-expand the target directory in tree (skip for root /)
+    if (normalized !== '/') get().expandDir(normalized);
   },
 
   openFile: (filePath: string, targetLine?: number) => {

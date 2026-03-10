@@ -22,7 +22,7 @@ set -euo pipefail
 # ║  See docs/releasing.md for full documentation.                             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SANDBOX_DIR="$REPO_ROOT/packages/sandbox"
 CHANGELOG="$SANDBOX_DIR/CHANGELOG.json"
 PACKAGE_JSON="$SANDBOX_DIR/package.json"
@@ -424,15 +424,15 @@ if $BUILD_DOCKER && ! $DRY_RUN; then
     info "Building + pushing sandbox Docker image..."
     docker buildx build --platform "${PLATFORMS}" \
       -f packages/sandbox/docker/Dockerfile \
-      -t "${DOCKER_ORG}/sandbox:${VERSION}" \
-      -t "${DOCKER_ORG}/sandbox:latest" \
+      -t "${DOCKER_ORG}/computer:${VERSION}" \
+      -t "${DOCKER_ORG}/computer:latest" \
       --push "$REPO_ROOT"
     ok "sandbox → Docker Hub (${VERSION} + latest)"
-    add_artifact "${DOCKER_ORG}/sandbox:${VERSION}" "docker-hub"
+    add_artifact "${DOCKER_ORG}/computer:${VERSION}" "docker-hub"
     step_complete "docker-sandbox"
   else
     ok "Sandbox Docker already pushed (resuming)"
-    add_artifact "${DOCKER_ORG}/sandbox:${VERSION}" "docker-hub"
+    add_artifact "${DOCKER_ORG}/computer:${VERSION}" "docker-hub"
   fi
 
   # ── 6b: Daytona snapshot (right after sandbox — only depends on sandbox)
@@ -441,7 +441,7 @@ if $BUILD_DOCKER && ! $DRY_RUN; then
       DAYTONA_SNAPSHOT_NAME="kortix-sandbox-v${VERSION}"
       info "Creating Daytona snapshot from Docker Hub image..."
       daytona snapshot create "${DAYTONA_SNAPSHOT_NAME}" \
-        --image "${DOCKER_ORG}/sandbox:${VERSION}" \
+        --image "${DOCKER_ORG}/computer:${VERSION}" \
         --cpu 4 \
         --memory 8 \
         --disk 20
@@ -568,7 +568,7 @@ if ! $DRY_RUN; then
 
   # Docker
   if $BUILD_DOCKER; then
-    for img in sandbox; do
+    for img in computer; do
       if docker manifest inspect "${DOCKER_ORG:-kortix}/$img:$VERSION" &>/dev/null 2>&1; then
         ok "Docker Hub: ${DOCKER_ORG:-kortix}/$img:$VERSION"
       else
