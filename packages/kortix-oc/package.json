@@ -1,6 +1,6 @@
 {
   "name": "@kortix/kortix-oc",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": false,
   "type": "module",
   "description": "Standalone Kortix OpenCode runtime package with a minimal entry config and plugin runtime",
@@ -36,6 +36,7 @@
     "docs/migration/kortix-oc-migration-plan.md"
   ],
   "scripts": {
+    "postinstall": "npm install -g ocx",
     "typecheck": "tsc --noEmit",
     "test:plugin": "bun test tests/plugin/kortix-sys",
     "verify:runtime": "bun run bin/kortix-oc.ts verify",
@@ -59,6 +60,7 @@
   "devDependencies": {
     "@types/bun": "^1.3.9",
     "@types/js-yaml": "^4.0.9",
+    "ocx": "^2.0.0",
     "typescript": "^5.9.3"
   },
   "publishConfig": {
