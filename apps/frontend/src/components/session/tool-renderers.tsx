@@ -46,6 +46,7 @@ import {
 	Terminal,
 	Type,
 	Video,
+	X,
 } from "lucide-react";
 import React, {
 	type ComponentType,
@@ -75,6 +76,11 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+	Dialog,
+	DialogContent,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { useOpenCodeMessages } from "@/hooks/opencode/use-opencode-sessions";
 import {
 	renderHighlightedLine,
@@ -5059,6 +5065,170 @@ function TaskTool({ part, forceOpen }: ToolProps) {
 	);
 }
 ToolRegistry.register("task", TaskTool);
+
+// ============================================================================
+// SkillTool — Skill loading
+// ============================================================================
+
+/** Extract content from <skill_content> XML wrapper */
+function extractSkillContent(output: string): string {
+	const match = output.match(/<skill_content[^>]*>([\s\S]*?)<\/skill_content>/);
+	return match ? match[1].trim() : output;
+}
+
+/** Extract skill files list from output */
+function extractSkillFiles(output: string): string[] {
+	const filesMatch = output.match(/<skill_files>([\s\S]*?)<\/skill_files>/);
+	if (!filesMatch) return [];
+	const fileRegex = /<file>(.*?)<\/file>/g;
+	const files: string[] = [];
+	let m: RegExpExecArray | null;
+	while ((m = fileRegex.exec(filesMatch[1])) !== null) {
+		files.push(m[1].trim());
+	}
+	return files;
+}
+
+function SkillTool({ part, forceOpen }: ToolProps) {
+	const input = partInput(part);
+	const status = partStatus(part);
+	const rawOutput = (part.state as any).output ?? "";
+	const output = String(rawOutput);
+
+	const skillName = (input.name as string) || "skill";
+	const skillDir = (input.dir as string) || "";
+
+	// Extract skill content for modal
+	const skillContent = useMemo(() => extractSkillContent(output), [output]);
+	const skillFiles = useMemo(() => extractSkillFiles(output), [output]);
+
+	// Clean markdown content (strip file list block)
+	const markdownContent = useMemo(() => {
+		return skillContent
+			.replace(/<skill_files>[\s\S]*?<\/skill_files>/, "")
+			.replace(/Base directory:.*$/m, "")
+			.replace(/Note:.*relative to the base directory.*$/m, "")
+			.trim();
+	}, [skillContent]);
+
+	const [modalOpen, setModalOpen] = useState(false);
+
+	const isRunning = status === "running" || status === "pending";
+	const isCompleted = status === "completed";
+
+	// Generate a brief summary from skill content (first paragraph)
+	const description = useMemo(() => {
+		const firstPara = markdownContent.split("\n\n")[0]?.trim();
+		if (!firstPara) return null;
+		// Truncate if too long
+		if (firstPara.length > 120) {
+			return firstPara.slice(0, 120).trim() + "...";
+		}
+		return firstPara;
+	}, [markdownContent]);
+
+	const running = useContext(ToolRunningContext);
+
+	// Clean skill content for the modal display
+	const modalContent = useMemo(() => {
+		return `# ${skillName}\n\n${skillDir ? `*Location: ${skillDir}*\n\n` : ""}${markdownContent}${skillFiles.length > 0 ? `\n\n---\n\n**Skill Files:**\n${skillFiles.map(f => `- \`${f}\``).join("\n")}` : ""}`;
+	}, [skillName, skillDir, markdownContent, skillFiles]);
+
+	return (
+		<>
+			{/* Clickable card — entire row opens modal */}
+			<div
+				role="button"
+				tabIndex={0}
+				onClick={() => setModalOpen(true)}
+				onKeyDown={(e) => e.key === "Enter" && setModalOpen(true)}
+				className={cn(
+					"flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg",
+					"bg-muted/20 border border-border/40",
+					"text-xs transition-colors select-none cursor-pointer hover:bg-muted/40",
+					"max-w-full group",
+				)}
+			>
+				{/* Icon */}
+				<BookOpen className="size-3.5 flex-shrink-0 text-muted-foreground" />
+
+				{/* Title + description */}
+				<div className="flex items-center gap-1.5 min-w-0 flex-1">
+					<span className="font-medium text-xs text-foreground whitespace-nowrap">
+						Load Skill
+					</span>
+					{isRunning ? (
+						<TextShimmer duration={1} spread={2} className="text-xs truncate font-mono">
+							{skillName}
+						</TextShimmer>
+					) : description ? (
+						<span className="text-muted-foreground text-xs truncate font-mono">
+							{skillName}: {description}
+						</span>
+					) : (
+						<span className="text-muted-foreground text-xs truncate font-mono">
+							{skillName}
+						</span>
+					)}
+
+					{/* Skill files badge */}
+					{isCompleted && skillFiles.length > 0 && (
+						<span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/70 font-mono whitespace-nowrap flex-shrink-0">
+							{skillFiles.length} files
+						</span>
+					)}
+				</div>
+
+				{/* Right side */}
+				{running && (
+					<Loader2 className="size-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+				)}
+				{!running && (
+					<ExternalLink className="size-3 flex-shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
+				)}
+			</div>
+
+			{/* Modal with full skill content */}
+			{modalOpen && (
+				<Dialog open={modalOpen} onOpenChange={setModalOpen}>
+					<DialogContent
+						hideCloseButton
+						className={cn(
+							"flex flex-col p-0 gap-0 overflow-hidden",
+							"w-[90vw] max-w-3xl h-[80vh] max-h-[800px]",
+						)}
+						aria-describedby={undefined}
+					>
+						{/* Header */}
+						<div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-muted/30 shrink-0">
+							<BookOpen className="size-3.5 text-muted-foreground flex-shrink-0" />
+							<DialogTitle className="text-sm font-medium truncate flex-1">
+								Skill: {skillName}
+							</DialogTitle>
+							<button
+								type="button"
+								onClick={() => setModalOpen(false)}
+								className={cn(
+									"flex items-center justify-center size-6 rounded-md",
+									"text-muted-foreground hover:text-foreground",
+									"hover:bg-muted/60 transition-colors",
+								)}
+							>
+								<X className="size-3.5" />
+							</button>
+						</div>
+
+						{/* Content */}
+						<div className={cn("flex-1 overflow-auto p-4", MD_FLUSH_CLASSES)}>
+							<UnifiedMarkdown content={modalContent} isStreaming={false} />
+						</div>
+					</DialogContent>
+				</Dialog>
+			)}
+		</>
+	);
+}
+ToolRegistry.register("skill", SkillTool);
 
 // ============================================================================
 // ToolError
