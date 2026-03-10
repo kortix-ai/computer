@@ -1,6 +1,6 @@
 {
   "name": "@kortix/kortix-oc",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "private": false,
   "type": "module",
   "description": "Standalone Kortix OpenCode runtime package with a minimal entry config and plugin runtime",
@@ -43,7 +43,6 @@
     "pack:check": "npm pack --json --dry-run"
   },
   "dependencies": {
-    "@kortix/opencode-agent-triggers": "0.1.0",
     "@mendable/firecrawl-js": "4.13.0",
     "@morphllm/morphsdk": "0.2.134",
     "@opencode-ai/plugin": "1.2.21",

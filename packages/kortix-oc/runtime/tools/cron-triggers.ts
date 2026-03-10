@@ -3,8 +3,9 @@ import { tool } from "@opencode-ai/plugin";
 /**
  * Cron Triggers tool — lets agents manage scheduled tasks directly inside the sandbox.
  *
- * Requests go to kortix-master on localhost. No auth is needed because localhost
- * requests bypass the sandbox's external bearer-token guard.
+ * Requests go to kortix-master's localhost compatibility API, which is backed by
+ * the embedded scheduler from @kortix/opencode-agent-triggers. No auth is needed
+ * because localhost requests bypass the sandbox's external bearer-token guard.
  */
 
 function getCronUrl(): string {

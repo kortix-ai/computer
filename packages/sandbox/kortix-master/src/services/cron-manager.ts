@@ -1,125 +1,219 @@
-import { Cron } from 'croner'
-import { CronExecutor } from './cron-executor'
-import { CronStore, type CreateTriggerInput, type TriggerRecord, type UpdateTriggerInput, type ExecutionStatus } from './cron-store'
+import { mkdirSync } from 'node:fs'
+import path from 'path'
+import { CronManager as EmbeddedCronManager, CronStore, dispatchCronTriggerViaHttp, type CronExecutionRecord, type CronTriggerRecord } from '@kortix/opencode-agent-triggers'
+import { config } from '../config'
+
+export type SessionMode = 'new' | 'reuse'
+export type ExecutionStatus = 'running' | 'completed' | 'failed' | 'skipped'
+
+export interface TriggerRecord {
+  triggerId: string
+  name: string
+  description: string | null
+  cronExpr: string
+  timezone: string
+  agentName: string | null
+  modelProviderId: string | null
+  modelId: string | null
+  prompt: string
+  sessionMode: SessionMode
+  sessionId: string | null
+  isActive: boolean
+  maxRetries: number
+  timeoutMs: number
+  metadata: Record<string, unknown>
+  lastRunAt: string | null
+  nextRunAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ExecutionRecord {
+  executionId: string
+  triggerId: string
+  status: ExecutionStatus
+  sessionId: string | null
+  startedAt: string
+  completedAt: string | null
+  durationMs: number | null
+  errorMessage: string | null
+  retryCount: number
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
+export interface CreateTriggerInput {
+  name: string
+  description?: string
+  cron_expr: string
+  timezone?: string
+  agent_name?: string
+  model_provider_id?: string
+  model_id?: string
+  prompt: string
+  session_mode?: SessionMode
+  session_id?: string
+  max_retries?: number
+  timeout_ms?: number
+  metadata?: Record<string, unknown>
+}
+
+export interface UpdateTriggerInput {
+  name?: string
+  description?: string | null
+  cron_expr?: string
+  timezone?: string
+  agent_name?: string | null
+  model_provider_id?: string | null
+  model_id?: string | null
+  prompt?: string
+  session_mode?: SessionMode
+  session_id?: string | null
+  is_active?: boolean
+  max_retries?: number
+  timeout_ms?: number
+  metadata?: Record<string, unknown>
+}
+
+function mapTrigger(trigger: CronTriggerRecord): TriggerRecord {
+  const now = new Date().toISOString()
+  return {
+    triggerId: String(trigger.id),
+    name: trigger.name,
+    description: null,
+    cronExpr: trigger.cron_expr,
+    timezone: trigger.timezone ?? 'UTC',
+    agentName: trigger.agent_name ?? null,
+    modelProviderId: trigger.model_id ? (trigger.model_id.includes('/') ? trigger.model_id.split('/')[0] : 'kortix') : null,
+    modelId: trigger.model_id ?? null,
+    prompt: trigger.prompt,
+    sessionMode: (trigger.session_mode as SessionMode | undefined) ?? 'new',
+    sessionId: trigger.session_id ?? null,
+    isActive: trigger.is_active ?? true,
+    maxRetries: 0,
+    timeoutMs: 300000,
+    metadata: trigger.metadata ?? {},
+    lastRunAt: trigger.last_run_at ?? null,
+    nextRunAt: trigger.next_run_at ?? null,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
+function mapExecution(execution: CronExecutionRecord): ExecutionRecord {
+  return {
+    executionId: execution.execution_id,
+    triggerId: execution.trigger_id,
+    status: execution.status,
+    sessionId: execution.session_id ?? null,
+    startedAt: execution.started_at,
+    completedAt: execution.completed_at ?? null,
+    durationMs: execution.duration_ms ?? null,
+    errorMessage: execution.error_message ?? null,
+    retryCount: execution.retry_count,
+    metadata: execution.metadata,
+    createdAt: execution.created_at,
+  }
+}
+
+async function dispatchToOpenCode(trigger: CronTriggerRecord, event: { type: 'cron.tick'; manual: boolean; timestamp: string }) {
+  return dispatchCronTriggerViaHttp(trigger, event, {
+    baseUrl: `http://${config.OPENCODE_HOST}:${config.OPENCODE_PORT}`,
+    timeoutMs: 300000,
+  })
+}
 
 export class CronManager {
-  private jobs = new Map<string, Cron>()
-  private running = new Set<string>()
-  private executor: CronExecutor
+  private inner: EmbeddedCronManager
 
-  constructor(private store: CronStore = new CronStore()) {
-    this.executor = new CronExecutor(this.store)
+  constructor(store: CronStore = new CronStore(getCronStatePath())) {
+    this.inner = new EmbeddedCronManager(store, dispatchToOpenCode)
   }
 
   start(): void {
-    for (const trigger of this.store.listTriggers({ active: true })) {
-      this.scheduleTrigger(trigger)
-    }
+    this.inner.start()
   }
 
   stop(): void {
-    for (const job of this.jobs.values()) job.stop()
-    this.jobs.clear()
-    this.running.clear()
-    this.store.close()
+    this.inner.stop()
   }
 
   listTriggers(active?: boolean): TriggerRecord[] {
-    return this.store.listTriggers({ active })
+    return this.inner.listTriggers(active).map(mapTrigger)
   }
 
   getTrigger(triggerId: string): TriggerRecord | null {
-    return this.store.getTrigger(triggerId)
+    const trigger = this.inner.getTrigger(triggerId)
+    return trigger ? mapTrigger(trigger) : null
   }
 
   createTrigger(input: CreateTriggerInput): TriggerRecord {
-    const trigger = this.store.createTrigger(input)
-    if (trigger.isActive) this.scheduleTrigger(trigger)
-    return trigger
+    return mapTrigger(this.inner.createTrigger({
+      name: input.name,
+      cron_expr: input.cron_expr,
+      prompt: input.prompt,
+      timezone: input.timezone,
+      agent_name: input.agent_name ?? null,
+      model_id: input.model_id,
+      session_mode: input.session_mode,
+      session_id: input.session_id,
+      is_active: true,
+      metadata: input.metadata ?? {},
+    }))
   }
 
   updateTrigger(triggerId: string, input: UpdateTriggerInput): TriggerRecord | null {
-    const trigger = this.store.updateTrigger(triggerId, input)
-    if (!trigger) return null
-    this.unscheduleTrigger(triggerId)
-    if (trigger.isActive) this.scheduleTrigger(trigger)
-    return trigger
+    const trigger = this.inner.updateTrigger(triggerId, {
+      name: input.name,
+      cron_expr: input.cron_expr,
+      prompt: input.prompt,
+      timezone: input.timezone,
+      agent_name: input.agent_name ?? undefined,
+      model_id: input.model_id ?? undefined,
+      session_mode: input.session_mode,
+      session_id: input.session_id ?? undefined,
+      is_active: input.is_active,
+      metadata: input.metadata,
+    })
+    return trigger ? mapTrigger(trigger) : null
   }
 
   deleteTrigger(triggerId: string): boolean {
-    this.unscheduleTrigger(triggerId)
-    return this.store.deleteTrigger(triggerId)
+    return this.inner.deleteTrigger(triggerId)
   }
 
   pauseTrigger(triggerId: string): TriggerRecord | null {
-    this.unscheduleTrigger(triggerId)
-    return this.store.setTriggerActive(triggerId, false)
+    const trigger = this.inner.pauseTrigger(triggerId)
+    return trigger ? mapTrigger(trigger) : null
   }
 
   resumeTrigger(triggerId: string): TriggerRecord | null {
-    const trigger = this.store.setTriggerActive(triggerId, true)
-    if (trigger) this.scheduleTrigger(trigger)
-    return trigger
+    const trigger = this.inner.resumeTrigger(triggerId)
+    return trigger ? mapTrigger(trigger) : null
   }
 
   async runTrigger(triggerId: string, options?: { manual?: boolean }): Promise<{ executionId: string } | null> {
-    const trigger = this.store.getTrigger(triggerId)
-    if (!trigger) return null
-    return this.invokeTrigger(trigger, options)
+    return this.inner.runTrigger(triggerId, options)
   }
 
   listExecutions(filters?: { status?: ExecutionStatus; triggerId?: string; limit?: number; offset?: number }) {
-    return this.store.listExecutions(filters)
+    const result = this.inner.listExecutions({ triggerId: filters?.triggerId, limit: filters?.limit, offset: filters?.offset })
+    return { data: result.data.map(mapExecution), total: result.total }
   }
 
   getExecution(executionId: string) {
-    return this.store.getExecution(executionId)
-  }
-
-  private scheduleTrigger(trigger: TriggerRecord): void {
-    this.unscheduleTrigger(trigger.triggerId)
-    const job = new Cron(trigger.cronExpr, { timezone: trigger.timezone }, async () => {
-      await this.invokeTrigger(trigger)
-    })
-    this.jobs.set(trigger.triggerId, job)
-  }
-
-  private unscheduleTrigger(triggerId: string): void {
-    const job = this.jobs.get(triggerId)
-    if (job) {
-      job.stop()
-      this.jobs.delete(triggerId)
-    }
-  }
-
-  private async invokeTrigger(trigger: TriggerRecord, options?: { manual?: boolean }): Promise<{ executionId: string }> {
-    const latest = this.store.getTrigger(trigger.triggerId)
-    if (!latest) throw new Error('Trigger not found')
-    if (this.running.has(trigger.triggerId)) {
-      const skipped = this.store.createExecution(trigger.triggerId, {
-        status: 'skipped',
-        metadata: { reason: 'already_running', manual: options?.manual === true },
-      })
-      this.store.updateExecution(skipped.executionId, {
-        status: 'skipped',
-        completedAt: new Date().toISOString(),
-        durationMs: 0,
-        errorMessage: 'Trigger is already running',
-        metadata: skipped.metadata,
-      })
-      return { executionId: skipped.executionId }
-    }
-
-    this.running.add(trigger.triggerId)
-    try {
-      return await this.executor.runTrigger(latest, options)
-    } finally {
-      this.running.delete(trigger.triggerId)
-    }
+    const execution = this.inner.getExecution(executionId)
+    return execution ? mapExecution(execution) : null
   }
 }
 
 let singleton: CronManager | null = null
+
+function getCronStatePath(): string {
+  const root = path.join('/workspace', '.local', 'share', 'opencode', 'storage', 'agent-triggers')
+  mkdirSync(root, { recursive: true })
+  return path.join(root, 'cron-state.json')
+}
 
 export function getCronManager(): CronManager {
   if (!singleton) singleton = new CronManager()

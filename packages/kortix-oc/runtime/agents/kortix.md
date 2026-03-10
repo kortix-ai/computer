@@ -2,19 +2,105 @@
 description: "Kortix — Autonomous general-purpose agent. Plans, explores, and builds. Handles all tasks directly: coding, debugging, research, writing, analysis, and more. Spawns subagent instances of itself for parallel work."
 mode: primary
 permission:
+  agent_triggers: allow
+  apply_patch: allow
   bash: allow
+  context7_query-docs: allow
+  'context7_resolve-library-id': allow
+  cron-triggers: allow
+  cron_triggers: allow
   edit: allow
-  read: allow
+  envsitter_add: allow
+  envsitter_annotate: allow
+  envsitter_copy: allow
+  envsitter_delete: allow
+  envsitter_fingerprint: allow
+  envsitter_format: allow
+  envsitter_help: allow
+  envsitter_keys: allow
+  envsitter_match: allow
+  envsitter_match_by_key: allow
+  envsitter_reorder: allow
+  envsitter_scan: allow
+  envsitter_set: allow
+  envsitter_unset: allow
+  envsitter_validate: allow
+  get_mem: allow
+  get_tool_output: allow
   glob: allow
   grep: allow
-  write: allow
-  task: allow
-  todowrite: allow
-  todoread: allow
-  web-search: allow
-  scrape-webpage: allow
-  skill: allow
+  image-search: allow
+  integration-actions: allow
+  integration-connect: allow
+  integration-exec: allow
+  integration-list: allow
+  integration-request: allow
+  integration-run: allow
+  integration-search: allow
+  ltm_save: allow
+  ltm_search: allow
+  morph_edit: allow
+  observation_search: allow
+  presentation-gen: allow
+  pty_kill: allow
+  pty_list: allow
+  pty_read: allow
+  pty_spawn: allow
+  pty_write: allow
   question: allow
+  read: allow
+  scrape-webpage: allow
+  session_get: allow
+  session_list: allow
+  show: allow
+  skill: allow
+  sync_agent_triggers: allow
+  task: allow
+  todoread: allow
+  todowrite: allow
+  tunnel_app_launch: allow
+  tunnel_app_quit: allow
+  tunnel_ax_action: allow
+  tunnel_ax_focus: allow
+  tunnel_ax_search: allow
+  tunnel_ax_set_value: allow
+  tunnel_ax_tree: allow
+  tunnel_click: allow
+  tunnel_clipboard_read: allow
+  tunnel_clipboard_write: allow
+  tunnel_cursor_image: allow
+  tunnel_fs_list: allow
+  tunnel_fs_read: allow
+  tunnel_fs_write: allow
+  tunnel_key: allow
+  tunnel_mouse_drag: allow
+  tunnel_mouse_move: allow
+  tunnel_mouse_scroll: allow
+  tunnel_screen_info: allow
+  tunnel_screenshot: allow
+  tunnel_shell_exec: allow
+  tunnel_status: allow
+  tunnel_type: allow
+  tunnel_window_focus: allow
+  tunnel_window_list: allow
+  warpgrep_codebase_search: allow
+  web-search: allow
+  webfetch: allow
+  woa-create: allow
+  woa-find: allow
+  worktree_create: allow
+  worktree_delete: allow
+  write: allow
+triggers:
+  - name: "Weekly Reflection"
+    enabled: false
+    source:
+      type: "cron"
+      expr: "0 0 10 * * 6"
+      timezone: "UTC"
+    execution:
+      prompt: "Generate a weekly reflection covering important sessions, major accomplishments, unresolved issues, and durable learnings worth documenting for future work."
+      session_mode: "new"
 ---
 
 # Kortix

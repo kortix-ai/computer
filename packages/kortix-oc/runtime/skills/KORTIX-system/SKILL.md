@@ -343,7 +343,7 @@ console.log(data);
 
 ## Cron Triggers — Scheduled Agent Execution
 
-Scheduled triggers now live entirely inside the sandbox and are managed by `kortix-master`.
+Scheduled triggers now run on the embedded scheduler from `@kortix/opencode-agent-triggers`. `kortix-master` keeps the `/kortix/cron` HTTP API as a compatibility layer for the frontend and existing integrations.
 
 ### Quick Start (Local Mode — No Auth Needed)
 
@@ -405,6 +405,118 @@ curl "http://localhost:8000/kortix/cron/executions/by-trigger/{triggerId}"
 | `agent_name` | No | Target agent (e.g., `kortix`) |
 | `model_id` | No | Model (`kortix/basic` = Sonnet, `kortix/power` = Opus) |
 | `session_mode` | No | `new` (default) or `reuse` |
+
+---
+
+### Standalone Package
+
+Cron and webhook trigger support lives in the standalone package `@kortix/opencode-agent-triggers`.
+
+- `createAgentTriggersPlugin()` adds declarative agent triggers to any OpenCode plugin stack
+- Cron trigger declarations sync into the embedded scheduler shipped by `@kortix/opencode-agent-triggers`
+- Webhook declarations boot a local webhook server and dispatch into OpenCode sessions
+- Tools exposed by the package: `agent_triggers`, `sync_agent_triggers`, `cron_triggers`
+- Default cron state path: `.opencode/agent-triggers/cron-state.json`
+
+Webhook example:
+
+```yaml
+triggers:
+  - name: "Inbound Event"
+    enabled: true
+    source:
+      type: "webhook"
+      path: "/hooks/inbound"
+      method: "POST"
+      secret: "top-secret"
+    execution:
+      prompt: "Handle the inbound webhook payload"
+      session_mode: "reuse"
+```
+
+Cron example:
+
+```yaml
+triggers:
+  - name: "Weekly Reflection"
+    enabled: false
+    source:
+      type: "cron"
+      expr: "0 0 10 * * 6"
+      timezone: "UTC"
+    execution:
+      prompt: "Generate a weekly reflection"
+```
+
+---
+
+## Agent Triggers — Declarative Scheduled Triggers
+
+Define scheduled triggers directly in agent markdown files. The `@kortix/opencode-agent-triggers` plugin parses these on startup and registers them with its embedded scheduler and webhook runtime.
+
+### Defining Triggers in Agent.md
+
+Add a `triggers` array to the agent's YAML frontmatter:
+
+```yaml
+---
+description: "My Agent"
+mode: primary
+triggers:
+  - name: "Daily Report"
+    enabled: true
+    source:
+      type: "cron"
+      expr: "0 0 9 * * *"
+      timezone: "America/New_York"
+    execution:
+      prompt: "Generate the daily report"
+      model_id: "kortix/power"
+      session_mode: "reuse"
+---
+
+# Agent system prompt...
+```
+
+### Trigger Properties
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | Yes | Human-readable name (unique within agent) |
+| `source.type` | Yes | Trigger source, currently `cron` or `webhook` |
+| `source.expr` | Cron only | 6-field cron expression |
+| `source.timezone` | No | IANA timezone (default: UTC) |
+| `source.path` | Webhook only | HTTP endpoint path |
+| `source.method` | Webhook only | HTTP method (default: POST) |
+| `source.secret` | Webhook only | Shared secret for authenticated delivery |
+| `execution.prompt` | Yes | Prompt sent to agent when triggered |
+| `execution.model_id` | No | Override model for this trigger |
+| `execution.session_mode` | No | `new` (default) or `reuse` |
+| `context.extract` | No | Map prompt template variables from trigger event data |
+| `context.include_raw` | No | Include the raw normalized trigger event in the final prompt |
+| `enabled` | No | Set to `false` to disable without deleting |
+
+### Tools
+
+| Tool | Description |
+|---|---|
+| `agent_triggers` | List all triggers defined in agent.md files and their registration status |
+| `sync_agent_triggers` | Re-sync triggers from agent.md files to the embedded scheduler and webhook runtime |
+
+### How It Works
+
+1. On plugin startup, triggers are auto-synced immediately
+2. Each cron trigger is registered with name `{agent_name}:{trigger_name}`
+3. Cron state is persisted in `.opencode/agent-triggers/cron-state.json` by default
+4. Use `sync_agent_triggers` to refresh after editing the agent markdown
+
+### Example: Kortix Agent Triggers
+
+The kortix.md agent includes these example triggers:
+
+- **Daily Standup** (enabled): Daily at 9 AM America/New_York
+- **Hourly Health Check** (enabled): Every hour
+- **Weekly Report** (disabled): Every Monday at 10 AM
 
 ---
 
@@ -500,7 +612,7 @@ Quick reference below; the `session-search` skill has the complete decision tree
 
 ## Commands
 
-Slash commands trigger structured workflows. Their source markdown lives in `@kortix/kortix-oc/runtime/commands/`, and materialization compiles them inline into `/opt/opencode/opencode.jsonc` so the sandbox does not need a checked-in `/opt/opencode/commands/` tree.
+Slash commands trigger structured workflows. Their source markdown lives in `@kortix/kortix-oc/runtime/commands/`, and the Kortix wrapper plugin loads them into `config.command` at runtime so the sandbox does not need a checked-in `/opt/opencode/commands/` tree.
 
 | Command | File | Purpose |
 |---|---|---|
@@ -578,14 +690,14 @@ Main config at `/opt/opencode/opencode.jsonc`:
 - **Default agent**: `kortix`
 - **Built-in agents**: `build`, `plan`, `explore`, `general` are available but not default (disable lines are commented out in config)
 - **Permission**: `allow` (all tool calls auto-approved)
-- **Plugins**: `opencode-pty`, `envsitter-guard`, and the single Kortix wrapper plugin referenced from `/opt/kortix-oc/runtime/plugin/kortix-oc.ts`
+- **Plugins**: the single Kortix wrapper plugin referenced from `/opt/kortix-oc/runtime/plugin/kortix-oc.ts`
 - **MCP servers**: Context7 (remote, for documentation lookup)
 - **Provider**: Kortix router (OpenAI-compatible) with two models: `kortix/basic` and `kortix/power`
 - **Auto-update**: enabled (`autoupdate: true`)
 
 ### Agents
 
-Located at `/opt/opencode/agents/`:
+Loaded by the wrapper plugin from `/opt/kortix-oc/runtime/agents/`:
 
 | Agent | File | Mode | Role |
 |---|---|---|---|
@@ -595,7 +707,7 @@ Located at `/opt/opencode/agents/`:
 
 ### Custom Tools
 
-Located at `/opt/opencode/tools/`:
+Loaded by the wrapper plugin from `/opt/kortix-oc/runtime/tools/`:
 
 | Tool | File | Description |
 |---|---|---|
@@ -605,6 +717,7 @@ Located at `/opt/opencode/tools/`:
 | Presentation Gen | `presentation-gen.ts` | HTML slide deck creation |
 | Show | `show.ts` | Present outputs to user UI (images, files, URLs, text, errors) |
 | Cron Triggers | `cron-triggers.ts` | Scheduled agent execution |
+| Agent Triggers | `@kortix/opencode-agent-triggers` | Embedded cron + webhook triggers defined in agent markdown |
 
 | Integration List | `integration-list.ts` | List connected OAuth apps |
 | Integration Search | `integration-search.ts` | Search available apps by keyword |
@@ -614,7 +727,7 @@ Located at `/opt/opencode/tools/`:
 | Integration Exec | `integration-exec.ts` | Execute Node.js code with `proxyFetch()` |
 | Integration Request | `integration-request.ts` | Raw authenticated HTTP request |
 
-Replicate guidance now lives in the `replicate` skill at `/opt/opencode/skills/replicate/`.
+Replicate guidance now lives in the `replicate` skill loaded via the wrapper plugin's `skills.paths` entries.
 
 ## Debugging
 

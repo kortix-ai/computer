@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { describeRoute } from 'hono-openapi'
 import { z } from 'zod'
+import { describeCron, isValidCronExpression } from '@kortix/opencode-agent-triggers'
 import { getCronManager } from '../services/cron-manager'
-import { describeCron, isValidCronExpression } from '../services/cron-store'
 
 const cronRouter = new Hono()
 const cronManager = getCronManager()

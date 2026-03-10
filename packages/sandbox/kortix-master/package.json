@@ -12,9 +12,9 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
+    "@kortix/opencode-agent-triggers": "file:./vendor/opencode-agent-triggers",
     "@hono/standard-validator": "^0.2.2",
     "@scalar/hono-api-reference": "^0.9.45",
-    "croner": "^9.1.0",
     "hono": "^4.0.0",
     "hono-openapi": "^1.2.0",
     "zod": "^4.3.6"

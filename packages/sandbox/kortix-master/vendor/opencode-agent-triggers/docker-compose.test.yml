@@ -1,0 +1,12 @@
+services:
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: npm run test:e2e
+
+  typecheck:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: npm run typecheck

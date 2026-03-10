@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { CronStore } from '@kortix/opencode-agent-triggers'
 import { CronManager } from '../../src/services/cron-manager'
-import { CronStore } from '../../src/services/cron-store'
 
 async function waitFor<T>(fn: () => T | Promise<T>, predicate: (value: T) => boolean, timeoutMs: number = 1500): Promise<T> {
   const start = Date.now()
