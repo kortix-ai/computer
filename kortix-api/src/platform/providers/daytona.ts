@@ -55,7 +55,8 @@ export class DaytonaProvider implements SandboxProvider {
     );
 
     const externalId = daytonaSandbox.id;
-    const baseUrl = `https://new-api.kortix.com/v1/p/${externalId}/8000`;
+    const apiBase = config.KORTIX_URL.replace(/\/v1\/router\/?$/, '').replace(/\/v1\/?$/, '');
+    const baseUrl = `${apiBase}/v1/p/${externalId}/8000`;
 
     return {
       externalId,

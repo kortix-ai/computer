@@ -18,15 +18,9 @@ const getBackendUrl = (): string => {
     return 'https://new-api.kortix.com/v1';
   }
 
-  // Preview deployments (non-main branches)
-  if (vercelEnv === 'preview' && gitRef && gitRef !== 'main') {
-    // Sanitize branch name for URL
-    const sanitizedBranch = gitRef
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-    return `https://${sanitizedBranch}.staging-api.kortix.com/v1`;
+  // Preview deployments (staging branch)
+  if (vercelEnv === 'preview') {
+    return 'https://computer-preview-api.kortix.com/v1';
   }
 
   // Main branch / staging (default)

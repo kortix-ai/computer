@@ -49,6 +49,7 @@ const cloudOrigins = [
   'https://kortix.cloud',
   'https://www.kortix.cloud',
   'https://new.kortix.com',
+  'https://computer-preview.kortix.com',
 ];
 const localOrigins = [
   'http://localhost:3000',
