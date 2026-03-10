@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { motion, useSpring, useTransform } from 'framer-motion';
 import {
   X,
   MessageCircle,
@@ -25,7 +24,6 @@ import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType, DASHBOARD_TAB_ID } from '@/stores/tab-store';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
-import { useDebouncedBusySessions } from '@/hooks/use-debounced-busy-sessions';
 import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
 import { useServerStore } from '@/stores/server-store';
 import { childMapByParent } from '@/ui';
@@ -81,9 +79,8 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     '/projects': { title: 'Workspace', type: 'page' },
     '/files': { title: 'Files', type: 'page' },
     '/configuration': { title: 'Workspace', type: 'page' },
-    '/settings/credentials': { title: 'Secrets Manager', type: 'settings' },
+    '/settings/credentials': { title: 'Integrations', type: 'settings' },
     '/settings/api-keys': { title: 'API Keys', type: 'settings' },
-    '/settings/providers': { title: 'LLM Providers', type: 'settings' },
     '/credits-explained': { title: 'Credits', type: 'page' },
     '/support': { title: 'Support', type: 'page' },
     '/admin/analytics': { title: 'Analytics', type: 'page' },
@@ -286,15 +283,14 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
         )}
         onClick={() => { onActivate(tab.id, tab.href); onClose(); }}
       >
-        <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+        {tab.type === 'session' && (isBusy || pendingCount > 0) ? (
+          <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+            {isBusy && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+            {pendingCount > 0 && !isBusy && <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />}
+          </div>
+        ) : (
           <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-          {tab.type === 'session' && isBusy && (
-            <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          )}
-          {tab.type === 'session' && pendingCount > 0 && !isBusy && (
-            <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-          )}
-        </div>
+        )}
         <span className="flex-1 truncate">{tab.title || 'Untitled'}</span>
         {tab.pinned && <Pin className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground/50 -rotate-[20deg]" />}
         {tab.dirty && <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-amber-500" />}
@@ -478,16 +474,17 @@ function TabItem({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'group relative flex items-center text-xs select-none cursor-pointer h-full',
-        'transition-colors duration-150',
+        'group relative flex items-center text-xs select-none cursor-pointer',
+        'transition-all duration-200 ease-out',
         isDashboard
           ? 'w-9 md:w-10 justify-center px-0'
           : 'gap-2 pl-3 pr-2 max-w-[200px] min-w-[100px]',
         isActive
-          ? 'text-foreground bg-muted-foreground/10'
-          : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
+          ? 'h-[36px] md:h-[40px] rounded-t-[8px] bg-muted text-foreground'
+          : 'h-[32px] md:h-[36px] rounded-t-[6px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]',
       )}
     >
+      {/* Drag-over indicator */}
       {isDragOver && dragSide === 'left' && (
         <div className="absolute left-0 top-2 bottom-2 w-[2px] bg-primary rounded-full z-10 animate-in fade-in-0 duration-150" />
       )}
@@ -495,22 +492,16 @@ function TabItem({
         <div className="absolute right-0 top-2 bottom-2 w-[2px] bg-primary rounded-full z-10 animate-in fade-in-0 duration-150" />
       )}
 
-      {/* Active tab indicator */}
-      {isActive && (
-        <div className="absolute bottom-0 inset-x-1 h-[2px] bg-primary rounded-full" />
-      )}
-
       {/* Icon with status */}
       {tab.type === 'session' && (isBusy || pendingCount > 0) ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-              <Icon className={cn('h-3 w-3 flex-shrink-0 transition-colors', isActive ? 'text-foreground/50' : 'text-muted-foreground/40')} />
               {isBusy && (
-                <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               )}
               {pendingCount > 0 && !isBusy && (
-                <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
               )}
             </div>
           </TooltipTrigger>
@@ -566,6 +557,8 @@ function TabItem({
           <X className="h-2.5 w-2.5" />
         </button>
       )}
+
+
     </div>
   );
 }
@@ -618,9 +611,6 @@ export function TabBar() {
   const statuses = useOpenCodeSessionStatusStore((s) => s.statuses);
   const permissions = useOpenCodePendingStore((s) => s.permissions);
   const questions = useOpenCodePendingStore((s) => s.questions);
-
-  // Debounced busy state — prevents green dot from flickering during reasoning
-  const debouncedBusy = useDebouncedBusySessions(statuses);
 
   // Sessions data
   const { data: sessions, isLoading: sessionsLoading } = useOpenCodeSessions();
@@ -800,14 +790,10 @@ export function TabBar() {
   const getStatus = useCallback(
     (sessionId: string) => {
       const pendingCount = getPendingCount(sessionId);
-      const isBusy =
-        pendingCount === 0 &&
-        (debouncedBusy[sessionId] ||
-          statuses[sessionId]?.type === 'busy' ||
-          statuses[sessionId]?.type === 'retry');
+      const isBusy = pendingCount === 0 && statuses[sessionId]?.type === 'busy';
       return { isBusy: !!isBusy, pendingCount };
     },
-    [getPendingCount, debouncedBusy, statuses],
+    [getPendingCount, statuses],
   );
 
   // Tab switching: all types are pre-mounted, so always use pushState (no re-mount).
@@ -1042,20 +1028,19 @@ export function TabBar() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setActiveTab, handleClose]);
 
-  // Scroll active tab into view when it changes or tabs are added/removed
+  // Scroll active tab into view when it changes
   useEffect(() => {
     if (!activeTabId || !scrollRef.current) return;
-    // Use rAF to ensure layout has settled after tab add/remove
-    const raf = requestAnimationFrame(() => {
-      const container = scrollRef.current;
-      if (!container) return;
-      const activeEl = container.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
-      if (activeEl) {
+    const container = scrollRef.current;
+    const activeEl = container.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
+    if (activeEl) {
+      const containerRect = container.getBoundingClientRect();
+      const tabRect = activeEl.getBoundingClientRect();
+      if (tabRect.left < containerRect.left || tabRect.right > containerRect.right) {
         activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       }
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [activeTabId, orderedTabs.length]);
+    }
+  }, [activeTabId]);
 
   // ---------------------------------------------------------------------------
   // Scroll fade: hide the gradient when scrolled fully right (or no overflow).
@@ -1088,26 +1073,28 @@ export function TabBar() {
 
   // Always render the bar so the bg-sidebar strip above the content curve is consistent
   if (orderedTabs.length === 0) {
-    return <div className="flex-shrink-0 bg-sidebar h-[38px] md:h-[40px]" />;
+    return <div className="flex-shrink-0 bg-sidebar h-[42px] md:h-[46px]" />;
   }
 
   return (
     <>
       <div
         ref={tabBarRef}
-        className="flex-shrink-0 flex items-stretch bg-sidebar h-[38px] md:h-[40px] relative"
+        className="flex-shrink-0 flex items-end bg-sidebar h-[42px] md:h-[46px] relative overflow-hidden"
         role="tablist"
       >
+        {/* The content area's border-t provides the floor line; no extra line needed here */}
+
         <div
           ref={scrollRef}
           onWheel={handleWheel}
-          className="flex-1 flex items-stretch overflow-x-auto px-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative"
+          className="flex-1 flex items-end overflow-x-auto px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
         >
           {orderedTabs.map((tab, index) => {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;
-            const busy = tab.type === 'session' && pending === 0 && (debouncedBusy[tab.id] || statuses[tab.id]?.type === 'busy' || statuses[tab.id]?.type === 'retry');
+            const busy = tab.type === 'session' && pending === 0 && statuses[tab.id]?.type === 'busy';
             return (
-              <div key={tab.id} data-tab-id={tab.id} className="flex items-stretch relative">
+              <div key={tab.id} data-tab-id={tab.id} className={cn("flex items-end relative", tab.id === activeTabId ? "z-20" : "z-0")}>
                 <TabItem
                   tab={tab}
                   index={index}
@@ -1130,7 +1117,7 @@ export function TabBar() {
         </div>
 
         {/* Action buttons group — solid bg so tabs don't scroll behind */}
-        <div className="flex-shrink-0 flex items-center gap-px pr-1 relative bg-sidebar pl-2 h-full">
+        <div className="flex-shrink-0 flex items-center gap-px pr-1 relative z-20 bg-sidebar pl-2 h-full">
           {/* Fade edge — hidden when scrolled fully right */}
           <div ref={scrollFadeRef} className="absolute right-full top-0 bottom-0 w-3 bg-gradient-to-r from-transparent to-sidebar pointer-events-none transition-opacity duration-150" />
           {/* New tab button */}
