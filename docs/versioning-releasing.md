@@ -313,9 +313,11 @@ The release script auto-stamps these files:
 | File | What changes |
 |---|---|
 | `packages/sandbox/package.json` | `version` field |
-| `scripts/get-kortix.sh` | `KORTIX_VERSION="X.Y.Z"` (installer image tags) + `VERSION="X.Y.Z"` (embedded CLI) |
 | `kortix-api/src/config.ts` | `SANDBOX_VERSION` constant |
 | `packages/sandbox/CHANGELOG.json` | `artifacts[]` array added to the version's entry |
+
+`scripts/get-kortix.sh` is **not** stamped with a version — it always defaults to `:latest`.
+Users can pin a specific version with `--version 0.7.x` or `KORTIX_VERSION=0.7.x bash get-kortix.sh`.
 
 You do NOT need to manually edit versions in these files.
 

@@ -294,7 +294,7 @@ if ! step_done "bump"; then
 
   if $DRY_RUN; then
     ok "(dry-run) Would bump packages/sandbox/package.json → $VERSION"
-    ok "(dry-run) Would bump get-kortix.sh VERSION → $VERSION"
+    ok "(dry-run) Would bump kortix-api/src/config.ts SANDBOX_VERSION → $VERSION"
   else
     # packages/sandbox/package.json — version (CLI dep is upstream opencode-ai, pinned separately)
     node -e "
@@ -305,16 +305,7 @@ if ! step_done "bump"; then
     "
     ok "packages/sandbox/package.json → $VERSION"
 
-    # get-kortix.sh — installer image version + embedded CLI version
-    if [ -f "$GET_KORTIX" ]; then
-      sed -i.bak "s/^KORTIX_VERSION=\"[^\"]*\"/KORTIX_VERSION=\"$VERSION\"/" "$GET_KORTIX"
-      rm -f "${GET_KORTIX}.bak"
-      sed -i.bak "s/^VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$GET_KORTIX"
-      rm -f "${GET_KORTIX}.bak"
-      ok "get-kortix.sh KORTIX_VERSION + VERSION → $VERSION"
-    else
-      warn "get-kortix.sh not found, skipping stamp"
-    fi
+    # get-kortix.sh — always uses :latest by default; no version stamp needed
 
     # kortix-api config.ts — SANDBOX_VERSION constant
     API_CONFIG="$REPO_ROOT/kortix-api/src/config.ts"
@@ -601,7 +592,6 @@ if ! $DRY_RUN && ! $NO_COMMIT; then
   (
     cd "$REPO_ROOT"
     git add packages/sandbox/package.json packages/sandbox/CHANGELOG.json
-    [ -f "$GET_KORTIX" ] && git add scripts/get-kortix.sh
     [ -f kortix-api/src/config.ts ] && git add kortix-api/src/config.ts
     git commit -m "release: v$VERSION" --allow-empty 2>/dev/null || true
   )
@@ -614,7 +604,7 @@ elif $DRY_RUN; then
 else
   echo ""
   echo "  ${DIM}Don't forget to commit + push:${NC}"
-  echo "    git add packages/sandbox/package.json packages/sandbox/CHANGELOG.json scripts/get-kortix.sh"
+  echo "    git add packages/sandbox/package.json packages/sandbox/CHANGELOG.json"
   echo "    git commit -m 'release: v$VERSION'"
   echo "    git push"
 fi

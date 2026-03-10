@@ -2,11 +2,11 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  Kortix Frontend — Docker Entrypoint                                       ║
 # ║                                                                            ║
-# ║  Rewrites baked-in URLs in the Next.js bundle at container startup.        ║
+# ║  Rewrites baked-in values in the Next.js bundle at container startup.      ║
 # ║                                                                            ║
 # ║  NEXT_PUBLIC_ env vars are inlined at BUILD TIME by Next.js — both into    ║
 # ║  server chunks and client (static) JS. The baked values depend on whoever  ║
-# ║  built the image (could be localhost:8008, 127.0.0.1:54321, anything).     ║
+# ║  built the image (could be localhost:8008, billing enabled, anything).     ║
 # ║                                                                            ║
 # ║  This entrypoint DETECTS the baked values by inspecting the bundle, then   ║
 # ║  replaces them with runtime env vars. No hardcoded keys or URLs.           ║
@@ -20,6 +20,9 @@ BUNDLE_DIR="/app/apps/frontend/.next"
 RUNTIME_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-}"
 RUNTIME_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}"
 RUNTIME_BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL:-}"
+# NEXT_PUBLIC_BILLING_ENABLED is baked at build time as BILLING_ENABLED:!0 (true)
+# or BILLING_ENABLED:!1 (false). We rewrite it based on the runtime env var.
+RUNTIME_BILLING="${NEXT_PUBLIC_BILLING_ENABLED:-false}"
 
 # ── Detect baked values from the bundle ────────────────────────────────────────
 # The Supabase client is created via createBrowserClient("URL","KEY").
@@ -61,6 +64,28 @@ fi
 if [ -n "$RUNTIME_ANON_KEY" ] && [ -n "$BAKED_ANON_KEY" ] && [ "$RUNTIME_ANON_KEY" != "$BAKED_ANON_KEY" ]; then
   needs_rewrite=true
   echo "[entrypoint] Supabase anon key: replacing"
+fi
+
+# ── Billing flag rewrite ───────────────────────────────────────────────────────
+# Next.js compiles `NEXT_PUBLIC_BILLING_ENABLED === 'true'` → `BILLING_ENABLED:!0`
+# (true) or `BILLING_ENABLED:!1` (false) at build time. The cloud image is built
+# with billing ON (!0). Self-hosted installs set NEXT_PUBLIC_BILLING_ENABLED=false
+# at runtime — we rewrite the baked value so the correct UI branch is shown.
+BAKED_BILLING_TRUE=$(grep -rl 'BILLING_ENABLED:!0' "$BUNDLE_DIR" 2>/dev/null | head -1)
+BAKED_BILLING_FALSE=$(grep -rl 'BILLING_ENABLED:!1' "$BUNDLE_DIR" 2>/dev/null | head -1)
+
+if [ "$RUNTIME_BILLING" = "false" ] && [ -n "$BAKED_BILLING_TRUE" ]; then
+  echo "[entrypoint] Billing: ON (baked) -> OFF (runtime) — rewriting bundle"
+  find "$BUNDLE_DIR" -name '*.js' | xargs grep -rl 'BILLING_ENABLED:!0' 2>/dev/null | \
+    while read -r f; do sed -i 's|BILLING_ENABLED:!0|BILLING_ENABLED:!1|g' "$f"; done
+  needs_rewrite=true
+elif [ "$RUNTIME_BILLING" = "true" ] && [ -n "$BAKED_BILLING_FALSE" ]; then
+  echo "[entrypoint] Billing: OFF (baked) -> ON (runtime) — rewriting bundle"
+  find "$BUNDLE_DIR" -name '*.js' | xargs grep -rl 'BILLING_ENABLED:!1' 2>/dev/null | \
+    while read -r f; do sed -i 's|BILLING_ENABLED:!1|BILLING_ENABLED:!0|g' "$f"; done
+  needs_rewrite=true
+else
+  echo "[entrypoint] Billing: $([ "$RUNTIME_BILLING" = "true" ] && echo ON || echo OFF) (matches baked value — no rewrite needed)"
 fi
 
 if [ "$needs_rewrite" = "true" ]; then

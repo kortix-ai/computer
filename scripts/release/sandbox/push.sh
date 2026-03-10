@@ -42,12 +42,14 @@ warn() { echo "  ${YELLOW}⚠${NC} $*"; }
 SANDBOX_ONLY=false
 SKIP_DAYTONA=false
 SKIP_FRONTEND=false
+CLOUD_BUILD=false
 
 for arg in "$@"; do
   case "$arg" in
     --sandbox-only)   SANDBOX_ONLY=true ;;
     --skip-daytona)   SKIP_DAYTONA=true ;;
     --skip-frontend)  SKIP_FRONTEND=true ;;
+    --cloud)          CLOUD_BUILD=true ;;
     -h|--help)
       echo "Usage: ./scripts/release/sandbox/push.sh [flags]"
       echo ""
@@ -55,6 +57,7 @@ for arg in "$@"; do
       echo "  --sandbox-only    Only build+push sandbox (skip API + frontend)"
       echo "  --skip-daytona    Push to Docker Hub only, skip Daytona snapshot"
       echo "  --skip-frontend   Skip frontend build+push"
+      echo "  --cloud           Build frontend with billing enabled (cloud mode)"
       echo ""
       echo "Images pushed to Docker Hub (kortix/):"
       echo "  kortix/computer:{version} + :latest"
@@ -146,11 +149,20 @@ fi
 
 # ── Frontend ────────────────────────────────────────────────────────────────
 if ! $SANDBOX_ONLY && ! $SKIP_FRONTEND; then
-  # Check that frontend was pre-built
-  if [ ! -d "$REPO_ROOT/apps/frontend/.next/standalone" ]; then
-    fail "Frontend not built. Run first:"
-    echo "    cd apps/frontend && NEXT_OUTPUT=standalone pnpm build"
-    exit 1
+  # For cloud builds, rebuild frontend with billing enabled
+  if $CLOUD_BUILD; then
+    info "Rebuilding frontend with billing enabled (cloud mode)..."
+    (
+      cd "$REPO_ROOT/apps/frontend"
+      NEXT_PUBLIC_BILLING_ENABLED=true NEXT_OUTPUT=standalone pnpm build
+    )
+  else
+    # Check that frontend was pre-built (self-hosted mode uses host's .env)
+    if [ ! -d "$REPO_ROOT/apps/frontend/.next/standalone" ]; then
+      fail "Frontend not built. Run first:"
+      echo "    cd apps/frontend && NEXT_OUTPUT=standalone pnpm build"
+      exit 1
+    fi
   fi
 
   info "Building + pushing frontend..."

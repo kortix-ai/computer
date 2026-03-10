@@ -28,7 +28,7 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-KORTIX_VERSION="0.7.17"
+KORTIX_VERSION="latest"
 KORTIX_LOCAL_IMAGES="${KORTIX_LOCAL_IMAGES:-0}"
 KORTIX_LOCAL_TAG="${KORTIX_LOCAL_TAG:-latest}"
 KORTIX_BUILD_LOCAL_IMAGES="${KORTIX_BUILD_LOCAL_IMAGES:-0}"
@@ -117,7 +117,7 @@ Examples:
   bash get-kortix.sh --local --local-tag dev
   bash get-kortix.sh --version 0.7.14
   bash get-kortix.sh --query "v=0.7.14"
-  KORTIX_VERSION=0.7.14 bash get-kortix.sh
+  KORTIX_VERSION=0.7.15 bash get-kortix.sh
 EOF
         exit 0
         ;;
@@ -982,7 +982,6 @@ ${supabase_url_env}
 ${supabase_db_env}
       - SUPABASE_SERVICE_ROLE_KEY=\${SUPABASE_SERVICE_ROLE_KEY}
       - ALLOWED_SANDBOX_PROVIDERS=local_docker
-      - SANDBOX_IMAGE=${SANDBOX_IMAGE}
       - DOCKER_HOST=unix:///var/run/docker.sock
       - KORTIX_URL=http://kortix-api:8008/v1/router
       - SANDBOX_NETWORK=kortix_default
@@ -1020,7 +1019,6 @@ write_env() {
 # ─── Mode ────────────────────────────────────────────────────────────────────
 DEPLOY_MODE=${DEPLOY_MODE}
 DB_MODE=${DB_MODE}
-KORTIX_VERSION=${KORTIX_VERSION}
 KORTIX_LOCAL_IMAGES=${KORTIX_LOCAL_IMAGES}
 KORTIX_LOCAL_TAG=${KORTIX_LOCAL_TAG}
 KORTIX_LOCAL_REPO_ROOT=${KORTIX_LOCAL_REPO_ROOT}
@@ -1056,7 +1054,6 @@ SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET}
 SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
 
 # ─── Sandbox ─────────────────────────────────────────────────────────────────
-SANDBOX_IMAGE=${SANDBOX_IMAGE}
 ENVEOF
 
   chmod 600 "$INSTALL_DIR/.env"
@@ -1098,7 +1095,8 @@ cd "$DIR"
 
 G=$'\033[0;32m'; R=$'\033[0;31m'; C=$'\033[0;36m'; Y=$'\033[1;33m'
 B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
-VERSION=$(grep -m1 '^KORTIX_VERSION=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "latest")
+# Images always use :latest — show the image digest short-SHA when available
+VERSION=$(docker image inspect kortix/kortix-frontend:latest --format '{{slice .ID 7 19}}' 2>/dev/null || echo "latest")
 LOCAL_IMAGES=$(grep -m1 '^KORTIX_LOCAL_IMAGES=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "0")
 LOCAL_TAG=$(grep -m1 '^KORTIX_LOCAL_TAG=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "latest")
 LOCAL_REPO_ROOT=$(grep -m1 '^KORTIX_LOCAL_REPO_ROOT=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "")
@@ -1186,9 +1184,8 @@ case "${1:-help}" in
     else
       echo "  ${C}Pulling latest images...${N}"
       docker compose pull
-       # Pull sandbox image (managed by API, not in compose)
-       sb_img=$(grep -m1 '^SANDBOX_IMAGE=' "$DIR/.env" 2>/dev/null | cut -d= -f2-)
-      [ -n "$sb_img" ] && docker pull "$sb_img" 2>/dev/null || true
+      # Pull sandbox image (managed by API, not in compose) — always kortix/computer:latest
+      docker pull kortix/computer:latest 2>/dev/null || true
     fi
     docker compose --profile vps down 2>/dev/null || docker compose down
     if [ "$(_mode)" = "vps" ]; then
@@ -1227,7 +1224,7 @@ case "${1:-help}" in
     ;;
   *)
     echo ""
-    echo "  ${B}${C}Kortix CLI${N} ${D}v${VERSION}${N}"
+    echo "  ${B}${C}Kortix CLI${N} ${D}v${VERSION}${NC}"
     echo ""
     echo "  ${C}start${N}         Start all services"
     echo "  ${C}stop${N}          Stop all services"

@@ -1,10 +1,24 @@
 # syntax=docker.io/docker/dockerfile:1
 #
 # Lightweight runner-only image.
+#
 # Build the frontend on the HOST first:
 #   cd apps/frontend && NEXT_OUTPUT=standalone pnpm run build
+#
 # Then from repo root:
 #   docker build -f apps/frontend/Dockerfile -t kortix/kortix-frontend:latest .
+#
+# For CLOUD builds (kortix.ai), override billing at build time:
+#   NEXT_PUBLIC_BILLING_ENABLED=true pnpm build
+#   docker build -f apps/frontend/Dockerfile -t kortix/kortix-frontend:cloud .
+#
+# Build-time env vars (baked into the image):
+#   NEXT_PUBLIC_ENV_MODE       - "local" or "cloud"
+#   NEXT_PUBLIC_BILLING_ENABLED - "true" for cloud, "false" for self-hosted
+#   NEXT_PUBLIC_BACKEND_URL   - API URL
+#   NEXT_PUBLIC_URL           - Frontend URL
+#   NEXT_PUBLIC_SUPABASE_URL  - Supabase URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY - Supabase anon key
 #
 FROM node:22-slim AS runner
 WORKDIR /app
