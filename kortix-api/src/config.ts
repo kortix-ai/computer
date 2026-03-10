@@ -234,14 +234,8 @@ function validateEnv(): z.infer<typeof envSchema> {
 
   // ── Conditional: hetzner → need Hetzner keys ──────────────────────────
   if (providers.includes('hetzner')) {
-    if (!raw.HETZNER_API_KEY)     issues.push({ var: 'HETZNER_API_KEY',     message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"', level: 'error' });
-    if (!raw.HETZNER_SNAPSHOT_ID && !raw.HETZNER_SNAPSHOT_DESCRIPTION) {
-      issues.push({
-        var: 'HETZNER_SNAPSHOT_ID/HETZNER_SNAPSHOT_DESCRIPTION',
-        message: 'Set HETZNER_SNAPSHOT_ID or HETZNER_SNAPSHOT_DESCRIPTION when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"',
-        level: 'error',
-      });
-    }
+    if (!raw.HETZNER_API_KEY) issues.push({ var: 'HETZNER_API_KEY', message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"', level: 'error' });
+    // HETZNER_SNAPSHOT_DESCRIPTION falls back to kortix-computer-v{SANDBOX_VERSION} dynamically — no env var needed
   }
 
   // ── Conditional: Pipedream integration → need credentials ──────────────
