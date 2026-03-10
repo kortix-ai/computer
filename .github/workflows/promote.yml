@@ -60,7 +60,7 @@ jobs:
             git reset --hard origin/staging
             docker compose --project-directory . -f scripts/compose/docker-compose.yml --profile backend down --remove-orphans || true
             docker compose --project-directory . -f scripts/compose/docker-compose.yml --profile backend build --no-cache
-            docker compose --project-directory . -f scripts/compose/docker-compose.yml --profile backend up -d
+            docker compose --project-directory . -f scripts/compose/docker-compose.yml --profile backend up -d --remove-orphans --force-recreate
             for i in $(seq 1 15); do
               curl -sf http://localhost:8008/v1/health > /dev/null 2>&1 && echo "Healthy after ${i}s" && break
               [ "$i" -eq 15 ] && echo "Health check failed" && exit 1
