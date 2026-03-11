@@ -1,13 +1,12 @@
 import { z } from 'zod';
+import { releaseManifest, SANDBOX_VERSION } from './release';
+
+export { SANDBOX_VERSION } from './release';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type SandboxProviderName = 'daytona' | 'local_docker' | 'hetzner';
 export type InternalKortixEnv = 'dev' | 'staging' | 'prod';
-
-/** Single source of truth for the sandbox version — read from packages/sandbox/package.json. */
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-export const SANDBOX_VERSION: string = require('../../packages/sandbox/package.json').version;
 
 // ─── Zod Helpers ────────────────────────────────────────────────────────────
 
@@ -120,6 +119,7 @@ const envSchema = z.object({
   DAYTONA_API_KEY:             optStr,
   DAYTONA_SERVER_URL:          optStr,
   DAYTONA_TARGET:              optStr,
+  DAYTONA_SNAPSHOT:            optStr,
 
   // ── Hetzner — Sandbox provisioning (conditional: required if hetzner provider enabled) ──
   HETZNER_API_KEY:                    optStr,
@@ -372,28 +372,20 @@ export const config = {
   DAYTONA_API_KEY: env.DAYTONA_API_KEY,
   DAYTONA_SERVER_URL: env.DAYTONA_SERVER_URL,
   DAYTONA_TARGET: env.DAYTONA_TARGET,
-  DAYTONA_SNAPSHOT: `kortix-sandbox-v${SANDBOX_VERSION}`,
+  DAYTONA_SNAPSHOT: env.DAYTONA_SNAPSHOT || releaseManifest.sandbox.daytonaSnapshot,
 
   // ─── Hetzner (VPS Sandbox provisioning) ──────────────────────────────────
   HETZNER_API_KEY: env.HETZNER_API_KEY,
   HETZNER_DEFAULT_LOCATION: env.HETZNER_DEFAULT_LOCATION,
-  /** The version used to resolve the snapshot description. Explicit override wins, then falls back to SANDBOX_VERSION. */
-  get HETZNER_SNAPSHOT_DESCRIPTION(): string {
-    const v = env.HETZNER_SNAPSHOT_VERSION_OVERRIDE || SANDBOX_VERSION;
-    return `kortix-computer-v${v}`;
-  },
+  HETZNER_SNAPSHOT_ID: env.HETZNER_SNAPSHOT_ID,
+  HETZNER_SNAPSHOT_DESCRIPTION: env.HETZNER_SNAPSHOT_DESCRIPTION || releaseManifest.sandbox.hetznerSnapshotDescription,
   HETZNER_SSH_KEY_ID: env.HETZNER_SSH_KEY_ID,
   HETZNER_DEFAULT_SERVER_TYPE: env.HETZNER_DEFAULT_SERVER_TYPE,
 
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: env.KORTIX_URL,
   ALLOWED_SANDBOX_PROVIDERS: allowedProviders,
-  get SANDBOX_IMAGE(): string {
-    if (env.SANDBOX_IMAGE) return env.SANDBOX_IMAGE;
-    // Must match the snapshot version — they are always the same image
-    const v = env.HETZNER_SNAPSHOT_VERSION_OVERRIDE || SANDBOX_VERSION;
-    return `kortix/computer:${v}`;
-  },
+  SANDBOX_IMAGE: env.SANDBOX_IMAGE || releaseManifest.sandbox.image,
   DOCKER_HOST: env.DOCKER_HOST,
   SANDBOX_NETWORK: env.SANDBOX_NETWORK,
   SANDBOX_PORT_BASE: env.SANDBOX_PORT_BASE,

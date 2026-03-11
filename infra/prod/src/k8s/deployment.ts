@@ -1,5 +1,7 @@
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   namespace,
   appName,
@@ -20,6 +22,12 @@ interface DeploymentArgs {
   podRoleArn: pulumi.Output<string>;
   ghcrToken?: pulumi.Output<string>;
 }
+
+const releaseManifest = JSON.parse(readFileSync(resolve(__dirname, "../../../../packages/sandbox/release.json"), "utf8")) as {
+  sandbox: {
+    image: string;
+  };
+};
 
 export function createDeployment(args: DeploymentArgs) {
   const labels = { app: appName };
@@ -111,6 +119,20 @@ export function createDeployment(args: DeploymentArgs) {
                 env: [
                   { name: "PORT", value: String(appPort) },
                   { name: "ENV_MODE", value: "cloud" },
+                  { name: "INTERNAL_KORTIX_ENV", value: "staging" },
+                  { name: "ALLOWED_SANDBOX_PROVIDERS", value: "hetzner" },
+                  { name: "KORTIX_ROUTER_INTERNAL_ENABLED", value: "true" },
+                  { name: "KORTIX_BILLING_INTERNAL_ENABLED", value: "true" },
+                  { name: "KORTIX_DEPLOYMENTS_ENABLED", value: "false" },
+                  { name: "CHANNELS_ENABLED", value: "true" },
+                  { name: "TUNNEL_ENABLED", value: "true" },
+                  { name: "KORTIX_URL", value: "https://new-api.kortix.com/v1/router" },
+                  { name: "SANDBOX_IMAGE", value: releaseManifest.sandbox.image },
+                  { name: "FRONTEND_URL", value: "https://kortix.com" },
+                  { name: "CRON_API_URL", value: "https://new-api.kortix.com" },
+                  { name: "CHANNELS_PUBLIC_URL", value: "https://new-api.kortix.com" },
+                  { name: "INTEGRATION_AUTH_PROVIDER", value: "pipedream" },
+                  { name: "PIPEDREAM_ENVIRONMENT", value: "production" },
                 ],
                 envFrom: [{ secretRef: { name: k8sSecretName } }],
                 resources: {

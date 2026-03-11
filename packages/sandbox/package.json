@@ -1,6 +1,6 @@
 {
   "name": "@kortix/sandbox",
-  "version": "0.7.16",
+  "version": "0.7.18",
   "description": "Kortix sandbox runtime — kortix-master, opencode config/agents/skills, and dependencies",
   "license": "Elastic-2.0",
   "private": false,
@@ -18,14 +18,15 @@
     "postinstall.sh",
     "patch-agent-browser.js",
     "startup.sh",
+    "release.json",
     "CHANGELOG.json",
     "LICENSE"
   ],
   "dependencies": {
-    "@kortix/kortix-oc": "workspace:0.1.1",
-    "@kortix/opencode-channels": "^0.2.0",
+    "@kortix/kortix-oc": "0.1.2",
+    "@kortix/opencode-channels": "0.2.0",
     "opencode-ai": "1.2.17",
-    "agent-browser": "^0.10.0"
+    "agent-browser": "0.10.0"
   },
   "peerDependencies": {},
   "publishConfig": {
@@ -36,13 +37,13 @@
       "portless": "0.5.2"
     },
     "pythonDependencies": {
-      "local-semantic-search": "latest",
+      "local-semantic-search": "0.5.5",
       "pypdf2": "3.0.1",
       "python-pptx": "1.0.2",
       "pillow": "12.1.0",
-      "greenlet": "latest",
-      "pyee": "latest",
-      "typing-extensions": "latest",
+      "greenlet": "3.3.2",
+      "pyee": "13.0.1",
+      "typing-extensions": "4.15.0",
       "playwright": "1.58.0"
     }
   }

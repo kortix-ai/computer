@@ -1,5 +1,7 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { clusterName } from "./src/config";
 import { createVpc } from "./src/vpc";
 import { createEksCluster } from "./src/eks";
@@ -19,7 +21,10 @@ import { createPdb } from "./src/k8s/pdb";
 
 const config = new pulumi.Config("kortix-eks");
 const acmCertificateArn = config.require("acmCertificateArn");
-const imageTag = config.get("imageTag") || "latest";
+const releaseManifest = JSON.parse(readFileSync(resolve(__dirname, "../packages/sandbox/release.json"), "utf8")) as {
+  releaseVersion: string;
+};
+const imageTag = config.get("imageTag") || releaseManifest.releaseVersion;
 
 const ghcrImage = "ghcr.io/kortix-ai/computer";
 

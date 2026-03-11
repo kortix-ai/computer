@@ -28,7 +28,8 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-KORTIX_VERSION="latest"
+DEFAULT_KORTIX_VERSION="0.7.18"
+KORTIX_VERSION="${KORTIX_VERSION:-$DEFAULT_KORTIX_VERSION}"
 KORTIX_LOCAL_IMAGES="${KORTIX_LOCAL_IMAGES:-0}"
 KORTIX_LOCAL_TAG="${KORTIX_LOCAL_TAG:-latest}"
 KORTIX_BUILD_LOCAL_IMAGES="${KORTIX_BUILD_LOCAL_IMAGES:-0}"
@@ -105,7 +106,7 @@ Options:
   --build-local       Rebuild local installer images before starting
   --local-tag <tag>   Local image tag to use (default: latest)
   --local-tag=<tag>   Same as above
-  --version <tag>     Install a specific image tag (default: latest)
+  --version <tag>     Install a specific image tag (default: current stable release)
   --version=<tag>     Same as above
   --query "v=<tag>"   Query-style version override
   --query "version=<tag>"
@@ -991,6 +992,8 @@ ${supabase_db_env}
       - CHANNELS_CREDENTIAL_KEY=\${CHANNELS_CREDENTIAL_KEY}
       - API_KEY_SECRET=\${API_KEY_SECRET}
       - CORS_ALLOWED_ORIGINS=\${PUBLIC_URL}
+      - SANDBOX_IMAGE=\${SANDBOX_IMAGE}
+      - SANDBOX_VERSION=\${KORTIX_VERSION}
       - KORTIX_ROUTER_INTERNAL_ENABLED=false
       - KORTIX_BILLING_INTERNAL_ENABLED=false
     env_file:
@@ -1054,6 +1057,9 @@ SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET}
 SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
 
 # ─── Sandbox ─────────────────────────────────────────────────────────────────
+KORTIX_VERSION=${KORTIX_VERSION}
+SANDBOX_IMAGE=${SANDBOX_IMAGE}
+KORTIX_SANDBOX_VERSION=${KORTIX_VERSION}
 ENVEOF
 
   chmod 600 "$INSTALL_DIR/.env"
@@ -1095,8 +1101,9 @@ cd "$DIR"
 
 G=$'\033[0;32m'; R=$'\033[0;31m'; C=$'\033[0;36m'; Y=$'\033[1;33m'
 B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
-# Images always use :latest — show the image digest short-SHA when available
-VERSION=$(docker image inspect kortix/kortix-frontend:latest --format '{{slice .ID 7 19}}' 2>/dev/null || echo "latest")
+# Installed release metadata is persisted in .env so updates stay pinned.
+VERSION=$(grep -m1 '^KORTIX_VERSION=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "unknown")
+SANDBOX_IMAGE=$(grep -m1 '^SANDBOX_IMAGE=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "kortix/computer:${VERSION}")
 LOCAL_IMAGES=$(grep -m1 '^KORTIX_LOCAL_IMAGES=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "0")
 LOCAL_TAG=$(grep -m1 '^KORTIX_LOCAL_TAG=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "latest")
 LOCAL_REPO_ROOT=$(grep -m1 '^KORTIX_LOCAL_REPO_ROOT=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "")
@@ -1182,10 +1189,9 @@ case "${1:-help}" in
     if _using_local_images; then
       echo "  ${C}Using local Docker images from compose config...${N}"
     else
-      echo "  ${C}Pulling latest images...${N}"
+      echo "  ${C}Pulling release ${VERSION} images...${N}"
       docker compose pull
-      # Pull sandbox image (managed by API, not in compose) — always kortix/computer:latest
-      docker pull kortix/computer:latest 2>/dev/null || true
+      docker pull "$SANDBOX_IMAGE" 2>/dev/null || true
     fi
     docker compose --profile vps down 2>/dev/null || docker compose down
     if [ "$(_mode)" = "vps" ]; then
@@ -1232,7 +1238,7 @@ case "${1:-help}" in
     echo "  ${C}logs${N}          Tail logs (kortix logs sandbox)"
     echo "  ${C}status${N}        Show service status"
     echo "  ${C}setup${N}         Open setup wizard in browser"
-    echo "  ${C}update${N}        Pull latest images & restart"
+    echo "  ${C}update${N}        Pull configured release images & restart"
     echo "  ${C}rebuild${N}       Rebuild local images from source"
     echo "  ${C}open${N}          Open dashboard in browser"
     echo "  ${C}credentials${N}   Show admin credentials (VPS mode)"
@@ -1300,7 +1306,7 @@ pull_and_start() {
     verify_local_image "$SANDBOX_IMAGE"
     success "Local installer images found"
   else
-    info "Pulling Docker images..."
+  info "Pulling Docker images for release ${KORTIX_VERSION}..."
     echo ""
     docker compose pull
 
@@ -1366,7 +1372,7 @@ pull_and_start() {
   echo "    ${CYAN}kortix start${NC}    Start services"
   echo "    ${CYAN}kortix stop${NC}     Stop services"
   echo "    ${CYAN}kortix setup${NC}    Open setup wizard"
-  echo "    ${CYAN}kortix update${NC}   Update to latest"
+  echo "    ${CYAN}kortix update${NC}   Update to the configured release"
   echo "    ${CYAN}kortix logs${NC}     Tail logs"
   echo ""
 }

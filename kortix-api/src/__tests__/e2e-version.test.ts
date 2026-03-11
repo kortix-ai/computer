@@ -1,14 +1,13 @@
 /**
  * E2E tests for the version endpoint.
  *
- * GET /v1/platform/sandbox/version checks the npm registry for the latest @kortix/sandbox version.
- * This should work in CI but may fail if the registry is unreachable — we guard with
- * flexible assertions (version is either a semver string or '0.0.0' fallback).
+ * GET /v1/platform/sandbox/version returns the exact release targeted by this API deployment.
  *
  * No database required.
  */
 import { describe, it, expect } from 'bun:test';
 import { createTestApp, jsonGet } from './helpers';
+import { releaseManifest } from '../release';
 
 const app = createTestApp({ mountPlatform: false });
 
@@ -22,10 +21,9 @@ describe('Version endpoint', () => {
     expect(typeof body.version).toBe('string');
     expect(body.version.length).toBeGreaterThan(0);
 
-    // Version should be a semver-like string (X.Y.Z) or the fallback '0.0.0'
-    expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(body.version).toBe(releaseManifest.sandbox.package.version);
 
-    expect(body.package).toBe('@kortix/sandbox');
+    expect(body.package).toBe(releaseManifest.sandbox.package.name);
   });
 
   it('GET /v1/platform/sandbox/version respects SANDBOX_VERSION env override', async () => {

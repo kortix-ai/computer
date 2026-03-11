@@ -25,9 +25,6 @@ warn() { echo "  ${YELLOW}⚠${NC} $*"; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 HETZNER_API="https://api.hetzner.cloud/v1"
-# kortix/computer is a stable OS base — always pull :latest, never a versioned tag.
-# Code ships separately via @kortix/sandbox npm at first boot (startup.sh).
-# kortix/computer is versioned — image tag matches the sandbox version
 DOCKER_IMAGE_PREFIX="kortix/computer"
 # Use a cheap shared server just for building the snapshot
 # cx23 (2vCPU/4GB) is broadly available; cpx11 varies by account/region
@@ -203,10 +200,10 @@ printf '%s\n' '#!/bin/bash' 'set -e' '' \
   '# its own cloud-init with the correct env vars before starting the service.' \
   '# NOTE: This placeholder is fully overwritten by the API cloud-init on every real boot.' \
   'cat > /usr/local/bin/kortix-start.sh << '"'"'STARTEOF'"'"'' \
-  '#!/bin/bash' \
-  'echo "[kortix] This placeholder will be replaced by API cloud-init on boot"' \
-  'exec docker run --rm --name kortix-sandbox kortix/computer:latest' \
-  'STARTEOF' \
+   '#!/bin/bash' \
+   'echo "[kortix] This placeholder will be replaced by API cloud-init on boot"' \
+   "exec docker run --rm --name kortix-sandbox ${DOCKER_IMAGE}" \
+   'STARTEOF' \
   'chmod +x /usr/local/bin/kortix-start.sh' '' \
   '# Create the systemd service unit for kortix-sandbox' \
   'cat > /etc/systemd/system/kortix-sandbox.service << '"'"'SVCEOF'"'"'' \

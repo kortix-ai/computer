@@ -28,6 +28,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 SANDBOX_PACKAGE_DIR="$REPO_ROOT/packages/sandbox"
+RELEASE_MANIFEST="$SANDBOX_PACKAGE_DIR/release.json"
 
 # ── Colors ──────────────────────────────────────────────────────────────────
 GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[1;33m'
@@ -73,10 +74,10 @@ for arg in "$@"; do
   esac
 done
 
-# ── Read version from package.json ──────────────────────────────────────────
-VERSION=$(node -e "console.log(require('$SANDBOX_PACKAGE_DIR/package.json').version)")
+# ── Read version from release manifest ──────────────────────────────────────
+VERSION=$(node -e "console.log(require('$RELEASE_MANIFEST').releaseVersion)")
 if [ -z "$VERSION" ]; then
-  fail "Could not read version from packages/sandbox/package.json"
+  fail "Could not read version from packages/sandbox/release.json"
   exit 1
 fi
 

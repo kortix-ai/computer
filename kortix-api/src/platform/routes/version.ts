@@ -2,15 +2,15 @@ import { Hono } from 'hono';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { config } from '../../config';
+import { releaseManifest } from '../../release';
 
 /**
  * Sandbox version + changelog endpoint.
  *
- * Checks the npm registry for the latest published version of @kortix/sandbox.
+ * Returns the exact sandbox release targeted by this API deployment.
  * Loads CHANGELOG.json with a priority chain:
  *   1. Local filesystem (bundled in Docker image or sandbox npm package)
- *   2. npm registry (fetches package metadata which includes the file)
- *   3. GitHub raw (fallback, requires public repo or token)
+ *   2. GitHub raw (fallback, requires public repo or token)
  *
  * The full update flow:
  *
@@ -18,7 +18,8 @@ import { config } from '../../config';
  *   1. Add entry to packages/sandbox/CHANGELOG.json
  *   2. Run ./scripts/release/sandbox/release.sh X.Y.Z
  *   3. Script bumps versions, publishes CLI/SDK/sandbox, creates GitHub release
- *   4. Done. Platform auto-detects. Running sandboxes show "Update available".
+ *   4. Deploy the matching API/frontend images.
+ *   5. Running sandboxes show "Update available" when they lag behind the API target release.
  *
  * CLIENT SIDE (frontend triggering update):
  *   1. Frontend GETs /v1/platform/sandbox/version  →  { version, changelog }
@@ -28,8 +29,7 @@ import { config } from '../../config';
  *   5. Sandbox runs `npm install -g @kortix/sandbox@X.Y.Z`, restarts services
  */
 
-const NPM_PACKAGE = '@kortix/sandbox';
-const NPM_REGISTRY_URL = `https://registry.npmjs.org/${NPM_PACKAGE}/latest`;
+const NPM_PACKAGE = releaseManifest.sandbox.package.name;
 
 // Local filesystem paths where CHANGELOG.json might live (checked in order).
 // - Docker API image: /app/CHANGELOG.json (COPYed in Dockerfile)
@@ -57,33 +57,18 @@ let changelogCachedAt = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 async function getLatestVersion(): Promise<string> {
-  // Dev override: set SANDBOX_VERSION env var to skip npm registry lookup.
-  if (config.SANDBOX_VERSION_OVERRIDE) return config.SANDBOX_VERSION_OVERRIDE;
+  // Dev/self-hosted override: allow forcing a target release explicitly.
+  const override = process.env.SANDBOX_VERSION || config.SANDBOX_VERSION_OVERRIDE;
+  if (override) return override;
 
   const now = Date.now();
   if (cachedVersion && (now - cachedAt) < CACHE_TTL_MS) {
     return cachedVersion;
   }
 
-  try {
-    const res = await fetch(NPM_REGISTRY_URL, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(5_000),
-    });
-
-    if (!res.ok) {
-      console.error(`[Version] npm registry returned ${res.status}`);
-      return cachedVersion || '0.0.0';
-    }
-
-    const data = await res.json() as { version: string };
-    cachedVersion = data.version;
-    cachedAt = now;
-    return data.version;
-  } catch (e) {
-    console.error('[Version] Failed to fetch from npm registry:', e);
-    return cachedVersion || '0.0.0';
-  }
+  cachedVersion = releaseManifest.sandbox.package.version;
+  cachedAt = now;
+  return cachedVersion;
 }
 
 /**
@@ -154,7 +139,7 @@ const versionRouter = new Hono();
 /**
  * GET /v1/platform/sandbox/version
  *
- * Returns the latest published version + changelog entry.
+ * Returns the target sandbox version + changelog entry for this deployment.
  */
 versionRouter.get('/', async (c) => {
   const version = await getLatestVersion();
@@ -164,6 +149,7 @@ versionRouter.get('/', async (c) => {
   return c.json({
     version,
     package: NPM_PACKAGE,
+    channel: releaseManifest.channel,
     changelog: entry,
   });
 });

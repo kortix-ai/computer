@@ -10,6 +10,8 @@
 
 set -e
 
+DEFAULT_KORTIX_SANDBOX_VERSION="0.7.18"
+
 echo "[startup] Preparing Kortix sandbox..."
 
 # ── Pre-s6 fixes ────────────────────────────────────────────────────────────
@@ -66,9 +68,10 @@ if [ ! -L /opt/kortix-master ]; then
     echo "[startup] First boot detected — bootstrapping @kortix/sandbox from npm..."
 
     # Determine which version to install
-    # KORTIX_SANDBOX_VERSION can be set via env (e.g. docker-compose) to pin a version.
-    # Falls back to "latest".
-    SANDBOX_VERSION="${KORTIX_SANDBOX_VERSION:-latest}"
+    # KORTIX_SANDBOX_VERSION can be set via env (e.g. docker-compose) to override the
+    # release baked into this image. Falling back to the shipped release keeps fresh
+    # installs reproducible instead of following npm latest.
+    SANDBOX_VERSION="${KORTIX_SANDBOX_VERSION:-$DEFAULT_KORTIX_SANDBOX_VERSION}"
     INSTALL_DIR="/opt/kortix-bootstrap"
 
     mkdir -p "$INSTALL_DIR"

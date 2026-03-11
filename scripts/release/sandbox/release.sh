@@ -26,6 +26,8 @@ REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SANDBOX_DIR="$REPO_ROOT/packages/sandbox"
 CHANGELOG="$SANDBOX_DIR/CHANGELOG.json"
 PACKAGE_JSON="$SANDBOX_DIR/package.json"
+RELEASE_MANIFEST="$SANDBOX_DIR/release.json"
+STARTUP_SH="$SANDBOX_DIR/startup.sh"
 GET_KORTIX="$REPO_ROOT/scripts/get-kortix.sh"
 FRONTEND_DIR="$REPO_ROOT/apps/frontend"
 
@@ -294,7 +296,9 @@ if ! step_done "bump"; then
 
   if $DRY_RUN; then
     ok "(dry-run) Would bump packages/sandbox/package.json → $VERSION"
-    ok "(dry-run) Would bump kortix-api/src/config.ts SANDBOX_VERSION → $VERSION"
+    ok "(dry-run) Would bump packages/sandbox/release.json → $VERSION"
+    ok "(dry-run) Would bump packages/sandbox/startup.sh DEFAULT_KORTIX_SANDBOX_VERSION → $VERSION"
+    ok "(dry-run) Would bump scripts/get-kortix.sh DEFAULT_KORTIX_VERSION → $VERSION"
   else
     # packages/sandbox/package.json — version (CLI dep is upstream opencode-ai, pinned separately)
     node -e "
@@ -305,15 +309,29 @@ if ! step_done "bump"; then
     "
     ok "packages/sandbox/package.json → $VERSION"
 
-    # get-kortix.sh — always uses :latest by default; no version stamp needed
+    # packages/sandbox/release.json — exact release graph
+    node -e "
+      const fs = require('fs');
+      const manifest = JSON.parse(fs.readFileSync('$RELEASE_MANIFEST', 'utf8'));
+      manifest.releaseVersion = '$VERSION';
+      manifest.sandbox.package.version = '$VERSION';
+      manifest.sandbox.image = 'kortix/computer:$VERSION';
+      manifest.sandbox.daytonaSnapshot = 'kortix-sandbox-v$VERSION';
+      manifest.sandbox.hetznerSnapshotDescription = 'kortix-computer-v$VERSION';
+      manifest.api.image = 'kortix/kortix-api:$VERSION';
+      manifest.frontend.image = 'kortix/kortix-frontend:$VERSION';
+      fs.writeFileSync('$RELEASE_MANIFEST', JSON.stringify(manifest, null, 2) + '\n');
+    "
+    ok "packages/sandbox/release.json → $VERSION"
 
-    # kortix-api config.ts — SANDBOX_VERSION constant
-    API_CONFIG="$REPO_ROOT/kortix-api/src/config.ts"
-    if [ -f "$API_CONFIG" ]; then
-      sed -i.bak "s/^export const SANDBOX_VERSION = '[^']*'/export const SANDBOX_VERSION = '$VERSION'/" "$API_CONFIG"
-      rm -f "${API_CONFIG}.bak"
-      ok "config.ts SANDBOX_VERSION → $VERSION"
-    fi
+    sed -i.bak "s/^DEFAULT_KORTIX_SANDBOX_VERSION=\"[^\"]*\"/DEFAULT_KORTIX_SANDBOX_VERSION=\"$VERSION\"/" "$STARTUP_SH"
+    rm -f "${STARTUP_SH}.bak"
+    ok "packages/sandbox/startup.sh DEFAULT_KORTIX_SANDBOX_VERSION → $VERSION"
+
+    # get-kortix.sh — bake exact release default for self-hosted installs
+    sed -i.bak "s/^DEFAULT_KORTIX_VERSION=\"[^\"]*\"/DEFAULT_KORTIX_VERSION=\"$VERSION\"/" "$GET_KORTIX"
+    rm -f "${GET_KORTIX}.bak"
+    ok "scripts/get-kortix.sh DEFAULT_KORTIX_VERSION → $VERSION"
 
     step_complete "bump"
   fi

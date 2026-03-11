@@ -1,5 +1,29 @@
 [
   {
+    "version": "0.7.18",
+    "date": "2026-03-10",
+    "title": "Exact release manifest and pinned sandbox updates",
+    "description": "Introduces a single release manifest for the sandbox/API/frontend release graph, switches self-hosted installs to exact-version defaults, and removes floating runtime dependency resolution from the sandbox update path.",
+    "changes": [
+      {
+        "type": "improvement",
+        "text": "Added packages/sandbox/release.json as the canonical release graph for sandbox, API, frontend, and snapshot targets"
+      },
+      {
+        "type": "improvement",
+        "text": "Self-hosted installer and sandbox bootstrap now default to exact release versions instead of latest"
+      },
+      {
+        "type": "fix",
+        "text": "Pinned sandbox-critical npm and Python dependencies to exact versions for reproducible updates"
+      },
+      {
+        "type": "fix",
+        "text": "Hetzner snapshots now pull the exact release-tagged sandbox image instead of kortix/computer:latest"
+      }
+    ]
+  },
+  {
     "version": "0.7.17",
     "date": "2026-03-09",
     "title": "Stable OS base image — Kortix code ships via npm",

@@ -36,7 +36,7 @@ services:
         - type=local,src=.buildx-cache/sandbox
       cache_to:
         - type=local,dest=.buildx-cache/sandbox,mode=max
-    image: kortix/computer:${SANDBOX_VERSION:-latest}
+    image: kortix/computer:${SANDBOX_VERSION:-0.7.18}
     container_name: kortix-sandbox
     cap_add:
       - SYS_ADMIN

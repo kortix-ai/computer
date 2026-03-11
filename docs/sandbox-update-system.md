@@ -13,7 +13,7 @@ Every release includes a structured changelog at `packages/sandbox/CHANGELOG.jso
 - Bundled in the `@kortix/sandbox` npm package
 - Deployed to `/opt/kortix/CHANGELOG.json` by `postinstall.sh`
 - Served by kortix-master at `GET /kortix/health` (current version's entry)
-- Served by the platform API at `GET /v1/platform/sandbox/version` (latest version's entry)
+- Served by the platform API at `GET /v1/platform/sandbox/version` (the exact release targeted by the current API deployment)
 - Shown in the frontend update UI ("What's new in vX.Y.Z")
 
 To add a changelog entry, edit `packages/sandbox/CHANGELOG.json` before running the release script. The release script validates that an entry exists for the target version.
@@ -24,7 +24,7 @@ To add a changelog entry, edit `packages/sandbox/CHANGELOG.json` before running 
 
 Every running Kortix sandbox can be updated remotely via a single npm package: `@kortix/sandbox`. This package bundles all Kortix-specific code (agents, skills, tools, configs) and declares all dependency versions. When published to npm, running sandboxes detect the new version and can self-update.
 
-**Single source of truth:** `packages/sandbox/package.json` declares ALL versioned dependencies. Both the Docker first-boot bootstrap (`startup.sh`) and `postinstall.sh` (live updates) read from it. No versions are hardcoded anywhere else.
+**Single source of truth:** `packages/sandbox/release.json` defines the exact release graph (sandbox package version, images, snapshot names). `packages/sandbox/package.json` then pins the sandbox runtime dependencies exactly, and both first-boot bootstrap (`startup.sh`) and `postinstall.sh` consume those exact pins.
 
 **Two deployment paths:**
 
@@ -54,13 +54,13 @@ Every running Kortix sandbox can be updated remotely via a single npm package: `
       "portless": "0.5.2"
     },
     "pythonDependencies": {
-      "local-semantic-search": "latest",
+      "local-semantic-search": "0.5.5",
       "pypdf2": "3.0.1",
       "python-pptx": "1.0.2",
       "pillow": "12.1.0",
-      "greenlet": "latest",
-      "pyee": "latest",
-      "typing-extensions": "latest",
+      "greenlet": "3.3.2",
+      "pyee": "13.0.1",
+      "typing-extensions": "4.15.0",
       "playwright": "1.58.0"
     }
   }
@@ -71,13 +71,13 @@ Every running Kortix sandbox can be updated remotely via a single npm package: `
 
 | Directory/File | What it is | Deployed to |
 |---|---|---|
-| `packages/kortix-oc/runtime/agents/` | Agent definitions | `/opt/opencode/agents/` |
-| `packages/kortix-oc/runtime/skills/` | Skill definitions | `/opt/opencode/skills/` |
-| `packages/kortix-oc/runtime/tools/` | Custom tools | `/opt/opencode/tools/` |
-| `packages/kortix-oc/runtime/commands/` | Slash command source markdown | Inlined into `/opt/opencode/opencode.jsonc` during materialization |
+| `packages/kortix-oc/runtime/agents/` | Agent definitions | Loaded from `/opt/kortix-oc/runtime/agents/` by the wrapper plugin |
+| `packages/kortix-oc/runtime/skills/` | Skill definitions | Loaded from `/opt/kortix-oc/runtime/skills/` via `skills.paths` injection |
+| `packages/kortix-oc/runtime/tools/` | Custom tools | Loaded from `/opt/kortix-oc/runtime/tools/` by the wrapper plugin |
+| `packages/kortix-oc/runtime/commands/` | Slash command source markdown | Loaded from `/opt/kortix-oc/runtime/commands/` into `config.command` by the wrapper plugin |
 | `packages/kortix-oc/runtime/plugin/` | Wrapper plugin + source modules | Kept in `/opt/kortix-oc/runtime/plugin/`, referenced from `/opt/opencode/opencode.jsonc` |
 | `packages/kortix-oc/runtime/patches/` | Patch scripts | Kept in `/opt/kortix-oc/runtime/patches/`, applied to `/opt/opencode` during install |
-| `packages/kortix-oc/runtime/opencode.jsonc` | OpenCode config | `/opt/opencode/opencode.jsonc` |
+| `packages/kortix-oc/runtime/opencode.jsonc` | Minimal OpenCode entry config | `/opt/opencode/opencode.jsonc` |
 | `packages/kortix-oc/runtime/package.json` | OpenCode runtime deps | `/opt/opencode/package.json` |
 | `packages/kortix-oc/` | Full source-of-truth package | `/opt/kortix-oc/` |
 | `packages/sandbox/kortix-master/` | Proxy server + update handler | `/opt/kortix-master/` |
@@ -92,7 +92,7 @@ Every running Kortix sandbox can be updated remotely via a single npm package: `
 
 ### Secondary deps (resolved by `bun install` during postinstall)
 
-These live in `packages/kortix-oc/runtime/package.json` and auto-resolve within their `^` ranges on every update:
+These live in `packages/kortix-oc/runtime/package.json` and are pinned exactly on every update:
 
 | Package | Range | Purpose |
 |---|---|---|
@@ -114,7 +114,7 @@ startup.sh
   → checks: [ ! -L /opt/kortix-master ]
   → detects first boot (ACID symlink not yet created)
   → mkdir -p /opt/kortix-bootstrap
-  → npm install --no-audit --no-fund @kortix/sandbox@{KORTIX_SANDBOX_VERSION:-latest}
+  → npm install --no-audit --no-fund @kortix/sandbox@{KORTIX_SANDBOX_VERSION:-0.7.18}
   → postinstall.sh runs in DIRECT mode
 
 postinstall.sh (direct mode)
@@ -124,17 +124,18 @@ postinstall.sh (direct mode)
   4. npm install -g @kortix/opencode-channels@{v}  (Slack/Telegram channels CLI + lib)
   5. bun install kortix-master → /opt/kortix-master/
   6. rsync @kortix/kortix-oc → /opt/kortix-oc/
-  7. bun run kortix-oc materialize → /opt/opencode/
+  7. bun run kortix-oc materialize → minimal /opt/opencode/
   8. bun install /opt/opencode/
-  9. apply patches /opt/opencode/
-  10. apply bun-pty musl .so patch
-  11. rsync s6-services → /etc/s6-overlay/s6-rc.d/
-  12. cp config/ → /custom-cont-init.d/
-  13. rsync browser-viewer → /opt/agent-browser-viewer/
-  14. uv/pip install python dependencies (lss, pypdf2, pptx, playwright, etc.)
-  15. write /opt/kortix/.version
-  16. mv deployed dirs → /opt/kortix-staging-{version}/
-  17. ln -s staging dirs → /opt/kortix-master, /opt/opencode, etc. (ACID symlinks)
+  9. symlink /opt/kortix-oc/node_modules → /opt/opencode/node_modules
+  10. apply patches /opt/opencode/
+  11. apply bun-pty musl .so patch
+  12. rsync s6-services → /etc/s6-overlay/s6-rc.d/
+  13. cp config/ → /custom-cont-init.d/
+  14. rsync browser-viewer → /opt/agent-browser-viewer/
+  15. uv/pip install python dependencies (lss, pypdf2, pptx, playwright, etc.)
+  16. write /opt/kortix/.version
+  17. mv deployed dirs → /opt/kortix-staging-{version}/
+  18. ln -s staging dirs → /opt/kortix-master, /opt/opencode, etc. (ACID symlinks)
 
 startup.sh continues
   → exec unshare --pid --fork /init  (s6-overlay takes over as PID 1)
@@ -157,14 +158,13 @@ s6-overlay
 ```
 Platform API (kortix-api)
   GET /v1/platform/sandbox/version
-    → Fetches https://registry.npmjs.org/@kortix/sandbox/latest
-    → Returns { version: "0.7.17" }
+    → Returns the exact sandbox release targeted by the current API deployment
     → Cached for 5 minutes
 
 Frontend (use-sandbox-update.ts)
-  → Polls platform API every 5 min for latest version
+  → Polls platform API every 5 min for the API-targeted release version
   → Compares against sandbox's current version (from GET /kortix/health)
-  → Shows "Update available" banner if latest > current
+  → Shows "Update available" banner if target release > current
 ```
 
 ### Execution

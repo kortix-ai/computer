@@ -11,8 +11,7 @@ Update this section after every release so the next person knows what version to
 
 ## Overview
 
-Kortix Computer uses **one version number** across all artifacts. The release
-script (`scripts/release/sandbox/release.sh`) publishes everything from your local machine.
+Kortix Computer uses a **single release manifest** for the shipped platform release. `packages/sandbox/release.json` is the source of truth for the exact sandbox package version, image tags, and snapshot names that a release publishes.
 
 > **Note:** The OpenCode CLI (`opencode-ai`) and SDK (`@opencode-ai/sdk`) are
 > upstream packages published by anomalyco. We pin the CLI version in
@@ -146,7 +145,7 @@ The script does everything in order:
 | **0. Prerequisites** | Checks `node`, `bun`, `npm`, `gh` on PATH. Verifies npm + gh auth. Checks Docker daemon, buildx builder, and daytona CLI **upfront**. |
 | **1. Validate changelog** | Reads `CHANGELOG.json`, ensures entry for this version exists with `title` and `changes`. |
 | **2. Version lock check** | Checks if a GitHub Release for this version already exists. If it does and we're NOT resuming a previous run, **hard aborts** — someone else already released this version. This prevents two people from releasing the same version simultaneously. |
-| **3. Bump versions** | Stamps `packages/sandbox/package.json` (version), `scripts/get-kortix.sh` (VERSION line), and `kortix-api/src/config.ts` (SANDBOX_VERSION). |
+| **3. Bump versions** | Stamps `packages/sandbox/package.json`, `packages/sandbox/release.json`, `packages/sandbox/startup.sh`, and `scripts/get-kortix.sh`. |
 | **4. GitHub Release (lock)** | Creates `v{version}` release on `kortix-ai/computer` — this **locks** the version. If two people race, only one `gh release create` succeeds. The loser will see it in step 2 next time they run. |
 | **5. Publish sandbox** | `npm publish` for `@kortix/sandbox@{version}`. This triggers live auto-update on all running sandboxes. Waits 5s and verifies on npm registry. |
 | **6. Docker images** | Builds all 3 images (sandbox, API, frontend) multi-platform and pushes to Docker Hub. Then creates the Daytona snapshot from the sandbox image. |
@@ -313,11 +312,12 @@ The release script auto-stamps these files:
 | File | What changes |
 |---|---|
 | `packages/sandbox/package.json` | `version` field |
-| `kortix-api/src/config.ts` | `SANDBOX_VERSION` constant |
+| `packages/sandbox/release.json` | exact release graph |
+| `packages/sandbox/startup.sh` | baked default `DEFAULT_KORTIX_SANDBOX_VERSION` |
+| `scripts/get-kortix.sh` | baked default `DEFAULT_KORTIX_VERSION` |
 | `packages/sandbox/CHANGELOG.json` | `artifacts[]` array added to the version's entry |
 
-`scripts/get-kortix.sh` is **not** stamped with a version — it always defaults to `:latest`.
-Users can pin a specific version with `--version 0.7.x` or `KORTIX_VERSION=0.7.x bash get-kortix.sh`.
+`scripts/get-kortix.sh` is stamped with the current exact release version so self-hosted installs default to a reproducible release instead of `latest`. Users can still override it with `--version 0.7.x` or `KORTIX_VERSION=0.7.x bash get-kortix.sh`.
 
 You do NOT need to manually edit versions in these files.
 

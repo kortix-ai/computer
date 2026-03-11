@@ -591,11 +591,10 @@ describe('Deployment — LocalDockerProvider (mocked)', () => {
 describe('Deployment — Push Script Validation', () => {
   const pushScript = readFileSync(join(SANDBOX_RELEASE_DIR, 'push.sh'), 'utf-8');
 
-  it('reads version from packages/sandbox/package.json', () => {
-    expect(pushScript).toContain('package.json');
+  it('reads version from packages/sandbox/release.json', () => {
+    expect(pushScript).toContain('release.json');
     expect(pushScript).toContain('VERSION=');
-    // Should use node to read version from package.json
-    expect(pushScript).toMatch(/VERSION.*node.*package\.json.*version/s);
+    expect(pushScript).toContain("require('$RELEASE_MANIFEST').releaseVersion");
   });
 
   it('IMAGE_TAG follows the expected pattern: name:version', () => {
@@ -620,15 +619,13 @@ describe('Deployment — Push Script Validation', () => {
     expect(pushScript).toContain('PLATFORMS="linux/amd64,linux/arm64"');
   });
 
-  it('version from push.sh matches packages/sandbox/package.json', () => {
-    const pkgJson = JSON.parse(
-      readFileSync(join(SANDBOX_DIR, 'package.json'), 'utf-8'),
+  it('version from push.sh matches packages/sandbox/release.json', () => {
+    const releaseManifest = JSON.parse(
+      readFileSync(join(SANDBOX_DIR, 'release.json'), 'utf-8'),
     );
-    // push.sh reads from the same package.json, so they should match
-    // We verify the path reference is correct
-    expect(pushScript).toContain("$SANDBOX_PACKAGE_DIR/package.json");
-    expect(pkgJson.version).toBeDefined();
-    expect(pkgJson.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(pushScript).toContain("$SANDBOX_PACKAGE_DIR/release.json");
+    expect(releaseManifest.releaseVersion).toBeDefined();
+    expect(releaseManifest.releaseVersion).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
 
@@ -689,8 +686,7 @@ describe.skipIf(!HAS_DOCKER)('Deployment — Docker Compose Validation', () => {
       join(SANDBOX_DOCKER_DIR, 'docker-compose.yml'),
       'utf-8',
     );
-    // Should contain ${SANDBOX_VERSION:-<something>} (version or "latest")
-    expect(content).toMatch(/\$\{SANDBOX_VERSION:-[^}]+\}/);
+    expect(content).toContain('${SANDBOX_VERSION:-0.7.18}');
     // Should reference the image with the version variable
     expect(content).toContain('SANDBOX_VERSION');
   });

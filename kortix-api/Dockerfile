@@ -50,6 +50,7 @@ COPY LICENSE /LICENSE
 
 # Changelog (read by version endpoint — avoids GitHub raw fetch for private repos)
 COPY packages/sandbox/CHANGELOG.json /app/CHANGELOG.json
+COPY packages/sandbox/release.json /app/release.json
 
 # Sandbox package.json — single source of truth for SANDBOX_VERSION
 COPY packages/sandbox/package.json /app/packages/sandbox/package.json
