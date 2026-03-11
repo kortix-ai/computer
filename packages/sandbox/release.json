@@ -1,19 +1,19 @@
 {
-  "releaseVersion": "0.7.26",
+  "releaseVersion": "0.7.27",
   "channel": "stable",
   "sandbox": {
     "package": {
       "name": "@kortix/sandbox",
-      "version": "0.7.26"
+      "version": "0.7.27"
     },
-    "image": "kortix/computer:0.7.26",
-    "daytonaSnapshot": "kortix-sandbox-v0.7.26",
-    "hetznerSnapshotDescription": "kortix-computer-v0.7.26"
+    "image": "kortix/computer:0.7.27",
+    "daytonaSnapshot": "kortix-sandbox-v0.7.27",
+    "hetznerSnapshotDescription": "kortix-computer-v0.7.27"
   },
   "api": {
-    "image": "kortix/kortix-api:0.7.26"
+    "image": "kortix/kortix-api:0.7.27"
   },
   "frontend": {
-    "image": "kortix/kortix-frontend:0.7.26"
+    "image": "kortix/kortix-frontend:0.7.27"
   }
 }

@@ -1,5 +1,33 @@
 [
   {
+    "version": "0.7.27",
+    "date": "2026-03-11",
+    "title": "Simplify onboarding enforcement and fix installer",
+    "description": "Refactors the onboarding gate to use sandbox env directly instead of custom API endpoints, fixes get-kortix.sh silent exit bug, and removes 120+ lines of dead code.",
+    "changes": [
+      {
+        "type": "refactor",
+        "text": "Removed 4 custom onboarding API endpoints (onboarding-status, onboarding-complete, onboarding-reset, onboarding-session) and 2 helpers"
+      },
+      {
+        "type": "refactor", 
+        "text": "Onboarding enforcement now reads ONBOARDING_COMPLETE directly from sandbox /env API (same as Secrets Manager)"
+      },
+      {
+        "type": "refactor",
+        "text": "Removed middleware server-side onboarding check - client-side is now single source of truth"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed get-kortix.sh silent exit caused by set -e killing script on conditional logging"
+      },
+      {
+        "type": "fix",
+        "text": "Added || true to all docker compose up -d calls to prevent premature script exit"
+      }
+    ]
+  },
+  {
     "version": "0.7.26",
     "date": "2026-03-10",
     "title": "Restore Kortix OpenCode plugin loading",
