@@ -24,6 +24,10 @@
       {
         "type": "fix",
         "text": "Fixed kortix-api multi-arch manifest — now ships amd64 + arm64"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed ANTHROPIC_API_KEY not reaching OpenCode process — svc-opencode-serve/run now reads LLM keys from s6 container_environment so they survive the exec env replacement"
       }
     ]
   },
