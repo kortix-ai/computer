@@ -116,9 +116,17 @@ function applyKortixConfig(output: Config): void {
     },
   }
 
-  const providerIds = ["anthropic", "openai", "xai", "google", "groq"]
+  // Set explicit baseURLs for providers to avoid "fetch() URL is invalid" error
+  // Opencode doesn't resolve {env:...} templates in baseURL, so we set defaults
+  const providerDefaults: Record<string, string> = {
+    anthropic: "https://api.anthropic.com/v1",
+    openai: "https://api.openai.com/v1",
+    xai: "https://api.x.ai/v1",
+    google: "https://generativelanguage.googleapis.com/v1beta",
+    groq: "https://api.groq.com/openai/v1",
+  }
   config.provider ??= {}
-  for (const providerId of providerIds) {
+  for (const [providerId, defaultUrl] of Object.entries(providerDefaults)) {
     const existing = isRecord(config.provider[providerId]) ? config.provider[providerId] as Record<string, unknown> : {}
     const existingOptions = isRecord(existing.options) ? existing.options : {}
     const existingHeaders = isRecord(existingOptions.headers) ? existingOptions.headers : {}
@@ -126,6 +134,7 @@ function applyKortixConfig(output: Config): void {
       ...existing,
       options: {
         ...existingOptions,
+        baseURL: defaultUrl,
         headers: {
           "X-Kortix-Token": "{env:KORTIX_TOKEN}",
           ...existingHeaders,
