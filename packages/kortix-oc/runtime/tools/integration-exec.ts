@@ -100,7 +100,7 @@ export default tool({
   },
   async execute(args) {
     const masterUrl =
-      process.env.KORTIX_MASTER_URL || "http://localhost:8000";
+      process.env.KORTIX_MASTER_URL?.trim() || "http://localhost:8000";
     const proxyUrl = `${masterUrl}/api/integrations/proxy`;
 
     const fullCode = PROXY_FETCH_PREAMBLE + "\n" + args.code;
