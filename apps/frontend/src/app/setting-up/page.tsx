@@ -793,10 +793,6 @@ export default function SettingUpPage() {
                 {instanceMode ? 'Provisioning Failed' : 'Setup Issue'}
               </h1>
 
-              <p className="text-[16px] text-foreground/60 text-center leading-relaxed">
-                {errorMessage || 'An error occurred during setup.'}
-              </p>
-
               <Card className="w-full min-h-24 bg-card border border-border">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -809,9 +805,9 @@ export default function SettingUpPage() {
                           </span>
                         </div>
                         <p className="text-sm text-gray-400">
-                          {instanceMode
-                            ? 'The instance could not be provisioned. Try a different location.'
-                            : 'Please try again or choose a plan manually.'}
+                          {errorMessage || (instanceMode
+                            ? 'The instance could not be provisioned.'
+                            : 'Please try again or choose a plan manually.')}
                         </p>
                       </div>
                     </div>
