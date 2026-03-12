@@ -1,9 +1,7 @@
 /**
  * E2E tests for the version endpoint.
  *
- * GET /v1/platform/sandbox/version returns the exact release targeted by this API deployment.
- *
- * No database required.
+ * GET /v1/platform/sandbox/version returns the version from release.json.
  */
 import { describe, it, expect } from 'bun:test';
 import { createTestApp, jsonGet } from './helpers';
@@ -21,9 +19,7 @@ describe('Version endpoint', () => {
     expect(typeof body.version).toBe('string');
     expect(body.version.length).toBeGreaterThan(0);
 
-    expect(body.version).toBe(releaseManifest.sandbox.package.version);
-
-    expect(body.package).toBe(releaseManifest.sandbox.package.name);
+    expect(body.version).toBe(releaseManifest.version);
   });
 
   it('GET /v1/platform/sandbox/version respects SANDBOX_VERSION env override', async () => {
@@ -31,8 +27,6 @@ describe('Version endpoint', () => {
     try {
       process.env.SANDBOX_VERSION = '99.88.77';
 
-      // The version router caches results, but SANDBOX_VERSION override is checked
-      // before cache — so it should always take precedence.
       const res = await jsonGet(app, '/v1/platform/sandbox/version');
       expect(res.status).toBe(200);
 

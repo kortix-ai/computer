@@ -22,9 +22,9 @@ import { createPdb } from "./src/k8s/pdb";
 const config = new pulumi.Config("kortix-eks");
 const acmCertificateArn = config.require("acmCertificateArn");
 const releaseManifest = JSON.parse(readFileSync(resolve(__dirname, "../packages/sandbox/release.json"), "utf8")) as {
-  releaseVersion: string;
+  version: string;
 };
-const imageTag = config.get("imageTag") || releaseManifest.releaseVersion;
+const imageTag = config.get("imageTag") || releaseManifest.version;
 
 const ghcrImage = "ghcr.io/kortix-ai/computer";
 

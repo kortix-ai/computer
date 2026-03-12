@@ -1,5 +1,53 @@
 [
   {
+    "version": "0.8.1",
+    "date": "2026-03-12",
+    "title": "E2E update test release",
+    "description": "Test release to verify Docker image-based update flow works end-to-end.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "E2E update test — if you see this, the update worked"
+      }
+    ]
+  },
+  {
+    "version": "0.8.0",
+    "date": "2026-03-12",
+    "title": "Pure Docker-based updates — kill OTA complexity",
+    "description": "Massive simplification: updates are now 100% Docker image-based. Pull new image, recreate container, done. Killed the entire OTA tarball system, npm package publishing, staging directories, symlink swaps, and manifest-v2.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "Docker image-based sandbox updates via kortix-api (pull + recreate)"
+      },
+      {
+        "type": "feature",
+        "text": "New /v1/platform/sandbox/update API with progress polling"
+      },
+      {
+        "type": "feature",
+        "text": "Simplified release.json: just version + Docker image names"
+      },
+      {
+        "type": "feature",
+        "text": "Simplified ship.cjs: bump versions, build+push 3 Docker images, done"
+      },
+      {
+        "type": "refactor",
+        "text": "Dockerfile now COPYs source packages directly — no bundle-runtime.cjs"
+      },
+      {
+        "type": "refactor",
+        "text": "Removed OTA tarball, postinstall.sh, staging dirs, symlink swaps, manifest-v2, control-plane, npm publishing"
+      },
+      {
+        "type": "refactor",
+        "text": "sandbox/package.json is now private — no npm publishing"
+      }
+    ]
+  },
+  {
     "version": "0.7.28",
     "date": "2026-03-11",
     "title": "Fix provider baseURLs to resolve fetch URL errors",

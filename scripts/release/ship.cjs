@@ -3,42 +3,26 @@
  * ship.cjs — Kortix release script
  *
  * Usage:
- *   pnpm ship <version>            Release (OTA tarball + GitHub Release + Docker images)
- *   pnpm ship --no-docker <version> Release without Docker images
- *   pnpm ship --check              Validate current state, no changes
- *   pnpm ship --help               Show this help
+ *   pnpm ship <version>              Build + push 3 Docker images, create GitHub Release
+ *   pnpm ship --no-docker <version>  Version bump only, no Docker build
+ *   pnpm ship --check                Show current state
+ *   pnpm ship --dry-run <version>    Validate only, no changes
+ *   pnpm ship --help                 Show this help
  *
  * What it does:
  *   1. Validates changelog entry exists for the version
- *   2. Bumps versions in package.json, release.json, startup.sh, get-kortix.sh
- *   3. Runs bundle-runtime.cjs (vendors source packages)
- *   4. Creates OTA tarball: sandbox-runtime-{version}.tar.gz (~5MB, source only)
- *   5. Creates GitHub Release v{version} with changelog as notes
- *   6. Attaches OTA tarball to the GitHub Release
- *   7. Builds and pushes kortix/computer, kortix-api, kortix-frontend Docker images
- *   8. Commits version bump (you still need to git push)
+ *   2. Bumps versions in release.json, package.json, startup.sh, get-kortix.sh
+ *   3. Creates GitHub Release with changelog
+ *   4. Builds + pushes 3 Docker images (sandbox, api, frontend)
+ *   5. Commits version bump (you still need to git push)
  *
- * OTA tarball contents (what running sandboxes download on update):
- *   kortix-master/         proxy server source (no node_modules)
- *   vendor/kortix-oc/      OpenCode runtime, agents, skills, tools
- *   vendor/opencode-channels/
- *   vendor/opencode-agent-triggers/
- *   postinstall.sh         staging deployment script
- *   s6-services/           service definitions
- *   config/                init scripts
- *   browser-viewer/
- *   core/                  manifest + service spec
- *   package.json           version + dep metadata
- *   CHANGELOG.json
- *
- * Running sandboxes download this tarball (not npm), extract it, run postinstall.sh
- * in staging mode, then update.ts atomically swaps symlinks. No npm involved.
+ * That's it. No npm packages, no OTA tarballs, no staging, no symlinks.
+ * Updating a running sandbox = pull new image + recreate container.
  */
 
 const { execSync, execFileSync } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
-const os = require('node:os')
 
 const ROOT = path.resolve(__dirname, '..', '..')
 const SANDBOX_DIR = path.join(ROOT, 'packages', 'sandbox')
@@ -75,15 +59,6 @@ function run(cmd, opts = {}) {
   return typeof output === 'string' ? output.trim() : ''
 }
 
-function runFile(cmd, args, opts = {}) {
-  return execFileSync(cmd, args, {
-    cwd: opts.cwd || ROOT,
-    encoding: 'utf8',
-    stdio: opts.stdio || 'pipe',
-    ...opts,
-  })
-}
-
 function runPnpm(args, opts = {}) {
   const env = {
     ...process.env,
@@ -92,7 +67,7 @@ function runPnpm(args, opts = {}) {
   }
   const pnpmExecPath = process.env.npm_execpath
   if (pnpmExecPath && fs.existsSync(pnpmExecPath)) {
-    return runFile(process.execPath, [pnpmExecPath, ...args], { ...opts, env })
+    return execFileSync(process.execPath, [pnpmExecPath, ...args], { ...opts, env, cwd: opts.cwd || ROOT, encoding: 'utf8', stdio: opts.stdio || 'pipe' })
   }
   return run(`pnpm ${args.map((arg) => JSON.stringify(arg)).join(' ')}`, { ...opts, env })
 }
@@ -100,16 +75,15 @@ function runPnpm(args, opts = {}) {
 if (HELP) {
   console.log(`
 Usage:
-  pnpm ship <version>            Release (OTA tarball + GitHub Release + Docker images)
-  pnpm ship --no-docker <version> Release without Docker images
-  pnpm ship --check              Validate state
-  pnpm ship --dry-run <version>  Validate only, no changes
-  pnpm ship --help               Show this help
+  pnpm ship <version>              Build + push 3 Docker images
+  pnpm ship --no-docker <version>  Version bump only
+  pnpm ship --check                Show current state
+  pnpm ship --dry-run <version>    Validate only
+  pnpm ship --help                 Show this help
 
 Examples:
   pnpm ship 0.8.0
   pnpm ship --no-docker 0.8.0
-  pnpm ship --dry-run 0.8.0
 `)
   process.exit(0)
 }
@@ -119,7 +93,7 @@ if (CHECK) {
   info('Current state:')
   const release = JSON.parse(fs.readFileSync(RELEASE_JSON))
   const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON))
-  console.log(`  release.json: ${release.releaseVersion}`)
+  console.log(`  release.json: ${release.version}`)
   console.log(`  package.json: ${pkg.version}`)
   const gitStatus = run('git status --short')
   if (gitStatus) {
@@ -154,15 +128,13 @@ if (!entry) {
 ok(`Changelog: "${entry.title}"`)
 
 let releaseExists = false
-
-// Check GitHub release doesn't already exist
 try {
   run(`gh release view "v${version}" --repo kortix-ai/computer`)
   releaseExists = true
-  warn(`GitHub release v${version} already exists — reusing it and continuing`)
+  warn(`GitHub release v${version} already exists — reusing`)
 } catch (e) {
-  if (!e.message.includes('release not found') && !e.stderr?.includes('release not found') && !String(e).includes('release not found')) {
-    fail(`Failed to check GitHub release state: ${e.message || e}`)
+  if (!String(e).includes('release not found') && !e.message?.includes('release not found') && !e.stderr?.includes('release not found')) {
+    fail(`Failed to check GitHub release: ${e.message || e}`)
   }
   ok(`GitHub release v${version} not yet created`)
 }
@@ -178,71 +150,37 @@ info('Bumping versions...')
 const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON))
 pkg.version = version
 fs.writeFileSync(PACKAGE_JSON, JSON.stringify(pkg, null, 2) + '\n')
-ok(`packages/sandbox/package.json → ${version}`)
+ok(`package.json → ${version}`)
 
 const release = JSON.parse(fs.readFileSync(RELEASE_JSON))
-release.releaseVersion = version
-release.sandbox.package.version = version
-release.sandbox.image = `kortix/computer:${version}`
-release.sandbox.daytonaSnapshot = `kortix-sandbox-v${version}`
-release.sandbox.hetznerSnapshotDescription = `kortix-computer-v${version}`
-release.api.image = `kortix/kortix-api:${version}`
-release.frontend.image = `kortix/kortix-frontend:${version}`
+release.version = version
+release.images = {
+  sandbox: `kortix/computer:${version}`,
+  api: `kortix/kortix-api:${version}`,
+  frontend: `kortix/kortix-frontend:${version}`,
+}
+release.snapshots = {
+  daytona: `kortix-sandbox-v${version}`,
+  hetzner: `kortix-computer-v${version}`,
+}
 fs.writeFileSync(RELEASE_JSON, JSON.stringify(release, null, 2) + '\n')
-ok(`packages/sandbox/release.json → ${version}`)
+ok(`release.json → ${version}`)
 
-let startup = fs.readFileSync(STARTUP_SH, 'utf8')
-startup = startup.replace(/DEFAULT_KORTIX_SANDBOX_VERSION="[^"]*"/, `DEFAULT_KORTIX_SANDBOX_VERSION="${version}"`)
-fs.writeFileSync(STARTUP_SH, startup)
-ok(`startup.sh → ${version}`)
+if (fs.existsSync(STARTUP_SH)) {
+  let startup = fs.readFileSync(STARTUP_SH, 'utf8')
+  startup = startup.replace(/DEFAULT_KORTIX_SANDBOX_VERSION="[^"]*"/, `DEFAULT_KORTIX_SANDBOX_VERSION="${version}"`)
+  fs.writeFileSync(STARTUP_SH, startup)
+  ok(`startup.sh → ${version}`)
+}
 
-let installer = fs.readFileSync(GET_KORTIX, 'utf8')
-installer = installer.replace(/DEFAULT_KORTIX_VERSION="[^"]*"/, `DEFAULT_KORTIX_VERSION="${version}"`)
-fs.writeFileSync(GET_KORTIX, installer)
-ok(`get-kortix.sh → ${version}`)
+if (fs.existsSync(GET_KORTIX)) {
+  let installer = fs.readFileSync(GET_KORTIX, 'utf8')
+  installer = installer.replace(/DEFAULT_KORTIX_VERSION="[^"]*"/, `DEFAULT_KORTIX_VERSION="${version}"`)
+  fs.writeFileSync(GET_KORTIX, installer)
+  ok(`get-kortix.sh → ${version}`)
+}
 
-// ── Step 3: Vendor runtime sources ───────────────────────────────────────
-info('Vendoring runtime sources...')
-execSync('node scripts/bundle-runtime.cjs', { cwd: SANDBOX_DIR, stdio: 'inherit' })
-ok('Source packages vendored')
-
-// ── Step 4: Create OTA tarball ────────────────────────────────────────────
-info(`Creating OTA tarball sandbox-runtime-${version}.tar.gz...`)
-
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `kortix-ship-${version}-`))
-const tarballName = `sandbox-runtime-${version}.tar.gz`
-const tarballPath = path.join(tmpDir, tarballName)
-
-// List of dirs/files to include in the OTA tarball (no node_modules)
-const OTA_INCLUDES = [
-  'kortix-master',
-  'vendor',
-  'postinstall.sh',
-  's6-services',
-  'config',
-  'browser-viewer',
-  'core',
-  'package.json',
-  'CHANGELOG.json',
-  'patch-agent-browser.js',
-]
-
-const existingIncludes = OTA_INCLUDES.filter(f => fs.existsSync(path.join(SANDBOX_DIR, f)))
-
-runFile('tar', [
-  '-czf', tarballPath,
-  '--exclude=node_modules',
-  '--exclude=.git',
-  '--exclude=bun.lock',
-  '--exclude=*.tgz',
-  '-C', SANDBOX_DIR,
-  ...existingIncludes,
-])
-
-const tarSize = (fs.statSync(tarballPath).size / 1024 / 1024).toFixed(1)
-ok(`OTA tarball created: ${tarballName} (${tarSize}MB)`)
-
-// ── Step 5: GitHub Release ────────────────────────────────────────────────
+// ── Step 3: GitHub Release ────────────────────────────────────────────────
 info('Creating GitHub release...')
 
 const releaseNotes = `## ${entry.title}
@@ -255,43 +193,44 @@ ${entry.changes.map(c => `- **${c.type}**: ${c.text}`).join('\n')}
 
 ### How to Update
 
-Running sandboxes will auto-detect this version. Click **Update** in the sidebar.
-
-The sandbox downloads \`sandbox-runtime-${version}.tar.gz\` (~${tarSize}MB) from this release,
-stages it with zero downtime, and atomically swaps to the new version.
+Pull the new Docker image and recreate your container:
+\`\`\`
+docker pull kortix/computer:${version}
+\`\`\`
+Or click **Update** in the Kortix sidebar.
 `
 
-const notesFile = path.join(tmpDir, 'notes.md')
+const notesFile = path.join(require('node:os').tmpdir(), `kortix-ship-${version}-notes.md`)
 fs.writeFileSync(notesFile, releaseNotes)
 
-if (releaseExists) {
-  run(`gh release upload "v${version}" "${tarballPath}" --repo kortix-ai/computer --clobber`)
-  ok(`GitHub release v${version} reused and OTA tarball refreshed`)
-} else {
+if (!releaseExists) {
   run(`gh release create "v${version}" \
     --repo kortix-ai/computer \
     --title "v${version} — ${entry.title}" \
     --notes-file "${notesFile}" \
-    --latest \
-    "${tarballPath}"`)
-
-  ok(`GitHub release v${version} created with OTA tarball attached`)
+    --latest`)
+  ok(`GitHub release v${version} created`)
+} else {
+  ok(`GitHub release v${version} already exists`)
 }
 
-// ── Step 6: Docker (optional) ─────────────────────────────────────────────
+fs.rmSync(notesFile, { force: true })
+
+// ── Step 4: Docker ────────────────────────────────────────────────────────
 if (DOCKER) {
   info('Building Docker images...')
 
-  // Sandbox image
+  // Sandbox
   run(`docker buildx build \
     --platform linux/amd64,linux/arm64 \
     -f packages/sandbox/docker/Dockerfile \
+    --build-arg SANDBOX_VERSION=${version} \
     -t kortix/computer:${version} \
     -t kortix/computer:latest \
     --push "${ROOT}"`, { stdio: 'inherit' })
   ok(`kortix/computer:${version} pushed`)
 
-  // API image
+  // API
   run(`docker buildx build \
     --platform linux/amd64,linux/arm64 \
     --build-arg SERVICE=kortix-api \
@@ -301,13 +240,11 @@ if (DOCKER) {
     --push "${ROOT}"`, { stdio: 'inherit' })
   ok(`kortix/kortix-api:${version} pushed`)
 
-  // Frontend: build then dockerize
+  // Frontend
   info('Building frontend...')
   runPnpm(['--dir', 'apps/frontend', 'build'], {
     stdio: 'inherit',
-    env: {
-      NEXT_OUTPUT: 'standalone',
-    },
+    env: { NEXT_OUTPUT: 'standalone' },
   })
   run(`docker buildx build \
     --platform linux/amd64,linux/arm64 \
@@ -318,7 +255,7 @@ if (DOCKER) {
   ok(`kortix/kortix-frontend:${version} pushed`)
 }
 
-// ── Step 7: Commit ────────────────────────────────────────────────────────
+// ── Step 5: Commit ────────────────────────────────────────────────────────
 info('Committing version bump...')
 run(`git add \
   packages/sandbox/package.json \
@@ -331,15 +268,9 @@ if (hasStagedChanges) {
   run(`git commit -m "release: v${version}"`)
   ok(`Committed: release v${version}`)
 } else {
-  ok(`No version-bump commit needed for v${version}`)
+  ok(`No version-bump commit needed`)
 }
 
 // ── Done ──────────────────────────────────────────────────────────────────
-// Cleanup temp files
-fs.rmSync(tmpDir, { recursive: true, force: true })
-
 console.log(`\n  ${G}${B}✓ v${version} shipped!${X}`)
-console.log(`\n  ${D}Next steps:${X}`)
-console.log(`    git push`)
-console.log(`    Update .env: SANDBOX_VERSION=${version}`)
-console.log()
+console.log(`\n  ${D}Next: git push${X}\n`)

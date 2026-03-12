@@ -124,7 +124,9 @@ const envSchema = z.object({
   // ── Hetzner — Sandbox provisioning (conditional: required if hetzner provider enabled) ──
   HETZNER_API_KEY:                    optStr,
   HETZNER_DEFAULT_LOCATION:           optStrDefault('nbg1'),
-  HETZNER_SNAPSHOT_VERSION_OVERRIDE:  optStr,   // e.g. "0.7.15" — overrides SANDBOX_VERSION for snapshot resolution
+  HETZNER_SNAPSHOT_ID:                optStr,   // explicit snapshot ID (overrides description-based lookup)
+  HETZNER_SNAPSHOT_DESCRIPTION:       optStr,   // snapshot description pattern (default from release.json)
+  HETZNER_SNAPSHOT_VERSION_OVERRIDE:  optStr,   // e.g. "0.7.15" — overrides version for snapshot resolution
   HETZNER_SSH_KEY_ID:                 optStr,
   HETZNER_DEFAULT_SERVER_TYPE:        optStrDefault('cpx22'),
 
@@ -373,21 +375,21 @@ export const config = {
   DAYTONA_API_KEY: env.DAYTONA_API_KEY,
   DAYTONA_SERVER_URL: env.DAYTONA_SERVER_URL,
   DAYTONA_TARGET: env.DAYTONA_TARGET,
-  DAYTONA_SNAPSHOT: env.DAYTONA_SNAPSHOT || releaseManifest.sandbox.daytonaSnapshot,
+  DAYTONA_SNAPSHOT: env.DAYTONA_SNAPSHOT || releaseManifest.snapshots.daytona,
 
   // ─── Hetzner (VPS Sandbox provisioning) ──────────────────────────────────
   HETZNER_API_KEY: env.HETZNER_API_KEY,
   HETZNER_DEFAULT_LOCATION: env.HETZNER_DEFAULT_LOCATION,
   HETZNER_SNAPSHOT_ID: env.HETZNER_SNAPSHOT_ID,
   HETZNER_SNAPSHOT_VERSION_OVERRIDE: env.HETZNER_SNAPSHOT_VERSION_OVERRIDE,
-  HETZNER_SNAPSHOT_DESCRIPTION: env.HETZNER_SNAPSHOT_DESCRIPTION || releaseManifest.sandbox.hetznerSnapshotDescription,
+  HETZNER_SNAPSHOT_DESCRIPTION: env.HETZNER_SNAPSHOT_DESCRIPTION || releaseManifest.snapshots.hetzner,
   HETZNER_SSH_KEY_ID: env.HETZNER_SSH_KEY_ID,
   HETZNER_DEFAULT_SERVER_TYPE: env.HETZNER_DEFAULT_SERVER_TYPE,
 
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: env.KORTIX_URL,
   ALLOWED_SANDBOX_PROVIDERS: allowedProviders,
-  SANDBOX_IMAGE: env.SANDBOX_IMAGE || releaseManifest.sandbox.image,
+  SANDBOX_IMAGE: env.SANDBOX_IMAGE || releaseManifest.images.sandbox,
   KORTIX_LOCAL_IMAGES: env.KORTIX_LOCAL_IMAGES,
   DOCKER_HOST: env.DOCKER_HOST,
   SANDBOX_NETWORK: env.SANDBOX_NETWORK,
@@ -472,7 +474,7 @@ export const config = {
   SLACK_SIGNING_SECRET: env.SLACK_SIGNING_SECRET,
 
   // ─── Version / GitHub ──────────────────────────────────────────────────────
-  /** Dev override: if set, skip npm registry lookup for latest sandbox version. */
+  /** Dev override: force a specific sandbox version (skips release.json). */
   SANDBOX_VERSION_OVERRIDE: env.SANDBOX_VERSION,
   GITHUB_TOKEN: env.GITHUB_TOKEN,
 

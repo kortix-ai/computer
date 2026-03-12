@@ -1,23 +1,21 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+/**
+ * Release manifest — single source of truth for version + Docker image names.
+ * Loaded from release.json (bundled in the Docker image or found in the repo).
+ */
 export interface ReleaseManifest {
-  releaseVersion: string
+  version: string
   channel: string
-  sandbox: {
-    package: {
-      name: string
-      version: string
-    }
-    image: string
-    daytonaSnapshot: string
-    hetznerSnapshotDescription: string
+  images: {
+    sandbox: string
+    api: string
+    frontend: string
   }
-  api: {
-    image: string
-  }
-  frontend: {
-    image: string
+  snapshots: {
+    daytona: string
+    hetzner: string
   }
 }
 
@@ -31,29 +29,42 @@ const RELEASE_MANIFEST_PATHS = [
 function loadReleaseManifest(): ReleaseManifest {
   for (const manifestPath of RELEASE_MANIFEST_PATHS) {
     if (!existsSync(manifestPath)) continue
-    return JSON.parse(readFileSync(manifestPath, 'utf8')) as ReleaseManifest
+    const raw = JSON.parse(readFileSync(manifestPath, 'utf8'))
+
+    // Support both old and new format for backwards compat during transition
+    if (raw.releaseVersion && raw.sandbox?.image) {
+      return {
+        version: raw.releaseVersion,
+        channel: raw.channel || 'unknown',
+        images: {
+          sandbox: raw.sandbox.image,
+          api: raw.api?.image || `kortix/kortix-api:${raw.releaseVersion}`,
+          frontend: raw.frontend?.image || `kortix/kortix-frontend:${raw.releaseVersion}`,
+        },
+        snapshots: {
+          daytona: raw.sandbox.daytonaSnapshot || `kortix-sandbox-v${raw.releaseVersion}`,
+          hetzner: raw.sandbox.hetznerSnapshotDescription || `kortix-computer-v${raw.releaseVersion}`,
+        },
+      }
+    }
+
+    return raw as ReleaseManifest
   }
 
   return {
-    releaseVersion: '0.0.0',
+    version: '0.0.0',
     channel: 'unknown',
-    sandbox: {
-      package: {
-        name: '@kortix/sandbox',
-        version: '0.0.0',
-      },
-      image: 'kortix/computer:0.0.0',
-      daytonaSnapshot: 'kortix-sandbox-v0.0.0',
-      hetznerSnapshotDescription: 'kortix-computer-v0.0.0',
+    images: {
+      sandbox: 'kortix/computer:0.0.0',
+      api: 'kortix/kortix-api:0.0.0',
+      frontend: 'kortix/kortix-frontend:0.0.0',
     },
-    api: {
-      image: 'kortix/kortix-api:0.0.0',
-    },
-    frontend: {
-      image: 'kortix/kortix-frontend:0.0.0',
+    snapshots: {
+      daytona: 'kortix-sandbox-v0.0.0',
+      hetzner: 'kortix-computer-v0.0.0',
     },
   }
 }
 
 export const releaseManifest = loadReleaseManifest()
-export const SANDBOX_VERSION = releaseManifest.sandbox.package.version
+export const SANDBOX_VERSION = releaseManifest.version

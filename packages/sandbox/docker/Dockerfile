@@ -2,34 +2,29 @@
 #
 # kortix/computer — sandbox image
 #
-# Everything is PREBAKED at docker build time (zero network calls on container start):
-#   - Alpine apk packages (runtimes, build tools)
-#   - Bun runtime, uv (Python runner)
-#   - Rust/musl librust_pty.so (bun-pty on Alpine)
-#   - Full sandbox runtime: kortix-master, opencode, kortix-oc, channels, triggers
-#     (built via bundle-runtime.cjs + npm install → postinstall.sh → /opt/)
+# ONE image. Everything baked at build time. No OTA, no npm, no symlinks.
+# Updates = pull new image + recreate container. User data in /workspace volume.
 #
-# Release flow:
-#   Code change  →  pnpm ship <version>  →  OTA tarball on GitHub Release  →  done
-#   OS/dep change →  rebuild + push image, then pnpm ship <version>
+# Layout:
+#   /opt/kortix-master/          Hono proxy server + deps
+#   /opt/opencode/               Materialized OpenCode runtime + deps
+#   /opt/opencode-channels/      Chat SDK + deps
+#   /opt/opencode-agent-triggers/ Trigger definitions
+#   /opt/agent-browser-viewer/   Browser viewer HTML
+#   /opt/kortix/                 Version metadata, core contract, changelog
+#   /opt/kortix-oc/              kortix-oc source (shared node_modules with opencode)
 #
 
 # ── Stage 1: Build musl-compatible bun-pty Rust library ─────────────────────
-# bun-pty ships glibc-linked .so files, but our sandbox runs Alpine (musl).
-# Rust's musl target doesn't support cdylib directly, so we:
-#   1. Build a staticlib (.a) on Alpine with Rust
-#   2. Wrap it into a shared library (.so) using gcc
 FROM rust:alpine AS rust-pty-builder
 RUN --mount=type=cache,target=/var/cache/apk \
     apk add --no-cache musl-dev gcc git
 RUN git clone --depth 1 https://github.com/sursaone/bun-pty.git /build/bun-pty
 WORKDIR /build/bun-pty/rust-pty
-# Change crate-type from cdylib to staticlib for musl compatibility
 RUN sed -i 's/crate-type = \["cdylib"\]/crate-type = ["staticlib"]/' Cargo.toml
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     cargo build --release
-# Wrap the static lib into a shared .so using gcc
 RUN gcc -shared -o /build/librust_pty.so \
     -Wl,--whole-archive target/release/librust_pty.a -Wl,--no-whole-archive \
     -lpthread -ldl -lutil -lm
@@ -37,22 +32,19 @@ RUN gcc -shared -o /build/librust_pty.so \
 # ── Stage 2: Main image ─────────────────────────────────────────────────────
 FROM lscr.io/linuxserver/webtop:latest
 
-# ── License ──────────────────────────────────────────────────────────────────
-COPY LICENSE /LICENSE
+ARG SANDBOX_VERSION=0.0.0-dev
 
-# ── Branding ─────────────────────────────────────────────────────────────────
+# ── License + Branding ───────────────────────────────────────────────────────
+COPY LICENSE /LICENSE
 COPY packages/sandbox/assets/wallpaper.png             /usr/share/wallpapers/heyagi/wallpaper.png
 COPY packages/sandbox/assets/kortix-symbol.svg         /usr/share/icons/heyagi/kortix-symbol.svg
 COPY packages/sandbox/assets/kortix-symbol-white.svg   /usr/share/icons/heyagi/kortix-symbol-white.svg
 
 # ── OS packages ──────────────────────────────────────────────────────────────
-# Alpine XFCE base includes: chromium, xfce4-terminal, python3, git, bash, pillow.
-# Install Node.js + npm from Alpine repos, plus build dependencies needed
-# for pip packages with C extensions (numpy, lxml, greenlet).
 RUN --mount=type=cache,target=/var/cache/apk \
     apk update \
     && apk add --no-cache \
-        nodejs npm \
+        nodejs npm rsync \
         python3-dev py3-pip py3-virtualenv \
         curl unzip ca-certificates \
         gcc g++ musl-dev linux-headers \
@@ -63,28 +55,18 @@ RUN --mount=type=cache,target=/var/cache/apk \
     && rm -rf /var/cache/apk/*
 
 # ── Bun runtime ───────────────────────────────────────────────────────────────
-# Install bun to /opt/bun (NOT /workspace which is a volume mount at runtime)
 ENV BUN_INSTALL=/opt/bun
 RUN for i in 1 2 3; do curl -fsSL https://bun.sh/install | bash && break || sleep 5; done \
     && test -x /opt/bun/bin/bun \
     && ln -sf /opt/bun/bin/bun /usr/local/bin/bun
-
-# Make bun install dir/cache writable by any user (abc UID changes at runtime via PUID)
 RUN mkdir -p /opt/bun/install/cache && chmod -R 777 /opt/bun
 
-# ── uv (Python package runner — 10-100x faster than pip) ─────────────────────
+# ── uv (Python package runner) ───────────────────────────────────────────────
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
 # ── bun-pty musl .so ──────────────────────────────────────────────────────────
-# Replace glibc-linked bun-pty .so with musl-compiled version from builder stage.
-# Stored at /opt/bun-pty-musl/ — postinstall.sh and 96-fix-bun-pty.sh patch
-# the actual opencode node_modules at boot time.
 COPY --from=rust-pty-builder /build/librust_pty.so /opt/bun-pty-musl/librust_pty.so
 RUN chmod 644 /opt/bun-pty-musl/librust_pty.so
-
-# Tell bun-pty to load our musl-compiled .so directly, bypassing its path resolution.
-# This ENV is inherited by ALL processes in the container — including the Go binary's
-# Bun subprocess that actually loads bun-pty at runtime.
 ENV BUN_PTY_LIB=/opt/bun-pty-musl/librust_pty.so
 
 # ── Workspace ───────────────────────────────────────────────────────────────
@@ -104,62 +86,129 @@ WORKDIR /workspace
 ENV KORTIX_WORKSPACE=/workspace
 
 # ── Services (s6-rc.d longrun) ──────────────────────────────────────────────
-# Alpine webtop uses s6-overlay v3 with s6-rc.d instead of services.d.
-# Each service is a directory with: run, type (longrun), dependencies.d/init-services
 COPY packages/sandbox/s6-services/ /etc/s6-overlay/s6-rc.d/
-# Register all custom services in the user bundle so s6 starts them
 RUN for svc in svc-kortix-master svc-sshd; do \
         touch "/etc/s6-overlay/s6-rc.d/user/contents.d/${svc}"; \
     done \
     && chmod +x /etc/s6-overlay/s6-rc.d/svc-*/run
 
-# ── Silence spammy base-image desktop finish script ──────────────────────────
-# The webtop base image's svc-de service crashes in a loop because its run
-# script uses `exec ... &` (backgrounding after exec). On each restart the
-# finish script prints "No desktop processes found to terminate." endlessly.
-RUN printf '#!/bin/bash\nPID_FILE="/de-pid"\n\
-if [ ! -r "$PID_FILE" ]; then exit 0; fi\n\
-PARENT_PID=$(cat "$PID_FILE")\n\
-if [ -z "$PARENT_PID" ]; then rm -f "$PID_FILE"; exit 0; fi\n\
-PIDS=$(pstree -p "$PARENT_PID" 2>/dev/null | grep -o "([0-9]\\+)" | grep -o "[0-9]\\+" | grep -v "^${PARENT_PID}$")\n\
-[ -n "$PIDS" ] && echo "$PIDS" | xargs kill -TERM -- 2>/dev/null && sleep 1\n\
-rm -f "$PID_FILE"\nexit 0\n' > /etc/s6-overlay/s6-rc.d/svc-de/finish \
+# Silence spammy base-image desktop finish script
+RUN printf '#!/bin/bash\nPID_FILE="/de-pid"\nif [ ! -r "$PID_FILE" ]; then exit 0; fi\nPARENT_PID=$(cat "$PID_FILE")\nif [ -z "$PARENT_PID" ]; then rm -f "$PID_FILE"; exit 0; fi\nPIDS=$(pstree -p "$PARENT_PID" 2>/dev/null | grep -o "([0-9]\\+)" | grep -o "[0-9]\\+" | grep -v "^${PARENT_PID}$")\n[ -n "$PIDS" ] && echo "$PIDS" | xargs kill -TERM -- 2>/dev/null && sleep 1\nrm -f "$PID_FILE"\nexit 0\n' > /etc/s6-overlay/s6-rc.d/svc-de/finish \
     && chmod +x /etc/s6-overlay/s6-rc.d/svc-de/finish
 
-# ── Container init scripts (s6 cont-init.d) ─────────────────────────────────
+# ── Container init scripts ───────────────────────────────────────────────────
 RUN mkdir -p /custom-cont-init.d
 COPY packages/sandbox/config/95-setup-sshd.sh /custom-cont-init.d/95-setup-sshd
-RUN chmod +x /custom-cont-init.d/95-setup-sshd
 COPY packages/sandbox/config/96-fix-bun-pty.sh /custom-cont-init.d/96-fix-bun-pty
-RUN chmod +x /custom-cont-init.d/96-fix-bun-pty
 COPY packages/sandbox/config/97-secrets-to-s6-env.sh /custom-cont-init.d/97-secrets-to-s6-env
-RUN chmod +x /custom-cont-init.d/97-secrets-to-s6-env
 COPY packages/sandbox/config/kortix-env-setup.sh /custom-cont-init.d/98-kortix-env
-RUN chmod +x /custom-cont-init.d/98-kortix-env
 COPY packages/sandbox/config/customize.sh /custom-cont-init.d/99-customize
-RUN chmod +x /custom-cont-init.d/99-customize
+RUN chmod +x /custom-cont-init.d/*
 
-# ── Local source bootstrap payload ────────────────────────────────────────────
-COPY packages/sandbox /opt/kortix-local/sandbox
-COPY packages/kortix-oc /opt/kortix-local/kortix-oc
-COPY packages/opencode-channels /opt/kortix-local/opencode-channels
-COPY packages/opencode-agent-triggers /opt/kortix-local/opencode-agent-triggers
+# ── Copy source packages directly (no bundle-runtime.cjs needed) ─────────────
+COPY packages/sandbox/kortix-master  /opt/build/kortix-master
+COPY packages/sandbox/browser-viewer /opt/build/browser-viewer
+COPY packages/sandbox/core           /opt/build/core
+COPY packages/sandbox/package.json   /opt/build/package.json
+COPY packages/sandbox/CHANGELOG.json /opt/build/CHANGELOG.json
+COPY packages/sandbox/patch-agent-browser.js /opt/build/patch-agent-browser.js
+COPY packages/kortix-oc              /opt/build/kortix-oc
+COPY packages/opencode-channels      /opt/build/opencode-channels
+COPY packages/opencode-agent-triggers /opt/build/opencode-agent-triggers
 
-# ── Prebake sandbox runtime into image ────────────────────────────────────────
-# Always run at build time so the container boots instantly (no runtime installs).
-# bundle-runtime.cjs vendors source packages into sandbox/vendor/, then
-# npm install triggers postinstall.sh which deploys everything to /opt/.
-RUN echo "[docker] Prebaking sandbox runtime into image..." && \
-    cd /opt/kortix-local/sandbox && \
-    node scripts/bundle-runtime.cjs && \
-    npm install --no-audit --no-fund . && \
-    rm -rf /root/.npm/_cacache /root/.npm/_logs 2>/dev/null || true
+# ── Build sandbox runtime (flat /opt layout, no symlinks) ────────────────────
+RUN set -e && echo "[docker] Building sandbox runtime v${SANDBOX_VERSION}..." && \
+    \
+    # ── 1. Wire file: dependency references ── \
+    cd /opt/build/kortix-master && \
+    mkdir -p vendor && \
+    rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
+      /opt/build/opencode-agent-triggers/ vendor/opencode-agent-triggers/ && \
+    \
+    # ── 2. kortix-master ── \
+    mkdir -p /opt/kortix-master && \
+    rsync -a --exclude=node_modules --exclude=bun.lock \
+      /opt/build/kortix-master/ /opt/kortix-master/ && \
+    cd /opt/kortix-master && bun install && \
+    \
+    # ── 3. opencode-channels ── \
+    mkdir -p /opt/opencode-channels && \
+    rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
+      /opt/build/opencode-channels/ /opt/opencode-channels/ && \
+    cd /opt/opencode-channels && bun install && \
+    \
+    # ── 4. opencode-agent-triggers ── \
+    mkdir -p /opt/opencode-agent-triggers && \
+    rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
+      /opt/build/opencode-agent-triggers/ /opt/opencode-agent-triggers/ && \
+    \
+    # ── 5. kortix-oc + materialize opencode runtime ── \
+    mkdir -p /opt/kortix-oc /opt/opencode && \
+    rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
+      /opt/build/kortix-oc/ /opt/kortix-oc/ && \
+    # Wire triggers dependency for kortix-oc runtime \
+    cd /opt/kortix-oc && \
+    if [ -f runtime/package.json ]; then \
+      sed -i 's|"@kortix/opencode-agent-triggers": "[^"]*"|"@kortix/opencode-agent-triggers": "file:../opencode-agent-triggers"|' runtime/package.json; \
+    fi && \
+    bun run bin/kortix-oc.ts materialize /opt/opencode --clean && \
+    cd /opt/opencode && bun install && \
+    rm -rf /opt/kortix-oc/node_modules && \
+    ln -s /opt/opencode/node_modules /opt/kortix-oc/node_modules && \
+    bash /opt/kortix-oc/runtime/patches/apply.sh /opt/opencode && \
+    \
+    # ── 6. Binary patches ── \
+    if [ -f /opt/kortix-oc/runtime/patches/patch-opencode-streaming.js ]; then \
+      node /opt/kortix-oc/runtime/patches/patch-opencode-streaming.js || true; \
+    fi && \
+    \
+    # ── 7. bun-pty musl patches ── \
+    ARCH=$(uname -m) && \
+    for PTY_DIR in \
+        /opt/opencode/node_modules/bun-pty/rust-pty/target/release \
+        /opt/bun/install/cache/bun-pty@*/rust-pty/target/release; do \
+      [ -d "$PTY_DIR" ] || continue; \
+      if [ "$ARCH" = "x86_64" ]; then \
+        cp /opt/bun-pty-musl/librust_pty.so "$PTY_DIR/librust_pty.so"; \
+      else \
+        cp /opt/bun-pty-musl/librust_pty.so "$PTY_DIR/librust_pty_arm64.so"; \
+      fi; \
+    done && \
+    \
+    # ── 8. Agent browser viewer ── \
+    mkdir -p /opt/agent-browser-viewer && \
+    rsync -a --delete /opt/build/browser-viewer/ /opt/agent-browser-viewer/ && \
+    \
+    # ── 9. Version metadata + core contract ── \
+    mkdir -p /opt/kortix/core && \
+    echo "{\"version\":\"${SANDBOX_VERSION}\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /opt/kortix/.version && \
+    cp /opt/build/CHANGELOG.json /opt/kortix/CHANGELOG.json 2>/dev/null || true && \
+    rsync -a --delete /opt/build/core/ /opt/kortix/core/ && \
+    \
+    # ── 10. Global binary symlinks ── \
+    cd /opt/build && npm install --no-audit --no-fund . && \
+    for bin in opencode agent-browser; do \
+      SRC="/opt/build/node_modules/.bin/$bin"; \
+      [ -f "$SRC" ] && ln -sf "$SRC" "/usr/local/bin/$bin"; \
+    done && \
+    \
+    # ── 11. Remove stale opencode-ai bun cache ── \
+    rm -f /opt/build/node_modules/opencode-ai/bin/.opencode 2>/dev/null || true && \
+    \
+    # ── 12. Fix ownership ── \
+    chown -R 1000:1000 /opt/kortix-master /opt/opencode /opt/kortix /opt/kortix-oc \
+      /opt/opencode-agent-triggers /opt/agent-browser-viewer /opt/opencode-channels \
+      2>/dev/null || true && \
+    \
+    # ── 13. Cleanup ── \
+    rm -rf /root/.npm/_cacache /root/.npm/_logs 2>/dev/null || true && \
+    echo "[docker] Build complete."
 
-# ── Daytona / startup entrypoint ──────────────────────────────────────────────
+# ── Startup entrypoint ────────────────────────────────────────────────────────
 COPY packages/sandbox/startup.sh /opt/startup.sh
 RUN chmod +x /opt/startup.sh
 
-# ── agent-browser ENV (browser path set by agent-browser install at boot) ─────
+# ── Environment ───────────────────────────────────────────────────────────────
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV AGENT_BROWSER_PRIMARY_SESSION=default
 ENV AGENT_BROWSER_STREAM_PORT=9223
@@ -168,9 +217,8 @@ ENV AGENT_BROWSER_PROFILE=/workspace/.browser-profile
 ENV AGENT_BROWSER_SOCKET_DIR=/workspace/.agent-browser
 ENV AGENT_BROWSER_ARGS="--no-sandbox,--disable-setuid-sandbox,--disable-gpu,--disable-dev-shm-usage,--disable-blink-features=AutomationControlled,--disable-features=VizDisplayCompositor"
 ENV AGENT_BROWSER_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-
-# ── OpenCode config dir ───────────────────────────────────────────────────────
 ENV OPENCODE_CONFIG_DIR=/opt/opencode
+ENV SANDBOX_VERSION=${SANDBOX_VERSION}
 
 # ── Desktop config ───────────────────────────────────────────────────────────
 ENV CUSTOM_PORT=6080

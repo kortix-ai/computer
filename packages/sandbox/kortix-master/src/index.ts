@@ -14,7 +14,7 @@ import envRouter from './routes/env'
 import lssRouter from './routes/lss'
 import proxyRouter from './routes/proxy'
 import webProxyRouter from './routes/web-proxy'
-import updateRouter, { recoverFromCrashedUpdate, cleanupStaleStagingDirs } from './routes/update'
+import { updateRoutes as updateRouter } from './routes/update'
 import deployRouter from './routes/deploy'
 import servicesRouter from './routes/services'
 import integrationsRouter from './routes/integrations'
@@ -91,15 +91,7 @@ await syncAuthToSecrets(secretStore).catch(err =>
 // File watcher: auto-sync when auth.json changes at runtime
 startAuthWatcher(secretStore)
 
-// ─── ACID Update: crash recovery + stale staging cleanup ────────────────────
-// If a previous update crashed mid-way, recover (rollback or complete).
-// Also clean up any stale staging dirs left behind by old updates.
-await recoverFromCrashedUpdate().catch(err =>
-  console.error('[Kortix Master] update crash recovery error:', err)
-)
-await cleanupStaleStagingDirs().catch(err =>
-  console.error('[Kortix Master] staging cleanup error:', err)
-)
+// Updates are Docker image-based — no crash recovery needed
 
 await coreSupervisor.start().catch(err =>
   console.error('[Kortix Master] core supervisor start error:', err)
@@ -265,11 +257,12 @@ app.get('/kortix/health',
         version = data.version || '0.0.0'
       }
     } catch {}
+    const imageVersion = process.env.SANDBOX_VERSION || version
     await checkOpenCodeReady()
     const changelog = await getChangelog(version)
     const status = openCodeReady ? 'ok' : 'starting'
     const httpStatus = openCodeReady ? 200 : 503
-    return c.json({ status, version, changelog, activeWs: activeConnections, opencode: openCodeReady }, httpStatus)
+    return c.json({ status, version, imageVersion, changelog, activeWs: activeConnections, opencode: openCodeReady }, httpStatus)
   },
 )
 

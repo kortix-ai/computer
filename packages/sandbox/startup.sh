@@ -5,15 +5,12 @@
 # Solution: use `unshare --pid --fork` to create a PID namespace where
 # /init (s6-overlay) becomes PID 1. This gives 100% parity with local Docker.
 #
-# The sandbox runtime (kortix-master, opencode, etc.) is PREBAKED into the
-# Docker image at build time. On boot we just set up workspace dirs and go.
-#
-# OTA updates happen via POST /kortix/update which downloads a tarball from
-# GitHub Releases and does an ACID symlink swap — no npm involved.
+# The sandbox runtime is baked into the Docker image at build time.
+# Updates = pull new image + recreate container. User data in /workspace volume.
 
 set -e
 
-DEFAULT_KORTIX_SANDBOX_VERSION="0.7.28"
+DEFAULT_KORTIX_SANDBOX_VERSION="0.8.0"
 
 WORKSPACE_UID="${PUID:-1000}"
 WORKSPACE_GID="${PGID:-1000}"
@@ -36,17 +33,26 @@ mkdir -p \
   /workspace/.config \
   /workspace/.XDG
 
-chown -R "$WORKSPACE_UID:$WORKSPACE_GID" \
-  /workspace/.agent-browser /workspace/.browser-profile /workspace/.lss \
-  /workspace/.cache /workspace/.local /workspace/.kortix /workspace/.kortix-state \
-  /workspace/.secrets /workspace/.config /workspace/.XDG
-chmod 700 /workspace/.secrets || true
+# ── Fix ownership (critical after Docker image updates) ─────────────────────
+# When a container is recreated from a new image, the abc user UID may differ
+# from the previous image. Fix ALL workspace files to match the current abc user.
+echo "[startup] Fixing workspace ownership..."
+chown -R "$WORKSPACE_UID:$WORKSPACE_GID" /workspace 2>/dev/null || true
+chmod 700 /workspace/.secrets 2>/dev/null || true
+
+# ── Clean stale sqlite WAL/SHM files ────────────────────────────────────────
+# After container recreate, sqlite WAL/SHM files from the old container can
+# cause "readonly database" errors. Remove them so sqlite recreates cleanly.
+find /workspace/.local/share/opencode -name "*.db-wal" -o -name "*.db-shm" 2>/dev/null | while read f; do
+  echo "[startup] Removing stale sqlite file: $f"
+  rm -f "$f"
+done
 
 # ── Stale LSS database cleanup ───────────────────────────────────────────────
 if [ -f /workspace/.lss/lss.db ]; then
   LSS_OWNER=$(stat -c '%u' /workspace/.lss/lss.db 2>/dev/null || echo "unknown")
-  if [ "$LSS_OWNER" != "1000" ] && [ "$LSS_OWNER" != "unknown" ]; then
-    echo "[startup] Removing stale LSS database (owned by UID $LSS_OWNER, expected 1000)"
+  if [ "$LSS_OWNER" != "$WORKSPACE_UID" ] && [ "$LSS_OWNER" != "unknown" ]; then
+    echo "[startup] Removing stale LSS database (owned by UID $LSS_OWNER, expected $WORKSPACE_UID)"
     rm -f /workspace/.lss/lss.db /workspace/.lss/lss.db-wal /workspace/.lss/lss.db-shm
   fi
 fi
@@ -67,15 +73,9 @@ elif [ ! -e /workspace/.opencode ]; then
   ln -s /workspace/.kortix/.opencode /workspace/.opencode
 fi
 
-chown -R abc:abc /workspace 2>/dev/null || true
-
-# ── Verify prebaked runtime exists ──────────────────────────────────────────
-# The runtime is prebaked into the image. If somehow /opt/kortix-master is
-# missing (shouldn't happen), warn loudly but continue — services will fail
-# to start and logs will explain why.
+# ── Verify runtime exists ───────────────────────────────────────────────────
 if [ ! -e /opt/kortix-master ]; then
-  echo "[startup] WARNING: /opt/kortix-master not found!"
-  echo "[startup] The prebaked runtime may be missing. Rebuild the Docker image."
+  echo "[startup] WARNING: /opt/kortix-master not found! Rebuild the Docker image."
 fi
 
 echo "[startup] Starting s6-overlay via PID namespace..."
@@ -84,5 +84,5 @@ if unshare --pid --fork true >/dev/null 2>&1; then
   exec unshare --pid --fork /init
 fi
 
-echo "[startup] WARNING: unshare not permitted here — falling back to direct /init"
+echo "[startup] WARNING: unshare not permitted — falling back to direct /init"
 exec /init

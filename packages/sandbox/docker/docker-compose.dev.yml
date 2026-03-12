@@ -4,14 +4,14 @@
 #   docker compose -f packages/sandbox/docker/docker-compose.yml \
 #                  -f packages/sandbox/docker/docker-compose.dev.yml up
 #
-# The base docker-compose.yml builds the image with ALL deps prebaked at build
+# The base docker-compose.yml uses the image with ALL deps prebaked at build
 # time. This overlay then mounts your local source OVER the prebaked code so
 # changes are reflected immediately without rebuilding.
 #
 # You only need --build when:
 #   - Dockerfile changes
-#   - A new npm/bun dependency is added to a package
-#   - package.json changes in any sandbox package
+#   - A new npm/bun dependency is added
+#   - package.json changes
 #
 # For pure code changes (TypeScript, agents, skills, tools):
 #   Edit the file → it's already live in the container
@@ -25,8 +25,7 @@ services:
     environment:
       - KORTIX_DEV_MODE=1
     volumes:
-      # Bind-mount local source over the prebaked versions.
-      # These paths map directly to the active /opt/* symlink targets.
+      # Bind-mount local source over the prebaked /opt dirs (flat, no symlinks)
       - ../kortix-master/src:/opt/kortix-master/src:ro
       - ../../../packages/kortix-oc/runtime:/opt/kortix-oc/runtime:ro
       - ../../../packages/opencode-channels/src:/opt/opencode-channels/src:ro

@@ -466,7 +466,7 @@ export interface ChangelogEntry {
 
 export interface SandboxVersionInfo {
   version: string;
-  package: string;
+  channel?: string;
   changelog: ChangelogEntry | null;
 }
 
@@ -480,48 +480,51 @@ export interface SandboxUpdateResult {
   error?: string;
 }
 
+/**
+ * Update phases — Docker image-based flow.
+ *
+ * The update is coordinated by kortix-api (not the sandbox itself):
+ *   pulling → stopping → removing → recreating → health_check → complete
+ */
 export type UpdatePhase =
   | 'idle'
-  | 'staging'
-  | 'verifying'
-  | 'committing'
-  | 'restarting'
-  | 'validating'
-  | 'rolling_back'
+  | 'pulling'
+  | 'stopping'
+  | 'removing'
+  | 'recreating'
+  | 'starting'
+  | 'health_check'
   | 'complete'
   | 'failed';
 
 export interface SandboxUpdateStatus {
-  inProgress: boolean;
   phase: UpdatePhase;
+  progress: number;
   message: string;
   targetVersion: string | null;
   previousVersion: string | null;
-  currentVersion: string;
+  currentVersion: string | null;
+  error: string | null;
   startedAt: string | null;
   updatedAt: string | null;
-  error: string | null;
 }
 
 /**
- * Get the current update status from a running sandbox.
- * Used to poll progress during an in-flight update.
+ * Get the current update status from kortix-api.
+ * The API tracks the Docker pull + recreate progress.
  */
 export async function getSandboxUpdateStatus(
-  sandbox: SandboxInfo,
+  _sandbox?: SandboxInfo,
 ): Promise<SandboxUpdateStatus> {
-  const url = getSandboxUrl(sandbox);
-  const token = await getSupabaseAccessToken();
-  const headers: Record<string, string> = { 'Accept': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${url}/kortix/update/status`, { headers });
+  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/update/status`, {
+    headers: { 'Accept': 'application/json' },
+  });
   if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
   return res.json();
 }
 
 /**
  * Get the latest available sandbox version from the platform.
- * Platform checks npm registry (cached 5min).
  */
 export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
   const res = await fetch(`${PLATFORM_URL}/platform/sandbox/version`, {
@@ -544,24 +547,22 @@ export async function getFullChangelog(): Promise<ChangelogEntry[]> {
 }
 
 /**
- * Trigger an update on a running sandbox.
- * Frontend passes the target version — sandbox doesn't need to fetch it.
+ * Trigger a Docker image-based sandbox update via kortix-api.
+ *
+ * The API pulls the new image, stops the container, removes it (preserving
+ * the /workspace volume), and recreates with the new image. The frontend
+ * should poll getSandboxUpdateStatus() for progress.
  */
 export async function triggerSandboxUpdate(
-  sandbox: SandboxInfo,
+  _sandbox: SandboxInfo,
   version: string,
 ): Promise<SandboxUpdateResult> {
-  const url = getSandboxUrl(sandbox);
-  const token = await getSupabaseAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(`${url}/kortix/update`, {
+  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/update`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
     body: JSON.stringify({ version }),
   });
   if (!res.ok) {
@@ -569,4 +570,15 @@ export async function triggerSandboxUpdate(
     throw new Error(body.error || `Update failed: ${res.status}`);
   }
   return res.json();
+}
+
+/**
+ * Reset the update status on kortix-api (e.g. after a failed update to allow retry).
+ */
+export async function resetSandboxUpdateStatus(): Promise<void> {
+  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/update/reset`, {
+    method: 'POST',
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Reset failed: ${res.status}`);
 }

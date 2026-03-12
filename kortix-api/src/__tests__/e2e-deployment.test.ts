@@ -624,8 +624,10 @@ describe('Deployment — Push Script Validation', () => {
       readFileSync(join(SANDBOX_DIR, 'release.json'), 'utf-8'),
     );
     expect(pushScript).toContain("$SANDBOX_PACKAGE_DIR/release.json");
-    expect(releaseManifest.releaseVersion).toBeDefined();
-    expect(releaseManifest.releaseVersion).toMatch(/^\d+\.\d+\.\d+$/);
+    // Support both old (releaseVersion) and new (version) format
+    const ver = releaseManifest.version || releaseManifest.releaseVersion;
+    expect(ver).toBeDefined();
+    expect(ver).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
 

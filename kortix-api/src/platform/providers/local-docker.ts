@@ -155,6 +155,69 @@ export function getImagePullStatus(): ImagePullStatus {
   return { ..._pullStatus };
 }
 
+// ─── Sandbox Update State ────────────────────────────────────────────────────
+
+export type SandboxUpdatePhase =
+  | 'idle'
+  | 'pulling'
+  | 'stopping'
+  | 'removing'
+  | 'recreating'
+  | 'starting'
+  | 'health_check'
+  | 'complete'
+  | 'failed';
+
+export interface SandboxUpdateStatus {
+  phase: SandboxUpdatePhase;
+  progress: number;
+  message: string;
+  targetVersion: string | null;
+  previousVersion: string | null;
+  currentVersion: string | null;
+  error: string | null;
+  startedAt: string | null;
+  updatedAt: string | null;
+}
+
+const IDLE_UPDATE_STATUS: SandboxUpdateStatus = {
+  phase: 'idle',
+  progress: 0,
+  message: '',
+  targetVersion: null,
+  previousVersion: null,
+  currentVersion: null,
+  error: null,
+  startedAt: null,
+  updatedAt: null,
+};
+
+let _updateStatus: SandboxUpdateStatus = { ...IDLE_UPDATE_STATUS };
+
+export function getSandboxUpdateStatus(): SandboxUpdateStatus {
+  return { ..._updateStatus };
+}
+
+export function resetSandboxUpdateStatus(): void {
+  _updateStatus = { ...IDLE_UPDATE_STATUS };
+}
+
+function setUpdateStatus(partial: Partial<SandboxUpdateStatus>): void {
+  _updateStatus = { ..._updateStatus, ...partial, updatedAt: new Date().toISOString() };
+}
+
+/**
+ * Derive the target image name from a version string.
+ * Uses the current SANDBOX_IMAGE config as the base (strips existing tag).
+ * e.g. "kortix/computer:0.7.5" + version "0.8.0" → "kortix/computer:0.8.0"
+ */
+function getImageForVersion(version: string): string {
+  const current = config.SANDBOX_IMAGE;
+  const colonIdx = current.lastIndexOf(':');
+  const base = colonIdx > 0 ? current.slice(0, colonIdx) : current;
+  return `${base}:${version}`;
+}
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export class LocalDockerProvider implements SandboxProvider {
@@ -243,6 +306,124 @@ export class LocalDockerProvider implements SandboxProvider {
       // May already be stopped
     }
     await container.remove({ v: false });
+  }
+
+  /**
+   * Update the sandbox to a new Docker image version.
+   *
+   * Flow: pull new image → stop container → remove container (preserve volumes)
+   *       → recreate container with new image → start → health check.
+   *
+   * The /workspace volume is preserved across the recreate (v: false on remove).
+   * Returns the new SandboxInfo on success, throws on failure.
+   */
+  async updateSandbox(targetVersion: string): Promise<SandboxInfo> {
+    if (_updateStatus.phase !== 'idle' && _updateStatus.phase !== 'complete' && _updateStatus.phase !== 'failed') {
+      throw new Error(`Update already in progress (phase: ${_updateStatus.phase})`);
+    }
+
+    const targetImage = getImageForVersion(targetVersion);
+    let previousVersion: string | null = null;
+
+    try {
+      // Get current version from running container
+      const existing = await this.find();
+      if (existing) {
+        const currentTag = existing.image.split(':').pop() || null;
+        previousVersion = currentTag;
+      }
+
+      setUpdateStatus({
+        phase: 'pulling',
+        progress: 10,
+        message: `Checking image ${targetImage}...`,
+        targetVersion,
+        previousVersion,
+        currentVersion: previousVersion,
+        error: null,
+        startedAt: new Date().toISOString(),
+      });
+
+      // 1. Pull the new image (skip if already exists locally)
+      let imageExistsLocally = false;
+      try {
+        await this.docker.getImage(targetImage).inspect();
+        imageExistsLocally = true;
+        console.log(`[LOCAL-DOCKER] Image ${targetImage} already exists locally, skipping pull`);
+        setUpdateStatus({ progress: 50, message: `Image ${targetImage} found locally` });
+      } catch {
+        // Image not found locally — pull it
+      }
+
+      if (!imageExistsLocally) {
+        console.log(`[LOCAL-DOCKER] Pulling image ${targetImage} for update...`);
+        setUpdateStatus({ message: `Pulling image ${targetImage}...` });
+        await this.pullImageByName(targetImage);
+      }
+
+      // 2. Stop the running container
+      setUpdateStatus({ phase: 'stopping', progress: 50, message: 'Stopping sandbox...' });
+      console.log(`[LOCAL-DOCKER] Stopping sandbox for update...`);
+      try {
+        const container = this.docker.getContainer(CONTAINER_NAME);
+        await container.stop({ t: 15 });
+      } catch (err: any) {
+        // Container may not be running — that's fine
+        if (!err?.message?.includes('not running') && !err?.message?.includes('No such container')) {
+          console.warn(`[LOCAL-DOCKER] Stop warning: ${err.message}`);
+        }
+      }
+
+      // 3. Remove the container (preserve volumes with v: false)
+      setUpdateStatus({ phase: 'removing', progress: 60, message: 'Removing old container...' });
+      console.log(`[LOCAL-DOCKER] Removing old container (preserving volumes)...`);
+      try {
+        const container = this.docker.getContainer(CONTAINER_NAME);
+        await container.remove({ v: false, force: true });
+      } catch (err: any) {
+        if (err?.statusCode !== 404) {
+          console.warn(`[LOCAL-DOCKER] Remove warning: ${err.message}`);
+        }
+      }
+
+      // 4. Recreate the container with the new image
+      setUpdateStatus({ phase: 'recreating', progress: 70, message: `Recreating with ${targetImage}...` });
+      console.log(`[LOCAL-DOCKER] Recreating sandbox with image ${targetImage}...`);
+      // Temporarily override SANDBOX_IMAGE so createContainer uses the new image
+      const originalImage = config.SANDBOX_IMAGE;
+      (config as any).SANDBOX_IMAGE = targetImage;
+      this._serviceKeySynced = false; // Force re-sync of env vars
+      try {
+        await this.createContainer();
+      } finally {
+        (config as any).SANDBOX_IMAGE = originalImage;
+      }
+
+      // 5. Health check — wait for the sandbox to come back up
+      setUpdateStatus({ phase: 'health_check', progress: 90, message: 'Waiting for sandbox to become healthy...' });
+      console.log(`[LOCAL-DOCKER] Waiting for sandbox health check...`);
+      await this.waitForHealth(60_000); // 60s timeout
+
+      setUpdateStatus({
+        phase: 'complete',
+        progress: 100,
+        message: `Updated to v${targetVersion}`,
+        currentVersion: targetVersion,
+      });
+      console.log(`[LOCAL-DOCKER] Sandbox updated to ${targetImage} successfully`);
+
+      return this.getSandboxInfo();
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      setUpdateStatus({
+        phase: 'failed',
+        progress: 0,
+        message: `Update failed: ${errorMsg}`,
+        error: errorMsg,
+      });
+      console.error(`[LOCAL-DOCKER] Sandbox update failed:`, errorMsg);
+      throw err;
+    }
   }
 
   async getStatus(): Promise<SandboxStatus> {
@@ -516,6 +697,60 @@ export class LocalDockerProvider implements SandboxProvider {
     });
   }
 
+  /**
+   * Pull a specific image by full name (e.g. "kortix/computer:0.8.0").
+   * Updates both _pullStatus and _updateStatus with progress.
+   */
+  private async pullImageByName(imageName: string): Promise<void> {
+    _pullStatus = { state: 'pulling', progress: 0, message: `Pulling ${imageName}...` };
+
+    await new Promise<void>((resolve, reject) => {
+      this.docker.pull(imageName, (err: Error | null, stream: NodeJS.ReadableStream) => {
+        if (err) {
+          _pullStatus = { state: 'error', progress: 0, message: err.message, error: err.message };
+          return reject(err);
+        }
+        const layerProgress: Record<string, { current: number; total: number }> = {};
+        this.docker.modem.followProgress(
+          stream,
+          (err2: Error | null) => {
+            if (err2) {
+              _pullStatus = { state: 'error', progress: 0, message: err2.message, error: err2.message };
+              return reject(err2);
+            }
+            _pullStatus = { state: 'done', progress: 100, message: 'Image pulled successfully' };
+            console.log(`[LOCAL-DOCKER] Image ${imageName} pulled successfully`);
+            resolve();
+          },
+          (event: any) => {
+            if (event.id && event.progressDetail?.total) {
+              layerProgress[event.id] = {
+                current: event.progressDetail.current || 0,
+                total: event.progressDetail.total,
+              };
+              const layers = Object.values(layerProgress);
+              const totalBytes = layers.reduce((s, l) => s + l.total, 0);
+              const currentBytes = layers.reduce((s, l) => s + l.current, 0);
+              const pct = totalBytes > 0 ? Math.round((currentBytes / totalBytes) * 100) : 0;
+              _pullStatus = {
+                state: 'pulling',
+                progress: Math.min(pct, 99),
+                message: `Pulling image... ${pct}%`,
+              };
+              // Also update the sandbox update status with pull progress
+              setUpdateStatus({
+                progress: 10 + Math.round(pct * 0.4), // 10-50% range for pulling
+                message: `Pulling image... ${pct}%`,
+              });
+            } else if (event.status) {
+              _pullStatus = { ..._pullStatus, message: event.status };
+            }
+          },
+        );
+      });
+    });
+  }
+
   private async createContainer(): Promise<void> {
     // Pull image if not present locally
     if (!(await this.hasImage())) {
@@ -654,6 +889,34 @@ export class LocalDockerProvider implements SandboxProvider {
       mappedPorts: { ...PORT_MAP },
       createdAt: info.Created,
     };
+  }
+
+  /**
+   * Wait for the sandbox to pass health checks.
+   * Polls GET /kortix/health until it returns 200 with status "ok".
+   */
+  private async waitForHealth(timeoutMs: number): Promise<void> {
+    const start = Date.now();
+    const healthUrl = `http://localhost:${PORT_MAP['8000']}/kortix/health`;
+
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const res = await fetch(healthUrl, { signal: AbortSignal.timeout(5_000) });
+        if (res.ok) {
+          const data = await res.json() as any;
+          if (data.status === 'ok') {
+            console.log(`[LOCAL-DOCKER] Health check passed`);
+            return;
+          }
+        }
+      } catch {
+        // Container still starting — keep polling
+      }
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+
+    // Timeout — don't fail hard, the container might still be starting
+    console.warn(`[LOCAL-DOCKER] Health check timed out after ${timeoutMs}ms — container may still be starting`);
   }
 }
 

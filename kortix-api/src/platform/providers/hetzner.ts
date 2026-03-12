@@ -99,7 +99,7 @@ async function resolveSnapshot(): Promise<{ snapshotId: string; description: str
   const versionOverride = config.HETZNER_SNAPSHOT_VERSION_OVERRIDE;
   const effectiveDescription = versionOverride
     ? `kortix-computer-v${versionOverride}`
-    : releaseManifest.sandbox.hetznerSnapshotDescription;
+    : releaseManifest.snapshots.hetzner;
 
   const now = Date.now();
   if (

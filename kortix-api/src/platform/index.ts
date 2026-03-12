@@ -2,14 +2,19 @@ import { Hono } from 'hono';
 import { accountRouter } from './routes/account';
 import { cloudSandboxRouter } from './routes/sandbox-cloud';
 import { versionRouter } from './routes/version';
+import { sandboxUpdateRouter } from './routes/sandbox-update';
 import { apiKeysRouter } from './routes/api-keys';
 import { sshRouter } from './routes/ssh';
 
 const platformApp = new Hono();
 
-// Sandbox version (no auth — npm registry lookup) 
+// Sandbox version (from release.json)
 // Full path: /v1/platform/sandbox/version
 platformApp.route('/sandbox/version', versionRouter);
+
+// Sandbox update (Docker image-based)
+// Full path: /v1/platform/sandbox/update/*
+platformApp.route('/sandbox/update', sandboxUpdateRouter);
 
 // SSH key management
 // Full path: /v1/platform/sandbox/ssh/*

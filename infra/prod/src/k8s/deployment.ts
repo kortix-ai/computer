@@ -24,8 +24,8 @@ interface DeploymentArgs {
 }
 
 const releaseManifest = JSON.parse(readFileSync(resolve(__dirname, "../../../../packages/sandbox/release.json"), "utf8")) as {
-  sandbox: {
-    image: string;
+  images: {
+    sandbox: string;
   };
 };
 
@@ -127,7 +127,7 @@ export function createDeployment(args: DeploymentArgs) {
                   { name: "CHANNELS_ENABLED", value: "true" },
                   { name: "TUNNEL_ENABLED", value: "true" },
                   { name: "KORTIX_URL", value: "https://new-api.kortix.com/v1/router" },
-                  { name: "SANDBOX_IMAGE", value: releaseManifest.sandbox.image },
+                  { name: "SANDBOX_IMAGE", value: releaseManifest.images.sandbox },
                   { name: "FRONTEND_URL", value: "https://kortix.com" },
                   { name: "CRON_API_URL", value: "https://new-api.kortix.com" },
                   { name: "CHANNELS_PUBLIC_URL", value: "https://new-api.kortix.com" },
