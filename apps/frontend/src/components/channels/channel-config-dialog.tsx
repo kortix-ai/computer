@@ -28,8 +28,10 @@ import { SlackIcon } from '@/components/ui/icons/slack';
 import { TelegramIcon } from '@/components/ui/icons/telegram';
 import { DiscordIcon } from '@/components/ui/icons/discord';
 import { WhatsAppIcon } from '@/components/ui/icons/whatsapp';
+import { SlackSetupWizard } from './slack-setup-wizard';
+import { usePlatformCredentialStatus } from '@/hooks/channels';
 import { useSandbox } from '@/hooks/platform/use-sandbox';
-import { useServerStore } from '@/stores/server-store';
+import { useServerStore, isCloudMode } from '@/stores/server-store';
 import { ensureSandbox } from '@/lib/platform-client';
 import { toast } from 'sonner';
 
@@ -51,7 +53,7 @@ const CHANNEL_OPTIONS: { type: ChannelType; label: string; icon: React.Component
 ];
 
 export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelConfigDialogProps) {
-  const [step, setStep] = useState<'type' | 'config'>('type');
+  const [step, setStep] = useState<'type' | 'slack-wizard' | 'config'>('type');
   const [channelType, setChannelType] = useState<ChannelType | null>(null);
   const [name, setName] = useState('');
   const [botToken, setBotToken] = useState('');
@@ -60,6 +62,11 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
   const { sandbox } = useSandbox();
   const createMutation = useCreateChannel();
   const [checkingSlack, setCheckingSlack] = useState(false);
+  const slackCredStatus = usePlatformCredentialStatus(
+    !isCloudMode() ? 'slack' : null,
+    sandbox?.sandbox_id,
+  );
+  const needsSlackWizard = !isCloudMode() && slackCredStatus.data?.source !== 'env';
 
   const resolveBackendOrigin = () => {
     const explicitBackend = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/v1\/?$/, '');
@@ -125,6 +132,11 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
 
   const handleSelectType = async (type: ChannelType) => {
     if (type === 'slack') {
+      if (needsSlackWizard) {
+        setChannelType('slack');
+        setStep('slack-wizard');
+        return;
+      }
       setCheckingSlack(true);
       try {
         await proceedToSlackOAuth();
@@ -185,6 +197,35 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
   };
 
   if (!open) return null;
+
+  if (step === 'slack-wizard') {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
+          <div className="px-6 pt-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-muted border border-border/50">
+                  <SlackIcon className="h-4.5 w-4.5" />
+                </div>
+                Connect Slack
+              </DialogTitle>
+              <DialogDescription className="mt-1.5">
+                Set up Slack credentials for local development
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <SlackSetupWizard
+            sandboxId={sandbox?.sandbox_id}
+            onBack={() => { setStep('type'); setChannelType(null); }}
+            onSaved={(publicUrl) => {
+              proceedToSlackOAuth(publicUrl);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   if (step === 'type') {
     return (
