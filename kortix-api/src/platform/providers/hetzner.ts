@@ -12,6 +12,7 @@ import { eq } from 'drizzle-orm';
 import { sandboxes } from '@kortix/db';
 import { db } from '../../shared/db';
 import { config, SANDBOX_VERSION } from '../../config';
+import { releaseManifest } from '../../release';
 import type {
   SandboxProvider,
   ProviderName,
@@ -95,14 +96,17 @@ const SNAPSHOT_REQUIREMENTS_TTL_MS = 5 * 60 * 1000;
 
 async function resolveSnapshot(): Promise<{ snapshotId: string; description: string | null; diskSize: number; architecture: string }> {
   const configuredSnapshotId = config.HETZNER_SNAPSHOT_ID;
-  const configuredDescription = config.HETZNER_SNAPSHOT_DESCRIPTION;
+  const versionOverride = config.HETZNER_SNAPSHOT_VERSION_OVERRIDE;
+  const effectiveDescription = versionOverride
+    ? `kortix-computer-v${versionOverride}`
+    : releaseManifest.sandbox.hetznerSnapshotDescription;
 
   const now = Date.now();
   if (
     snapshotRequirementsCache &&
     (
       (configuredSnapshotId && snapshotRequirementsCache.snapshotId === configuredSnapshotId) ||
-      (configuredDescription && snapshotRequirementsCache.description === configuredDescription)
+      (effectiveDescription && snapshotRequirementsCache.description === effectiveDescription)
     ) &&
     now - snapshotRequirementsCache.fetchedAt < SNAPSHOT_REQUIREMENTS_TTL_MS
   ) {
@@ -116,27 +120,25 @@ async function resolveSnapshot(): Promise<{ snapshotId: string; description: str
 
   let image: HetznerImage | null = null;
 
-  // Preferred resolution path: by description (daytona-like by SANDBOX_VERSION)
-  if (configuredDescription) {
-    const data = await hetznerFetch<{ images: HetznerImage[] }>('/images?type=snapshot&per_page=50');
-    const exact = data.images
-      .filter((img) => img.description === configuredDescription)
-      .sort((a, b) => Date.parse(b.created || '') - Date.parse(a.created || ''));
+  // Resolve by description: override version if set, otherwise from release manifest
+  const data = await hetznerFetch<{ images: HetznerImage[] }>('/images?type=snapshot&per_page=50');
+  const exact = data.images
+    .filter((img) => img.description === effectiveDescription)
+    .sort((a, b) => Date.parse(b.created || '') - Date.parse(a.created || ''));
 
-    if (exact.length > 0) {
-      image = exact[0];
-    }
+  if (exact.length > 0) {
+    image = exact[0];
   }
 
-  // Fallback path: explicit snapshot ID
+  // Fallback: explicit snapshot ID
   if (!image && configuredSnapshotId) {
-    const data = await hetznerFetch<{ image: HetznerImage }>(`/images/${configuredSnapshotId}`);
-    image = data.image;
+    const idData = await hetznerFetch<{ image: HetznerImage }>(`/images/${configuredSnapshotId}`);
+    image = idData.image;
   }
 
   if (!image) {
     throw new Error(
-      `No Hetzner snapshot found. Checked description "${configuredDescription}" and ID "${configuredSnapshotId || ''}"`,
+      `No Hetzner snapshot found. Checked description "${effectiveDescription}" and ID "${configuredSnapshotId || ''}"`,
     );
   }
 
