@@ -386,11 +386,27 @@ export default function DashboardLayoutContent({
 	// Re-runs when the sandbox registers (activeServerId changes) so we get a URL.
 	const activeServerId = useServerStore((s) => s.activeServerId);
 	const [onboardingChecked, setOnboardingChecked] = useState(false);
+
+	// Timeout fallback: if sandbox URL never arrives (provisioning slow/failed),
+	// stop blocking the dashboard after 5 seconds. Without this, users see an
+	// infinite skeleton when getActiveOpenCodeUrl() keeps returning ''.
+	useEffect(() => {
+		if (onboardingChecked) return;
+		const timer = setTimeout(() => {
+			if (!onboardingChecked) {
+				console.warn("[layout] Onboarding check timed out — failing open");
+				setOnboardingChecked(true);
+			}
+		}, 5000);
+		return () => clearTimeout(timer);
+	}, [onboardingChecked]);
+
 	useEffect(() => {
 		const checkOnboarding = async () => {
 			const instanceUrl = getActiveOpenCodeUrl();
 			if (!instanceUrl) {
 				// Sandbox URL not known yet — wait for next re-run when it registers
+				// (timeout above prevents infinite wait)
 				return;
 			}
 			const { authenticatedFetch } = await import("@/lib/auth-token");

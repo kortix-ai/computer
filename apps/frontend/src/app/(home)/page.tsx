@@ -28,6 +28,8 @@ export default function Home() {
   const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
   const heroScale = useTransform(scrollY, [0, 400], [1, 0.95]);
 
+  // Primary redirect is handled by middleware (instant 302, no white screen).
+  // This is a safety net for edge cases (e.g. auth state change while on page).
   useEffect(() => {
     if (!isLoading && user) {
       router.replace('/dashboard');
@@ -39,10 +41,6 @@ export default function Home() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, []);
-
-  if (user) {
-    return null;
-  }
 
   return (
     <BackgroundAALChecker>

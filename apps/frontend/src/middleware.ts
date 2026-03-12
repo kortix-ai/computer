@@ -225,6 +225,13 @@ export async function middleware(request: NextRequest) {
     authError = error as Error;
   }
 
+  // FAST PATH: Authenticated users hitting the homepage get an instant 302
+  // to /dashboard. This avoids the old client-side redirect chain that caused
+  // a white flash (render null → useAuth resolves → router.replace → skeleton).
+  if (pathname === '/' && user) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
   // Auto-redirect based on geo-detection for marketing pages
   // Only redirect if:
   // 1. User is visiting a marketing route without locale prefix
