@@ -1,5 +1,25 @@
 [
   {
+    "version": "0.7.28",
+    "date": "2026-03-11",
+    "title": "Fix provider baseURLs to resolve fetch URL errors",
+    "description": "Fixes the 'TypeError [ERR_INVALID_URL]: fetch() URL is invalid' error by setting explicit baseURLs for all LLM providers in the kortix-oc plugin. Opencode doesn't resolve {env:...} templates in baseURL config.",
+    "changes": [
+      {
+        "type": "fix",
+        "text": "Added explicit baseURLs for anthropic, openai, xai, google, and groq providers"
+      },
+      {
+        "type": "fix",
+        "text": "Removed {env:...} template usage from baseURL config - opencode doesn't resolve these"
+      },
+      {
+        "type": "refactor",
+        "text": "Simplified kortix-env-setup.sh to remove LLM provider routing logic"
+      }
+    ]
+  },
+  {
     "version": "0.7.27",
     "date": "2026-03-11",
     "title": "Simplify onboarding enforcement and fix installer",

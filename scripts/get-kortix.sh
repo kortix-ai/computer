@@ -28,7 +28,7 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-DEFAULT_KORTIX_VERSION="0.7.27"
+DEFAULT_KORTIX_VERSION="0.7.28"
 KORTIX_VERSION="${KORTIX_VERSION:-$DEFAULT_KORTIX_VERSION}"
 KORTIX_LOCAL_IMAGES="${KORTIX_LOCAL_IMAGES:-0}"
 KORTIX_LOCAL_TAG="${KORTIX_LOCAL_TAG:-latest}"
@@ -377,12 +377,34 @@ pull_images_parallel() {
 }
 
 # Free ports used by Kortix (local mode)
+# Usage: free_kortix_ports [project_name]
+# If project_name is provided, only cleans containers from that project
 free_kortix_ports() {
-  [ "$DEPLOY_MODE" = "local" ] || return 0
+  local project_name="${1:-}"
+  local is_local=0
+  
+  # Determine if we're in local mode
+  if [ -n "$project_name" ]; then
+    # Called from CLI with project name
+    is_local=1
+  elif [ "$DEPLOY_MODE" = "local" ]; then
+    # Called during install
+    is_local=1
+  fi
+  
+  [ $is_local -eq 1 ] || return 0
   
   local ports=(13737 13738 13740 13741)
   local freed=0
   
+  # First, clean up any lingering containers that might hold ports
+  # Use project-specific pattern if project_name is provided
+  if [ -n "$project_name" ]; then
+    # Clean up containers from this specific project (including old Created state containers)
+    docker ps -a --format '{{.Names}}' | grep -E "^${project_name}-" | xargs -r docker rm -f 2>/dev/null || true
+  fi
+  
+  # Kill any processes using the ports
   for port in "${ports[@]}"; do
     local pid
     pid=$(lsof -t -i:$port 2>/dev/null || true)
@@ -391,9 +413,6 @@ free_kortix_ports() {
       freed=1
     fi
   done
-  
-  # Also clean up any lingering containers that might hold ports
-  docker ps -a --format '{{.Names}}' | grep -E '^(kortix-|supabase-)' | xargs -r docker rm -f 2>/dev/null || true
   
   [ $freed -eq 1 ] && info "Freed Kortix ports" || true
 }
@@ -1441,6 +1460,37 @@ _mode() {
   fi
 }
 
+_project_name() {
+  if [ -f "$DIR/.env" ]; then
+    grep -m1 '^COMPOSE_PROJECT_NAME=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "kortix"
+  else
+    echo "kortix"
+  fi
+}
+
+# Free ports used by Kortix (local mode)
+_free_kortix_ports() {
+  local project_name
+  project_name=$(_project_name)
+  local ports=(13737 13738 13740 13741)
+  local freed=0
+
+  # Clean up any lingering containers from this project
+  docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E "^${project_name}-" | xargs -r docker rm -f 2>/dev/null || true
+
+  # Kill any processes using the ports
+  for port in "${ports[@]}"; do
+    local pid
+    pid=$(lsof -t -i:$port 2>/dev/null || true)
+    if [ -n "$pid" ]; then
+      kill -9 $pid 2>/dev/null || true
+      freed=1
+    fi
+  done
+
+  [ $freed -eq 1 ] && echo "  ${Y}Freed Kortix ports${N}" || true
+}
+
 _using_local_images() {
   [ "$LOCAL_IMAGES" = "1" ]
 }
@@ -1454,6 +1504,8 @@ _rebuild_local_images() {
 
 case "${1:-help}" in
   start)
+    # Free ports and clean up lingering containers before starting
+    [ "$(_mode)" = "local" ] && _free_kortix_ports
     if [ "$(_mode)" = "vps" ]; then
       docker compose --profile vps up -d || true
     else
@@ -1472,6 +1524,8 @@ case "${1:-help}" in
     ;;
   restart)
     docker compose --profile vps down 2>/dev/null || docker compose down 2>/dev/null || true
+    # Free ports and clean up lingering containers before restarting
+    [ "$(_mode)" = "local" ] && _free_kortix_ports
     if [ "$(_mode)" = "vps" ]; then
       docker compose --profile vps up -d || true
     else
@@ -1503,11 +1557,12 @@ case "${1:-help}" in
       docker compose config --images | python3 -c 'import sys; print("\n".join(sorted(set(line.strip() for line in sys.stdin if line.strip()))))' | xargs -r -n1 -P 4 docker pull
     fi
     echo ""
-    info "Restarting services..."
-    free_kortix_ports
+    echo "  ${C}Restarting services...${N}"
+    # Free ports and clean up lingering containers before updating
+    [ "$(_mode)" = "local" ] && _free_kortix_ports
     docker compose down 2>/dev/null || true
     docker compose up -d || true
-    echo "  ${G}Updated.${NC}"
+    echo "  ${G}Updated.${N}"
     ;;
   credentials)
     [ -f "$DIR/.credentials" ] && cat "$DIR/.credentials" || echo "  ${D}No credentials (local mode or auth disabled)${N}"
@@ -1534,7 +1589,7 @@ case "${1:-help}" in
     ;;
   *)
     echo ""
-    echo "  ${B}${C}Kortix CLI${N} ${D}v${VERSION}${NC}"
+    echo "  ${B}${C}Kortix CLI${N} ${D}v${VERSION}${N}"
     echo ""
     echo "  ${C}start${N}         Start all services"
     echo "  ${C}stop${N}          Stop all services"

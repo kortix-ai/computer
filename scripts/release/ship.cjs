@@ -189,7 +189,7 @@ ok(`get-kortix.sh → ${version}`)
 
 // ── Step 3: Vendor runtime sources ───────────────────────────────────────
 info('Vendoring runtime sources...')
-run('node scripts/bundle-runtime.cjs', { cwd: SANDBOX_DIR, stdio: 'inherit' })
+execSync('node scripts/bundle-runtime.cjs', { cwd: SANDBOX_DIR, stdio: 'inherit' })
 ok('Source packages vendored')
 
 // ── Step 4: Create OTA tarball ────────────────────────────────────────────
