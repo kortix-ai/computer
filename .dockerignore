@@ -2,6 +2,11 @@ node_modules
 **/node_modules
 .next
 **/.next
+!apps/frontend/.next
+!apps/frontend/.next/standalone
+!apps/frontend/.next/standalone/**
+!apps/frontend/.next/static
+!apps/frontend/.next/static/**
 /.git
 **/.env
 **/.env.*

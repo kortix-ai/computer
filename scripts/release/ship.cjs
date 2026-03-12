@@ -84,6 +84,19 @@ function runFile(cmd, args, opts = {}) {
   })
 }
 
+function runPnpm(args, opts = {}) {
+  const env = {
+    ...process.env,
+    ...opts.env,
+    PATH: `${path.dirname(process.execPath)}:${opts.env?.PATH || process.env.PATH || ''}`,
+  }
+  const pnpmExecPath = process.env.npm_execpath
+  if (pnpmExecPath && fs.existsSync(pnpmExecPath)) {
+    return runFile(process.execPath, [pnpmExecPath, ...args], { ...opts, env })
+  }
+  return run(`pnpm ${args.map((arg) => JSON.stringify(arg)).join(' ')}`, { ...opts, env })
+}
+
 if (HELP) {
   console.log(`
 Usage:
@@ -290,7 +303,12 @@ if (DOCKER) {
 
   // Frontend: build then dockerize
   info('Building frontend...')
-  run('pnpm --dir apps/frontend build', { stdio: 'inherit' })
+  runPnpm(['--dir', 'apps/frontend', 'build'], {
+    stdio: 'inherit',
+    env: {
+      NEXT_OUTPUT: 'standalone',
+    },
+  })
   run(`docker buildx build \
     --platform linux/amd64,linux/arm64 \
     -f apps/frontend/Dockerfile \
