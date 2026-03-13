@@ -14,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +46,7 @@ export const ManageProfileDialog = ({
 }) => {
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState('');
+  const [savedLabel, setSavedLabel] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [instances, setInstances] = useState<SandboxInfo[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(false);
@@ -67,6 +67,7 @@ export const ManageProfileDialog = ({
     if (open && connection) {
       setConfirmDelete(false);
       setEditingLabel(false);
+      setSavedLabel(null);
       setLabelValue(connection.label || '');
       setLoadingInstances(true);
       setInstanceError(null);
@@ -89,6 +90,7 @@ export const ManageProfileDialog = ({
     [sandboxData],
   );
 
+  // Track other profiles linked to same sandbox (informational only — multi-account allowed)
   const otherProfileLinks = useMemo(() => {
     if (!connection || !sandboxData) return new Map<string, { integrationId: string; label: string | null }>();
     const map = new Map<string, { integrationId: string; label: string | null }>();
@@ -100,12 +102,14 @@ export const ManageProfileDialog = ({
     return map;
   }, [connection, sandboxData]);
 
+  const currentLabel = savedLabel ?? connection?.label ?? null;
+
   const handleSaveLabel = async () => {
     if (!connection) return;
-    const trimmed = labelValue.trim();
-    if (!trimmed || trimmed === connection.label) {
+    const effectiveLabel = currentLabel;
+    if (!trimmed || trimmed === effectiveLabel) {
       setEditingLabel(false);
-      setLabelValue(connection.label || '');
+      setLabelValue(effectiveLabel || '');
       return;
     }
     try {
@@ -113,6 +117,7 @@ export const ManageProfileDialog = ({
         integrationId: connection.integrationId,
         label: trimmed,
       });
+      setSavedLabel(trimmed);
       setEditingLabel(false);
       toast.success('Profile renamed');
     } catch {
@@ -152,7 +157,7 @@ export const ManageProfileDialog = ({
     if (!connection) return;
     try {
       await disconnect.mutateAsync(connection.integrationId);
-      toast.success(`${connection.label || connection.appName || connection.app} disconnected`);
+      toast.success(`${currentLabel || connection.appName || connection.app} disconnected`);
       onOpenChange(false);
     } catch {
       toast.error('Failed to disconnect');
@@ -161,7 +166,7 @@ export const ManageProfileDialog = ({
 
   if (!connection) return null;
 
-  const displayName = connection.label || connection.appName || connection.app;
+  const displayName = currentLabel || connection.appName || connection.app;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -193,7 +198,7 @@ export const ManageProfileDialog = ({
                         if (e.key === 'Enter') handleSaveLabel();
                         if (e.key === 'Escape') {
                           setEditingLabel(false);
-                          setLabelValue(connection.label || '');
+                          setLabelValue(currentLabel || '');
                         }
                       }}
                       className="h-9 px-3 text-sm font-medium border rounded-xl bg-background flex-1 focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -219,7 +224,7 @@ export const ManageProfileDialog = ({
                       className="h-9 px-2 text-muted-foreground"
                       onClick={() => {
                         setEditingLabel(false);
-                        setLabelValue(connection.label || '');
+                        setLabelValue(currentLabel || '');
                       }}
                     >
                       Cancel
@@ -230,7 +235,7 @@ export const ManageProfileDialog = ({
                     <span className="truncate">{displayName}</span>
                     <button
                       onClick={() => {
-                        setLabelValue(connection.label || displayName);
+                        setLabelValue(currentLabel || displayName);
                         setEditingLabel(true);
                       }}
                       className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
@@ -241,7 +246,7 @@ export const ManageProfileDialog = ({
                   </DialogTitle>
                 )}
                 <DialogDescription id="manage-profile-description" className="mt-0.5">
-                  {connection.label && (
+                  {currentLabel && (
                     <span>{connection.appName || connection.app} &middot; </span>
                   )}
                   Connected {new Date(connection.connectedAt).toLocaleDateString()}
@@ -290,7 +295,6 @@ export const ManageProfileDialog = ({
                 {instances.map((inst) => {
                   const isLinked = linkedSet.has(inst.sandbox_id);
                   const otherProfile = otherProfileLinks.get(inst.sandbox_id);
-                  const isBlocked = !!otherProfile;
 
                   return (
                     <div
@@ -298,9 +302,7 @@ export const ManageProfileDialog = ({
                       className={`flex items-center gap-2.5 p-3 rounded-xl border transition-colors ${
                         isLinked
                           ? 'border-muted-foreground/30 bg-muted-foreground/5'
-                          : isBlocked
-                            ? 'border-border/30 bg-muted/20'
-                            : 'border-border/50 hover:bg-muted/30'
+                          : 'border-border/50 hover:bg-muted/30'
                       }`}
                     >
                       <div className="w-7 h-7 rounded-md bg-muted/60 border border-border/50 flex items-center justify-center shrink-0">
@@ -308,10 +310,9 @@ export const ManageProfileDialog = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium truncate">{inst.name}</p>
-                        {isBlocked && (
-                          <p className="text-[10px] text-amber-500 flex items-center gap-0.5">
-                            <AlertTriangle className="h-2.5 w-2.5" />
-                            Uses &ldquo;{otherProfile.label || 'Another profile'}&rdquo;
+                        {otherProfile && !isLinked && (
+                          <p className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                            Also has &ldquo;{otherProfile.label || 'Another profile'}&rdquo;
                           </p>
                         )}
                       </div>
@@ -332,10 +333,6 @@ export const ManageProfileDialog = ({
                             </>
                           )}
                         </Button>
-                      ) : isBlocked ? (
-                        <Badge variant="secondary" className="text-[10px] shrink-0">
-                          In use
-                        </Badge>
                       ) : (
                         <Button
                           variant="outline"

@@ -4,6 +4,7 @@ import { mkdir, rm } from 'fs/promises'
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { SecretStore } from '../services/secret-store'
 import { syncSecretToAuth } from '../services/auth-sync'
+import { updateBootstrapKey } from '../services/bootstrap-env'
 import {
   ErrorResponse,
   UnauthorizedResponse,
@@ -167,6 +168,7 @@ envRouter.post('/',
         await secretStore.setEnv(key, value)
         await writeS6Env(key, value)
         await syncSecretToAuth(key, value)  // sync provider keys → auth.json
+        updateBootstrapKey(key, value)  // persist core vars for bootstrap recovery
         updated++
       }
       return c.json({ ok: true, updated, restarted: false })
@@ -267,6 +269,7 @@ envRouter.post('/:key',
       await secretStore.setEnv(key, body.value)
       await writeS6Env(key, body.value)
       await syncSecretToAuth(key, body.value)  // sync provider keys → auth.json
+      updateBootstrapKey(key, body.value)  // persist core vars for bootstrap recovery
       return c.json({ ok: true, key, restarted: false })
     } catch (error) {
       console.error('[ENV API] Error setting key:', error)
@@ -299,6 +302,7 @@ envRouter.put('/:key',
       await secretStore.setEnv(key, body.value)
       await writeS6Env(key, body.value)
       await syncSecretToAuth(key, body.value)  // sync provider keys → auth.json
+      updateBootstrapKey(key, body.value)  // persist core vars for bootstrap recovery
       return c.json({ ok: true, key, restarted: false })
     } catch (error) {
       console.error('[ENV API] Error setting key:', error)

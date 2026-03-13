@@ -124,11 +124,6 @@ export function useIntegrationsPage(): any {
                     `${app.name} connected, but it could not be linked to this sandbox. ` +
                     'Make sure you are in the same account/workspace that owns this sandbox.',
                   );
-                } else if (reason === 'sandbox_conflict') {
-                  toast.error(
-                    `${app.name} connected, but this sandbox already has another active ${app.name} profile linked. ` +
-                    'Unlink the existing profile first, then reconnect.',
-                  );
                 } else {
                   toast.error(
                     `${app.name} connected, but sandbox linking failed. Check Integrations settings to relink manually.`,

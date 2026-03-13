@@ -82,10 +82,6 @@ export function IntegrationConnectProvider({ children }: { children: React.React
                   toast.error(
                     `${displayName} connected, but it could not be linked to this sandbox.`,
                   );
-                } else if (reason === 'sandbox_conflict') {
-                  toast.error(
-                    `${displayName} connected, but this sandbox already has another active profile linked.`,
-                  );
                 } else {
                   toast.error(
                     `${displayName} connected, but sandbox linking failed.`,
