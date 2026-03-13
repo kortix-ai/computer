@@ -1,7 +1,12 @@
 /**
- * Hook to fetch marketplace components (skills, agents, tools, plugins) from the OCX registry.
+ * Hooks to fetch marketplace components and check real install state.
+ *
+ * Install state is derived from the OpenCode SDK's skill list — the actual
+ * skills on disk — NOT localStorage. This ensures the UI always reflects
+ * reality.
  */
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   fetchComponentBundle,
@@ -9,6 +14,8 @@ import {
   type RegistryComponent,
   type RegistryComponentBundle,
 } from '../api/marketplace-api';
+import { listSkills } from '../api/skills-api';
+import { skillsKeys } from './use-skills';
 
 const MARKETPLACE_KEYS = {
   all: ['marketplace', 'components'] as const,
@@ -24,18 +31,45 @@ export function useMarketplaceSkills() {
   });
 }
 
-export function useIsSkillInstalled(skillName: string): boolean {
-  const { data: installedSkills } = useQuery({
-    queryKey: ['marketplace', 'installed-skills'],
-    queryFn: async () => {
-      // This would need to call the backend to list installed skills
-      // For now, return empty - we'll update this later
-      return [] as string[];
-    },
-    staleTime: 0,
+/**
+ * Returns a referentially-stable Set of skill names that are actually
+ * installed on the server.
+ *
+ * This queries `client.app.skills()` (the real filesystem) so the UI
+ * never shows "Installed" for something that isn't there.
+ *
+ * The Set is memoised on the `skills` data reference so it won't cause
+ * unnecessary re-renders in consumers that use it as a useMemo dependency.
+ */
+export function useInstalledSkillNames(): Set<string> {
+  const { data: skills } = useQuery({
+    queryKey: skillsKeys.all,
+    queryFn: listSkills,
+    staleTime: 0, // always fresh — we need accurate install state
+    refetchOnWindowFocus: true,
   });
-  
-  return (installedSkills || []).includes(skillName);
+
+  return useMemo(() => {
+    const installed = new Set<string>();
+    if (skills) {
+      for (const s of skills) {
+        const name = s.name.toLowerCase();
+        installed.add(name);
+        // Also add with "skill-" prefix so registry names match
+        // e.g. server returns "agent-browser", registry has "skill-agent-browser"
+        installed.add(`skill-${name}`);
+      }
+    }
+    return installed;
+  }, [skills]);
+}
+
+/**
+ * Check if a single registry component name is installed.
+ */
+export function useIsSkillInstalled(componentName: string): boolean {
+  const installed = useInstalledSkillNames();
+  return installed.has(componentName.toLowerCase());
 }
 
 export function useMarketplaceComponent(componentName: string | null) {

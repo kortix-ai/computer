@@ -63,10 +63,14 @@ if [ -L /workspace/.secrets ]; then
   chmod 700 /workspace/.secrets
 fi
 
-# ── Convenience symlink: OpenCodeConfig → .opencode ─────────────────────────
+# ── Convenience symlink: opencode → .opencode ───────────────────────────────
 # Visible, discoverable alias for users who don't know to look for dotfiles.
-if [ ! -e /workspace/OpenCodeConfig ] && [ ! -L /workspace/OpenCodeConfig ]; then
-  ln -s /workspace/.opencode /workspace/OpenCodeConfig
+# Migrate legacy "OpenCodeConfig" symlink to the shorter "opencode" name.
+if [ -L /workspace/OpenCodeConfig ]; then
+  rm -f /workspace/OpenCodeConfig
+fi
+if [ ! -e /workspace/opencode ] && [ ! -L /workspace/opencode ]; then
+  ln -s /workspace/.opencode /workspace/opencode
 fi
 
 # ── Clean stale browser locks ───────────────────────────────────────────────
