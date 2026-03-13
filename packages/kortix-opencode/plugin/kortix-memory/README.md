@@ -1,4 +1,6 @@
-# kortix-sys-oc-plugin
+# Kortix Memory Plugin
+
+Bundled inside `@kortix/kortix-opencode` at `plugin/kortix-memory`.
 
 Long-term memory plugin for [OpenCode](https://opencode.ai). Ensures no important information is ever lost across sessions or compaction events.
 
@@ -44,7 +46,7 @@ Agent works on tasks
 ### From npm (once published)
 
 ```bash
-bun add kortix-sys-oc-plugin
+bun add kortix-memory
 ```
 
 ### From local path
@@ -53,7 +55,7 @@ Reference the plugin directly in your `opencode.jsonc`:
 
 ```jsonc
 {
-  "plugin": ["./path/to/kortix-sys-oc-plugin/src/index.ts"]
+  "plugin": ["./path/to/kortix-memory/src/index.ts"]
 }
 ```
 
@@ -61,7 +63,7 @@ Reference the plugin directly in your `opencode.jsonc`:
 
 ```jsonc
 {
-  "plugin": ["kortix-sys-oc-plugin"]
+  "plugin": ["kortix-memory"]
 }
 ```
 
@@ -83,7 +85,7 @@ The plugin works without any env vars for basic memory (observations + search). 
 ```jsonc
 // opencode.jsonc
 {
-  "plugin": ["kortix-sys-oc-plugin"]
+  "plugin": ["kortix-memory"]
 }
 ```
 

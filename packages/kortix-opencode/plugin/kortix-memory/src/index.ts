@@ -44,24 +44,6 @@ import { join } from "node:path"
 import { getEnv, shortTs, changeSummary, formatMessages, ttcCompress, STORAGE_BASE, DB_PATH } from "./session"
 import { MEMORY_CONTEXT_MARKER, upsertMemoryContextAtPromptEnd } from "./message-transform"
 import type { LogFn, CreateLTMInput, LTMType } from "./types"
-import {
-	type ContinuationConfig,
-	type ContinuationState,
-	type LoopState,
-	DEFAULT_CONFIG,
-	createInitialState,
-	createInitialLoopState,
-	mergeConfig,
-	evaluate,
-	activateUltrawork,
-	deactivateUltrawork,
-	evaluateLoop,
-	startLoop,
-	stopLoop,
-	advanceIteration,
-	enterVerification,
-	loadPersistedLoopState,
-} from "./continuation"
 
 // ─── Plugin Entry ────────────────────────────────────────────────────────────
 
@@ -102,20 +84,6 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 	let promptCount = 0
 	const pendingArgs = new Map<string, Record<string, unknown>>()
 
-	// Continuation engine state
-	let continuationConfig: ContinuationConfig = mergeConfig(DEFAULT_CONFIG)
-	const continuationState: ContinuationState = createInitialState()
-
-	// Loop state (active work loops — work/ulw)
-	let loopState: LoopState = createInitialLoopState()
-	// Recover loop state from filesystem on startup
-	try {
-		const persisted = loadPersistedLoopState()
-		if (persisted?.active) {
-			loopState = persisted
-		}
-	} catch { /* non-fatal */ }
-
 	// Logging via OpenCode SDK
 	const log: LogFn = (level, message) => {
 		try {
@@ -150,7 +118,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 			writeFileSync(USER_MD_PATH, [
 				"# User Profile",
 				"",
-				"<!-- Auto-created by kortix-sys-oc-plugin. The agent enriches this file as it learns about you. -->",
+				"<!-- Auto-created by kortix-memory plugin. The agent enriches this file as it learns about you. -->",
 				"",
 				"## Preferences",
 				"",
@@ -339,47 +307,6 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 					updateEnrichmentOpts({ model: currentModel })
 					log("info", `[memory] Model updated: ${currentModel}`)
 				}
-
-				// Reset continuation counters on new user message (new work cycle)
-				continuationState.consecutiveContinuations = 0
-				continuationState.workCycleStartedAt = Date.now()
-				if (currentSessionId && continuationState.sessionId !== currentSessionId) {
-					continuationState.sessionId = currentSessionId
-					continuationState.totalSessionContinuations = 0
-				}
-
-				// Detect loop commands in user message
-				try {
-					const parts = (input as any).parts ?? []
-					let messageText = ""
-					for (const part of parts) {
-						if (typeof part === "string") messageText += part
-						else if (part?.type === "text") messageText += part.text ?? ""
-						else if (typeof part?.text === "string") messageText += part.text
-					}
-
-					if (messageText && currentSessionId) {
-						if (messageText.includes("KORTIX_LOOP:work") || /\/work-loop\b/.test(messageText)) {
-							const task = messageText
-								.replace(/^.*?\/work-loop\s*/, "")
-								.replace(/<!--.*?-->/g, "")
-								.trim() || "Unspecified task"
-							loopState = startLoop("work", task, currentSessionId)
-							log("info", `[loop] Work loop activated: "${task}"`)
-						} else if (messageText.includes("KORTIX_LOOP:ulw") || /\/ulw-loop\b/.test(messageText)) {
-							const task = messageText
-								.replace(/^.*?\/ulw-loop\s*/, "")
-								.replace(/<!--.*?-->/g, "")
-								.trim() || "Unspecified task"
-							loopState = startLoop("ulw", task, currentSessionId)
-							log("info", `[loop] ULW loop activated: "${task}"`)
-						} else if (messageText.includes("KORTIX_LOOP_STOP") || /\/stop-continuation\b/.test(messageText)) {
-							loopState = stopLoop(loopState)
-							continuationConfig.features.continuation = false
-							log("info", `[loop] All continuation stopped`)
-						}
-					}
-				} catch { /* non-fatal — loop detection is best-effort via chat.message */ }
 			} catch (err) {
 				log("warn", `[memory] chat.message hook failed: ${err}`)
 			}
@@ -432,118 +359,6 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 						backgroundConsolidate(undefined, sessionId).catch((err) => {
 							log("warn", `[memory] Session-idle consolidation failed: ${err}`)
 						})
-
-						// Filesystem fallback: recover loop state if not in memory
-						if (!loopState.active) {
-							try {
-								const persisted = loadPersistedLoopState()
-								if (persisted?.active) {
-									loopState = persisted
-									log("info", `[loop] Recovered active ${persisted.mode} loop from filesystem`)
-								}
-							} catch { /* non-fatal */ }
-						}
-
-						// ── Priority 1: Active loop evaluation ──
-						if (loopState.active) {
-							try {
-								const messagesRes = await client.session.messages({ path: { id: sessionId } }).catch(() => ({ data: [] as any[] }))
-								const messages = (messagesRes.data ?? []) as any[]
-
-								let lastAssistantText = ""
-								for (let i = messages.length - 1; i >= 0; i--) {
-									const msg = messages[i]
-									if (msg?.info?.role === "assistant") {
-										for (const part of (msg.parts ?? [])) {
-											if (part.type === "text" && !part.synthetic && !part.ignored) {
-												lastAssistantText += part.text + "\n"
-											}
-										}
-										break
-									}
-								}
-
-								const loopDecision = evaluateLoop(loopState, lastAssistantText.trim())
-								log("info", `[loop] ${loopDecision.action} — ${loopDecision.reason}`)
-
-								if ((loopDecision.action === "continue" || loopDecision.action === "verify") && loopDecision.prompt) {
-									if (loopDecision.action === "verify") {
-										loopState = enterVerification(loopState)
-									}
-									loopState = advanceIteration(loopState)
-
-									await client.session.promptAsync({
-										path: { id: sessionId },
-										body: { parts: [{ type: "text" as const, text: loopDecision.prompt }] },
-									}).catch((err: unknown) => {
-										log("warn", `[loop] promptAsync failed: ${err}`)
-									})
-								} else if (loopDecision.action === "stop") {
-									loopState = stopLoop(loopState)
-									log("info", `[loop] Loop stopped: ${loopDecision.reason}`)
-								}
-							} catch (err) {
-								log("warn", `[loop] Evaluation failed: ${err}`)
-							}
-						}
-						// ── Priority 2: Passive continuation evaluation ──
-						else if (continuationConfig.features.continuation) {
-							try {
-								const [todoRes, messagesRes] = await Promise.all([
-									client.session.todo({ path: { id: sessionId } }).catch(() => ({ data: [] as Todo[] })),
-									client.session.messages({ path: { id: sessionId } }).catch(() => ({ data: [] as any[] })),
-								])
-
-								const todos = (todoRes.data ?? []) as Todo[]
-								const messages = (messagesRes.data ?? []) as any[]
-
-								let lastAssistantText = ""
-								let hadToolCalls = false
-								for (let i = messages.length - 1; i >= 0; i--) {
-									const msg = messages[i]
-									if (msg?.info?.role === "assistant") {
-										for (const part of (msg.parts ?? [])) {
-											if (part.type === "text" && !part.synthetic && !part.ignored) {
-												lastAssistantText += part.text + "\n"
-											}
-											if (part.type === "tool") {
-												hadToolCalls = true
-											}
-										}
-										break
-									}
-								}
-
-								const decision = evaluate(
-									continuationConfig,
-									continuationState,
-									lastAssistantText.trim(),
-									hadToolCalls,
-									todos,
-								)
-
-								log("info", `[continuation] Decision: ${decision.action} — ${decision.reason}`)
-
-								if (decision.action === "continue" && decision.prompt) {
-									continuationState.consecutiveContinuations++
-									continuationState.totalSessionContinuations++
-									continuationState.lastContinuationAt = Date.now()
-
-									log("info", `[continuation] Sending continuation prompt (consecutive: ${continuationState.consecutiveContinuations}, total: ${continuationState.totalSessionContinuations})`)
-
-									await client.session.promptAsync({
-										path: { id: sessionId },
-										body: {
-											parts: [{ type: "text" as const, text: decision.prompt }],
-										},
-									}).catch((err: unknown) => {
-										log("warn", `[continuation] promptAsync failed: ${err}`)
-									})
-								}
-							} catch (err) {
-								log("warn", `[continuation] Evaluation failed: ${err}`)
-							}
-						}
 					}
 				}
 			} catch (err) {

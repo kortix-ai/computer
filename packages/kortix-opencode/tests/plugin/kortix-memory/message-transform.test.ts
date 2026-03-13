@@ -4,7 +4,7 @@ import {
 	SYNTHETIC_MEMORY_MESSAGE_ID,
 	upsertMemoryContextAtPromptEnd,
 	type ChatMessage,
-} from "../../../runtime/plugin/kortix-sys/src/message-transform"
+} from "../../../plugin/kortix-memory/src/message-transform"
 
 function makeUser(text: string, id?: string): ChatMessage {
 	return {

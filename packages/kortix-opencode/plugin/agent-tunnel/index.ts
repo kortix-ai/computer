@@ -3,8 +3,13 @@ import { tool } from "@opencode-ai/plugin"
 import { TunnelClient, createTunnelTools } from "agent-tunnel/client"
 import { getEnv } from "../../tools/lib/get-env"
 
+const FALLBACK_API_URL = "http://localhost:8008"
+
 function getApiBase(): string {
-	return (getEnv("KORTIX_API_URL") || "http://localhost:8008").replace(/\/+$/, "")
+	const raw = getEnv("KORTIX_API_URL") || FALLBACK_API_URL
+	// Guard against unresolved {env:...} templates or garbage values
+	const url = raw.startsWith("http") ? raw : FALLBACK_API_URL
+	return url.replace(/\/+$/, "")
 }
 
 function createClient(): TunnelClient {

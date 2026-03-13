@@ -28,7 +28,8 @@ Supports local machine and VPS/server (HTTPS + reverse proxy) setups.
 - `pnpm dev:frontend` — start frontend only
 - `pnpm dev:api` — start API only
 - `pnpm dev:sandbox` — start sandbox with dev bind mounts (hot reload, from `sandbox/`)
-- `pnpm build` — build all packages
+- `pnpm dev:sandbox:build` — rebuild and start the sandbox
+- `pnpm build` — build all packages (`pnpm -r run build`)
 - `pnpm ship <version>` — bump versions, build + push Docker images, create GitHub release
 - `pnpm ship --dry-run <version>` — validate without making changes
 - `pnpm ship --check` — show current release state

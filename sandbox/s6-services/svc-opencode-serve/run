@@ -1,71 +1,21 @@
 #!/usr/bin/with-contenv bash
-# OpenCode API Server — headless API on port 4096 (proxied by Kortix Master)
+# OpenCode API server on port 4096 (proxied by kortix-master)
+# with-contenv loads all s6 env vars (API keys, KORTIX_TOKEN, etc.) automatically.
+
+export HOME=/workspace
+export OPENCODE_CONFIG_DIR=/opt/opencode
+export OPENCODE_FILE_ROOT=/
+export BUN_PTY_LIB=/opt/bun-pty-musl/librust_pty.so
+export PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# Drop empty *_BASE_URL vars — empty string causes @ai-sdk to fetch("") → ERR_INVALID_URL
+[ -z "$ANTHROPIC_BASE_URL" ] && unset ANTHROPIC_BASE_URL
+[ -z "$OPENAI_BASE_URL" ] && unset OPENAI_BASE_URL
 
 cd /workspace
 
-mkdir -p /workspace/.local/share/opencode/log \
-         /workspace/.local/share/opencode/storage \
-         /workspace/.local/share/opencode/snapshot \
-         /workspace/.lss
 if [ "$(id -u)" -eq 0 ]; then
-  chown -R abc:abc /workspace/.local/share/opencode /workspace/.lss
+  exec s6-setuidgid abc /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0
 fi
 
-echo "[opencode-serve] Starting API server on port 4096"
-
-# Load env vars from the s6 container environment directory.
-# 98-kortix-env (cont-init) writes ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, etc.
-# to /run/s6/container_environment/ after deriving them from KORTIX_TOKEN.
-# with-contenv loads those into this shell, but the `exec env KEY=VAL ...` call
-# below replaces the entire process environment with only the listed vars —
-# dropping everything with-contenv loaded. We explicitly read each key we need
-# from the envdir so they survive into the exec'd opencode process.
-_read_env() {
-    local f="/run/s6/container_environment/$1"
-    [ -f "$f" ] && cat "$f" || printf '%s' "${!1:-}"
-}
-
-ANTHROPIC_API_KEY="$(_read_env ANTHROPIC_API_KEY)"
-ANTHROPIC_BASE_URL="$(_read_env ANTHROPIC_BASE_URL)"
-OPENAI_API_KEY="$(_read_env OPENAI_API_KEY)"
-OPENAI_BASE_URL="$(_read_env OPENAI_BASE_URL)"
-XAI_API_KEY="$(_read_env XAI_API_KEY)"
-GOOGLE_GENERATIVE_AI_API_KEY="$(_read_env GOOGLE_GENERATIVE_AI_API_KEY)"
-GROQ_API_KEY="$(_read_env GROQ_API_KEY)"
-KORTIX_TOKEN="$(_read_env KORTIX_TOKEN)"
-ENV_MODE="$(_read_env ENV_MODE)"
-
-if [ "$(id -u)" -eq 0 ]; then
-  exec s6-setuidgid abc \
-    env HOME=/workspace \
-        OPENCODE_CONFIG_DIR=/opt/opencode \
-        OPENCODE_FILE_ROOT=/ \
-        BUN_PTY_LIB=/opt/bun-pty-musl/librust_pty.so \
-        PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
-        ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
-        ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL}" \
-        OPENAI_API_KEY="${OPENAI_API_KEY}" \
-        OPENAI_BASE_URL="${OPENAI_BASE_URL}" \
-        XAI_API_KEY="${XAI_API_KEY}" \
-        GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY}" \
-        GROQ_API_KEY="${GROQ_API_KEY}" \
-        KORTIX_TOKEN="${KORTIX_TOKEN}" \
-        ENV_MODE="${ENV_MODE}" \
-    /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0
-fi
-
-exec env HOME=/workspace \
-    OPENCODE_CONFIG_DIR=/opt/opencode \
-    OPENCODE_FILE_ROOT=/ \
-    BUN_PTY_LIB=/opt/bun-pty-musl/librust_pty.so \
-    PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
-    ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
-    ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL}" \
-    OPENAI_API_KEY="${OPENAI_API_KEY}" \
-    OPENAI_BASE_URL="${OPENAI_BASE_URL}" \
-    XAI_API_KEY="${XAI_API_KEY}" \
-    GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY}" \
-    GROQ_API_KEY="${GROQ_API_KEY}" \
-    KORTIX_TOKEN="${KORTIX_TOKEN}" \
-    ENV_MODE="${ENV_MODE}" \
-  /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0
+exec /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0

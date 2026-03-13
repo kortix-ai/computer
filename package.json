@@ -6,6 +6,7 @@
     "dev:frontend": "pnpm --filter Kortix-Computer-Frontend dev",
     "dev:api": "pnpm --filter kortix-api dev",
     "dev:sandbox": "docker compose -f sandbox/docker/docker-compose.yml -f sandbox/docker/docker-compose.dev.yml up",
+    "dev:sandbox:build": "docker compose -f sandbox/docker/docker-compose.yml -f sandbox/docker/docker-compose.dev.yml up --build",
     "build": "pnpm -r run build",
     "ship": "node scripts/release/ship.cjs",
     "check": "node scripts/release/ship.cjs --check",

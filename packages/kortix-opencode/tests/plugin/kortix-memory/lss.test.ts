@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, readFileSync, rmSync, mkdirSync } from "node:fs"
-import { writeObservationFile, writeLTMFile, ensureMemDir } from "../../../runtime/plugin/kortix-sys/src/lss"
+import { writeObservationFile, writeLTMFile, ensureMemDir } from "../../../plugin/kortix-memory/src/lss"
 
 const TEST_DIR = "/tmp/kortix-memory-lss-test"
 

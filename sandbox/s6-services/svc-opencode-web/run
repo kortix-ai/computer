@@ -1,24 +1,17 @@
 #!/usr/bin/with-contenv bash
-# OpenCode Web UI — serves the web interface on port 3111
+# OpenCode Web UI on port 3111
+
+export HOME=/workspace
+export OPENCODE_CONFIG_DIR=/opt/opencode
+export PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+[ -z "$ANTHROPIC_BASE_URL" ] && unset ANTHROPIC_BASE_URL
+[ -z "$OPENAI_BASE_URL" ] && unset OPENAI_BASE_URL
 
 cd /workspace
 
-mkdir -p /workspace/.local/share/opencode/log \
-         /workspace/.local/share/opencode/storage \
-         /workspace/.local/share/opencode/snapshot
 if [ "$(id -u)" -eq 0 ]; then
-  chown -R abc:abc /workspace/.local/share/opencode
+  exec s6-setuidgid abc /usr/local/bin/opencode web --port 3111 --hostname 0.0.0.0
 fi
 
-if [ "$(id -u)" -eq 0 ]; then
-  exec s6-setuidgid abc \
-    env HOME=/workspace \
-        OPENCODE_CONFIG_DIR=/opt/opencode \
-        PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
-    /usr/local/bin/opencode web --port 3111 --hostname 0.0.0.0
-fi
-
-exec env HOME=/workspace \
-    OPENCODE_CONFIG_DIR=/opt/opencode \
-    PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
-  /usr/local/bin/opencode web --port 3111 --hostname 0.0.0.0
+exec /usr/local/bin/opencode web --port 3111 --hostname 0.0.0.0

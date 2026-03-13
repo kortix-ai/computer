@@ -19,8 +19,8 @@ import {
 	completeSession,
 	getSessionMeta,
 	markConsolidated,
-} from "../../../runtime/plugin/kortix-sys/src/db"
-import type { CreateObservationInput, CreateLTMInput } from "../../../runtime/plugin/kortix-sys/src/types"
+} from "../../../plugin/kortix-memory/src/db"
+import type { CreateObservationInput, CreateLTMInput } from "../../../plugin/kortix-memory/src/types"
 import type { Database } from "bun:sqlite"
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────

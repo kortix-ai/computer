@@ -157,7 +157,7 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   'oc-plan_enter': OcPlanToolView,
   'oc-plan-enter': OcPlanToolView,
 
-  // Memory tools (kortix-sys-oc-plugin)
+  // Memory tools (kortix-memory)
   'oc-mem_search': OcMemSearchToolView,
   'oc-mem-search': OcMemSearchToolView,
   'mem_search': OcMemSearchToolView,
@@ -169,7 +169,7 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   'oc-mem_save': OcMemSaveToolView,
   'oc-mem-save': OcMemSaveToolView,
 
-  // Session tools (kortix-sys-oc-plugin)
+  // Session tools (kortix-memory)
   'oc-session_list': OcSessionListToolView,
   'oc-session-list': OcSessionListToolView,
   'oc-session_get': OcSessionGetToolView,

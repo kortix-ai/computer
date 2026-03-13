@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { unlinkSync } from "node:fs"
-import { initDb, insertLTM } from "../../../runtime/plugin/kortix-sys/src/db"
-import { generateContextBlock } from "../../../runtime/plugin/kortix-sys/src/context"
-import type { CreateLTMInput } from "../../../runtime/plugin/kortix-sys/src/types"
+import { initDb, insertLTM } from "../../../plugin/kortix-memory/src/db"
+import { generateContextBlock } from "../../../plugin/kortix-memory/src/context"
+import type { CreateLTMInput } from "../../../plugin/kortix-memory/src/types"
 import type { Database } from "bun:sqlite"
 
 const TEST_DB_PATH = "/tmp/kortix-memory-context-test.db"

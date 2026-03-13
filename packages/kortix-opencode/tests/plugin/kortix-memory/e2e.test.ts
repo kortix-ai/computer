@@ -12,11 +12,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import { unlinkSync, rmSync, existsSync, readdirSync, readFileSync } from "node:fs"
-import { initDb, insertObservation, getObservationsBySession, getAllLTM, getRecentLTM, getLTMByType, insertLTM, unifiedSearch, ensureSession, incrementPromptCount, markConsolidated, getSessionMeta, searchObservationsFts, searchLTMFts } from "../../../runtime/plugin/kortix-sys/src/db"
-import { extractObservation, type RawToolData } from "../../../runtime/plugin/kortix-sys/src/extract"
-import { consolidateMemories } from "../../../runtime/plugin/kortix-sys/src/consolidate"
-import { generateContextBlock } from "../../../runtime/plugin/kortix-sys/src/context"
-import { ensureMemDir, writeObservationFile, writeLTMFile } from "../../../runtime/plugin/kortix-sys/src/lss"
+import { initDb, insertObservation, getObservationsBySession, getAllLTM, getRecentLTM, getLTMByType, insertLTM, unifiedSearch, ensureSession, incrementPromptCount, markConsolidated, getSessionMeta, searchObservationsFts, searchLTMFts } from "../../../plugin/kortix-memory/src/db"
+import { extractObservation, type RawToolData } from "../../../plugin/kortix-memory/src/extract"
+import { consolidateMemories } from "../../../plugin/kortix-memory/src/consolidate"
+import { generateContextBlock } from "../../../plugin/kortix-memory/src/context"
+import { ensureMemDir, writeObservationFile, writeLTMFile } from "../../../plugin/kortix-memory/src/lss"
 import type { Database } from "bun:sqlite"
 
 // ─── Shared Setup ────────────────────────────────────────────────────────────

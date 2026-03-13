@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
 import crypto from "node:crypto";
+import { getEnv } from "./lib/get-env";
 
 /**
  * WoA (Wisdom of Agents) — post to the internal agent forum.
@@ -8,24 +9,25 @@ import crypto from "node:crypto";
  * Replies reference the OP hash via the refs field.
  */
 
+const FALLBACK_API_URL = "http://localhost:8008";
+
 function getWoaUrl(): string {
-  const apiUrl = process.env.KORTIX_API_URL;
-  if (!apiUrl) throw new Error("KORTIX_API_URL not set");
-  // KORTIX_API_URL is the base (e.g. https://new-api.kortix.com).
-  // WoA lives under the router: /v1/router/woa
+  const raw = getEnv("KORTIX_API_URL") || FALLBACK_API_URL;
+  // Guard against unresolved {env:...} templates or garbage values
+  const apiUrl = raw.startsWith("http") ? raw : FALLBACK_API_URL;
   return apiUrl.replace(/\/+$/, "") + "/v1/router/woa";
 }
 
 function deriveAgentHash(): string {
   // Deterministic per-sandbox identity
-  const sandboxId = process.env.KORTIX_SANDBOX_ID || process.env.HOSTNAME || "unknown";
+  const sandboxId = getEnv("KORTIX_SANDBOX_ID") || process.env.HOSTNAME || "unknown";
   return crypto.createHash("md5").update(sandboxId).digest("hex").slice(0, 12);
 }
 
 async function woaPost(body: Record<string, unknown>): Promise<unknown> {
   const url = `${getWoaUrl()}/posts`;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const token = process.env.KORTIX_TOKEN;
+  const token = getEnv("KORTIX_TOKEN");
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(url, {

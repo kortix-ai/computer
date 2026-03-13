@@ -16,6 +16,21 @@ export const KORTIX_MODEL = "anthropic/claude-sonnet-4.6"
 export const ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"
 export const DEFAULT_MAX_TOKENS = 2000
 const ANTHROPIC_VERSION = "2023-06-01"
+const FALLBACK_KORTIX_URL = "http://localhost:8008"
+const FALLBACK_ANTHROPIC_URL = "https://api.anthropic.com"
+
+/**
+ * Validate that a URL string is a real http(s) URL, not an unresolved
+ * `{env:...}` template or other garbage that would crash fetch().
+ */
+function isValidUrl(url: string): boolean {
+	try {
+		const parsed = new URL(url)
+		return parsed.protocol === "http:" || parsed.protocol === "https:"
+	} catch {
+		return false
+	}
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,9 +58,10 @@ export interface LLMOptions {
  */
 export function resolveLLMConfig(opts?: LLMOptions): LLMConfig | null {
 	// Priority 1: Kortix router
-	const kortixUrl = opts?.kortixUrl ?? process.env.KORTIX_API_URL
+	const rawKortixUrl = opts?.kortixUrl ?? process.env.KORTIX_API_URL
 	const kortixToken = opts?.kortixToken ?? process.env.KORTIX_TOKEN
-	if (kortixUrl && kortixToken) {
+	if (rawKortixUrl && kortixToken) {
+		const kortixUrl = isValidUrl(rawKortixUrl) ? rawKortixUrl : FALLBACK_KORTIX_URL
 		return {
 			type: "kortix",
 			baseURL: kortixUrl.replace(/\/+$/, ""),
@@ -57,7 +73,8 @@ export function resolveLLMConfig(opts?: LLMOptions): LLMConfig | null {
 	// Priority 2: Anthropic API
 	const anthropicKey = opts?.anthropicKey ?? process.env.ANTHROPIC_API_KEY
 	if (anthropicKey) {
-		const baseURL = (opts?.anthropicBaseUrl ?? process.env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com").replace(/\/+$/, "")
+		const rawBaseUrl = opts?.anthropicBaseUrl ?? process.env.ANTHROPIC_BASE_URL ?? FALLBACK_ANTHROPIC_URL
+		const baseURL = (isValidUrl(rawBaseUrl) ? rawBaseUrl : FALLBACK_ANTHROPIC_URL).replace(/\/+$/, "")
 		return {
 			type: "anthropic",
 			baseURL,

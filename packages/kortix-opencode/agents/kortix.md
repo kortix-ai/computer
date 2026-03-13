@@ -10,21 +10,6 @@ permission:
   cron-triggers: allow
   cron_triggers: allow
   edit: allow
-  envsitter_add: allow
-  envsitter_annotate: allow
-  envsitter_copy: allow
-  envsitter_delete: allow
-  envsitter_fingerprint: allow
-  envsitter_format: allow
-  envsitter_help: allow
-  envsitter_keys: allow
-  envsitter_match: allow
-  envsitter_match_by_key: allow
-  envsitter_reorder: allow
-  envsitter_scan: allow
-  envsitter_set: allow
-  envsitter_unset: allow
-  envsitter_validate: allow
   get_mem: allow
   get_tool_output: allow
   glob: allow
@@ -93,7 +78,7 @@ permission:
   write: allow
 triggers:
   - name: "Weekly Reflection"
-    enabled: false
+    enabled: true
     source:
       type: "cron"
       expr: "0 0 10 * * 6"

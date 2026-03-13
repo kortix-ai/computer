@@ -40,6 +40,12 @@ FROM lscr.io/linuxserver/webtop:latest
 
 ARG SANDBOX_VERSION=0.0.0-dev
 
+# Global binary versions — pinned here, bumped manually
+ARG OPENCODE_VERSION=1.2.25
+ARG AGENT_BROWSER_VERSION=0.10.0
+ARG OCX_VERSION=2.0.0
+ARG PORTLESS_VERSION=0.5.2
+
 # ── License ──────────────────────────────────────────────────────────────────
 COPY LICENSE /LICENSE
 
@@ -111,44 +117,46 @@ RUN chmod +x /custom-cont-init.d/*
 # ── Copy source packages to build staging area ──────────────────────────────
 COPY sandbox/kortix-master  /opt/build/kortix-master
 COPY sandbox/s6-services/svc-agent-browser-viewer/index.html /opt/build/browser-viewer/index.html
-COPY sandbox/package.json   /opt/build/package.json
 COPY sandbox/CHANGELOG.json /opt/build/CHANGELOG.json
 COPY packages/kortix-opencode         /opt/build/kortix-opencode
 COPY packages/opencode-channels      /opt/build/opencode-channels
 COPY packages/opencode-agent-triggers /opt/build/opencode-agent-triggers
 
 # ── Build sandbox runtime ────────────────────────────────────────────────────
-RUN set -e && echo "[docker] Building sandbox runtime v${SANDBOX_VERSION}..." && \
+RUN set -eo pipefail && echo "[docker] Building sandbox runtime v${SANDBOX_VERSION}..." && \
     \
-    # ── 1. Wire file: dependency for Docker layout ── \
-    cd /opt/build/kortix-master && \
-    sed -i 's|"@kortix/opencode-agent-triggers": "[^"]*"|"@kortix/opencode-agent-triggers": "file:../opencode-agent-triggers"|' package.json && \
+    # ── 1. opencode-agent-triggers (must be first — other packages depend on it via file:) ── \
+    mkdir -p /opt/opencode-agent-triggers && \
+    rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
+      /opt/build/opencode-agent-triggers/ /opt/opencode-agent-triggers/ && \
     \
     # ── 2. kortix-master ── \
     mkdir -p /opt/kortix-master && \
+    cd /opt/build/kortix-master && \
+    sed -i 's|"@kortix/opencode-agent-triggers": "[^"]*"|"@kortix/opencode-agent-triggers": "file:../opencode-agent-triggers"|' package.json && \
     rsync -a --exclude=node_modules --exclude=bun.lock \
       /opt/build/kortix-master/ /opt/kortix-master/ && \
-    cd /opt/kortix-master && bun install && \
+    cd /opt/kortix-master && bun install 2>&1 && \
+    test -d /opt/kortix-master/node_modules && \
+    echo "[docker] kortix-master: bun install OK" && \
     \
     # ── 3. opencode-channels ── \
     mkdir -p /opt/opencode-channels && \
     rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
       /opt/build/opencode-channels/ /opt/opencode-channels/ && \
-    cd /opt/opencode-channels && bun install && \
+    cd /opt/opencode-channels && bun install 2>&1 && \
+    echo "[docker] opencode-channels: bun install OK" && \
     \
-    # ── 4. opencode-agent-triggers ── \
-    mkdir -p /opt/opencode-agent-triggers && \
-    rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
-      /opt/build/opencode-agent-triggers/ /opt/opencode-agent-triggers/ && \
-    \
-    # ── 5. opencode config (kortix-opencode IS the config dir) ── \
+    # ── 4. opencode config (kortix-opencode IS the config dir) ── \
     mkdir -p /opt/opencode && \
     rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
       --exclude=tests --exclude=infra --exclude=docs --exclude=README.md \
       /opt/build/kortix-opencode/ /opt/opencode/ && \
     # Wire triggers dependency for container layout \
     sed -i 's|"@kortix/opencode-agent-triggers": "[^"]*"|"@kortix/opencode-agent-triggers": "file:../opencode-agent-triggers"|' /opt/opencode/package.json && \
-    cd /opt/opencode && bun install && \
+    cd /opt/opencode && bun install 2>&1 && \
+    test -d /opt/opencode/node_modules && \
+    echo "[docker] opencode: bun install OK" && \
     bash /opt/opencode/patches/apply.sh /opt/opencode && \
     \
     # ── 6. Binary patches ── \
@@ -179,23 +187,24 @@ RUN set -e && echo "[docker] Building sandbox runtime v${SANDBOX_VERSION}..." &&
     cp /opt/build/CHANGELOG.json /opt/kortix/CHANGELOG.json 2>/dev/null || true && \
     cp /opt/build/kortix-master/service-spec.json /opt/kortix/core/service-spec.json && \
     \
-    # ── 10. Global binary symlinks ── \
-    cd /opt/build && npm install --no-audit --no-fund . && \
-    for bin in opencode agent-browser ocx; do \
-      SRC="/opt/build/node_modules/.bin/$bin"; \
-      [ -f "$SRC" ] && ln -sf "$SRC" "/usr/local/bin/$bin"; \
-    done && \
+    # ── 10. Global CLI binaries (direct install, no intermediate package.json) ── \
+    npm install -g --no-audit --no-fund \
+      "opencode-ai@${OPENCODE_VERSION}" \
+      "agent-browser@${AGENT_BROWSER_VERSION}" \
+      "ocx@${OCX_VERSION}" \
+      "portless@${PORTLESS_VERSION}" 2>&1 && \
+    # opencode postinstall caches a non-musl binary at .opencode — remove it \
+    # so the launcher resolves the musl variant (Alpine is musl-based) \
+    rm -f /usr/local/lib/node_modules/opencode-ai/bin/.opencode 2>/dev/null || true && \
+    echo "[docker] Global binaries: opencode=$(opencode --version 2>/dev/null || echo '?'), agent-browser, ocx, portless" && \
     \
-    # ── 11. Remove stale opencode-ai bun cache ── \
-    rm -f /opt/build/node_modules/opencode-ai/bin/.opencode 2>/dev/null || true && \
-    \
-    # ── 12. Fix ownership ── \
+    # ── 11. Fix ownership ── \
     chown -R 1000:1000 /opt/kortix-master /opt/opencode /opt/kortix \
       /opt/opencode-agent-triggers /opt/agent-browser-viewer /opt/opencode-channels \
       2>/dev/null || true && \
     \
-    # ── 13. Cleanup ── \
-    rm -rf /root/.npm/_cacache /root/.npm/_logs 2>/dev/null || true && \
+    # ── 12. Cleanup ── \
+    rm -rf /opt/build /root/.npm/_cacache /root/.npm/_logs 2>/dev/null || true && \
     echo "[docker] Build complete."
 
 # ── Startup entrypoint ────────────────────────────────────────────────────────

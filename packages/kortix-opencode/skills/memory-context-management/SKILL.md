@@ -1,6 +1,6 @@
 ---
 name: memory-context-management
-description: "Memory, context, and persistent knowledge management for the Kortix agent. Covers: kortix-sys-oc-plugin (observations, LTM consolidation, mem_search, mem_save, session_list, session_get), filesystem persistence rules, using .MD files for plans/notes/project state, how filesystem writes feed the memory pipeline, and best practices for ensuring nothing important is ever lost. Load this skill when you need to: understand how your memory works, decide where to persist information, write plans or notes, manage project context across sessions, or optimize your context window usage."
+description: "Memory, context, and persistent knowledge management for the Kortix agent. Covers: kortix-memory plugin (observations, LTM consolidation, mem_search, mem_save, session_list, session_get), filesystem persistence rules, using .MD files for plans/notes/project state, how filesystem writes feed the memory pipeline, and best practices for ensuring nothing important is ever lost. Load this skill when you need to: understand how your memory works, decide where to persist information, write plans or notes, manage project context across sessions, or optimize your context window usage."
 ---
 
 # Memory & Context Management
@@ -62,7 +62,7 @@ The filesystem is your most reliable long-term storage. Write `.md` files for an
 
 ---
 
-## 3. The Memory Plugin (kortix-sys-oc-plugin)
+## 3. The Memory Plugin (kortix-memory)
 
 Automatic system that captures, consolidates, and recalls knowledge.
 

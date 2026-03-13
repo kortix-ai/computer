@@ -68,6 +68,14 @@ if [ ! -e /workspace/OpenCodeConfig ] && [ ! -L /workspace/OpenCodeConfig ]; the
   ln -s /workspace/.opencode /workspace/OpenCodeConfig
 fi
 
+# ── Initialize ocx (marketplace CLI) ────────────────────────────────────────
+# Ensures ocx.jsonc exists in /workspace/.opencode/ so marketplace installs
+# (ocx add) work immediately without requiring 'ocx init' first.
+if command -v ocx >/dev/null 2>&1 && [ ! -f /workspace/.opencode/ocx.jsonc ]; then
+  echo "[startup] Running ocx init..."
+  ocx init --cwd /workspace 2>/dev/null || echo "[startup] WARNING: ocx init failed (non-fatal)"
+fi
+
 # ── Clean stale browser locks ───────────────────────────────────────────────
 # After unclean shutdown, Chromium singletons prevent agent-browser from starting.
 rm -f /workspace/.browser-profile/SingletonLock \

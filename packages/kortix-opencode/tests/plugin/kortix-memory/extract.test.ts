@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { extractObservation, SKIP_TOOLS } from "../../../runtime/plugin/kortix-sys/src/extract"
+import { extractObservation, SKIP_TOOLS } from "../../../plugin/kortix-memory/src/extract"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

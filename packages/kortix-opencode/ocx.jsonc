@@ -1,6 +1,9 @@
 {
   "$schema": "https://ocx.kdco.dev/schemas/ocx.json",
   "registries": {
+    "kortix": {
+      "url": "https://master.kortix-registry.pages.dev"
+    },
     "kdco": {
       "url": "https://registry.kdco.dev"
     }

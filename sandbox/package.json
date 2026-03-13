@@ -1,27 +1,5 @@
 {
   "name": "@kortix/sandbox",
   "version": "0.8.1",
-  "description": "Kortix sandbox runtime \u2014 Docker image source",
-  "license": "Elastic-2.0",
-  "private": true,
-  "dependencies": {
-    "opencode-ai": "1.2.17",
-    "agent-browser": "0.10.0",
-    "ocx": "2.0.0"
-  },
-  "kortix": {
-    "globalNpmTools": {
-      "portless": "0.5.2"
-    },
-    "pythonDependencies": {
-      "local-semantic-search": "0.5.5",
-      "pypdf2": "3.0.1",
-      "python-pptx": "1.0.2",
-      "pillow": "12.1.0",
-      "greenlet": "3.3.2",
-      "pyee": "13.0.1",
-      "typing-extensions": "4.15.0",
-      "playwright": "1.58.0"
-    }
-  }
+  "private": true
 }

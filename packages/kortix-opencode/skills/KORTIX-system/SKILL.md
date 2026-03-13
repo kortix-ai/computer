@@ -602,7 +602,7 @@ For the full memory, context, and filesystem persistence guide, load the **`memo
 
 **Key rules:**
 - **The filesystem is forever persistent.** `/workspace` survives restarts, rebuilds, reboots. Write plans and notes to disk for anything that should survive across sessions.
-- **kortix-sys-oc-plugin** auto-captures observations, consolidates into LTM during compaction, and injects your session ID + relevant LTM on every turn.
+- **kortix-memory** plugin auto-captures observations, consolidates into LTM during compaction, and injects your session ID + relevant LTM on every turn.
 - **Four tools:** `mem_search`, `mem_save`, `session_list`, `session_get` — all in one plugin.
 - **Both systems reinforce each other:** files on disk are ground truth; the memory plugin surfaces relevant knowledge automatically.
 
@@ -707,7 +707,7 @@ Main config at `/opt/opencode/opencode.jsonc`:
 - **Default agent**: `kortix`
 - **Built-in agents**: `build`, `plan`, `explore`, `general` are available but not default (disable lines are commented out in config)
 - **Permission**: `allow` (all tool calls auto-approved)
-- **Plugins**: the Kortix plugin at `./plugin/kortix-opencode.ts` (sub-plugins: PTY, memory, morph, worktree, tunnel, envsitter)
+- **Plugins**: individually loaded via `opencode.jsonc` plugin array (PTY, worktree, memory, continuation, tunnel, morph, orphan-tool-fixer, agent-triggers)
 - **MCP servers**: Context7 (remote, for documentation lookup)
 - **Provider**: Kortix router (OpenAI-compatible) with two models: `kortix/basic` and `kortix/power`
 - **Auto-update**: enabled (`autoupdate: true`)

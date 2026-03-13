@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
-import { truncate, shortTs, changeSummary, formatMessages, ttcCompress } from "../../../runtime/plugin/kortix-sys/src/session"
+import { truncate, shortTs, changeSummary, formatMessages, ttcCompress } from "../../../plugin/kortix-memory/src/session"
 import type { Session, Message, Part, ToolPart, ToolStateCompleted, ToolStateError, TextPart } from "@opencode-ai/sdk"
 
 // ─── truncate ────────────────────────────────────────────────────────────────

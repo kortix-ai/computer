@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"
 import { unlinkSync } from "node:fs"
-import { initDb, insertObservation, getAllLTM, getRecentLTM, ensureSession, insertLTM } from "../../../runtime/plugin/kortix-sys/src/db"
-import { consolidateMemories, type ConsolidateOptions } from "../../../runtime/plugin/kortix-sys/src/consolidate"
-import type { CreateObservationInput } from "../../../runtime/plugin/kortix-sys/src/types"
+import { initDb, insertObservation, getAllLTM, getRecentLTM, ensureSession, insertLTM } from "../../../plugin/kortix-memory/src/db"
+import { consolidateMemories, type ConsolidateOptions } from "../../../plugin/kortix-memory/src/consolidate"
+import type { CreateObservationInput } from "../../../plugin/kortix-memory/src/types"
 import type { Database } from "bun:sqlite"
 
 const TEST_DB_PATH = "/tmp/kortix-memory-consolidate-test.db"

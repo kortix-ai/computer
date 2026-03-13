@@ -33,7 +33,7 @@ Need to check what's running right now?
 
 ## 1. Plugin Tools (Recommended First Choice)
 
-Two tools provided by `kortix-sys-oc-plugin` (the unified Kortix system plugin).
+Two tools provided by `kortix-memory` (the Kortix memory plugin).
 
 ### session_list
 
