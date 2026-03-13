@@ -47,8 +47,8 @@ The sandbox is built in 4 layers:
 │                                                             │
 │  /opt/kortix-staging-{version}/   ← actual files live here │
 │      kortix-master/               ← proxy/API server        │
-│      opencode/                    ← materialized OC runtime │
-│      kortix-oc/                   ← plugin + skills/tools   │
+│      opencode/                    ← OC runtime config       │
+│      kortix-opencode/             ← OpenCode config dir     │
 │      opencode-channels/           ← chat adapters           │
 │      opencode-agent-triggers/     ← cron/triggers           │
 │      agent-browser-viewer/        ← browser viewer UI       │
@@ -56,7 +56,7 @@ The sandbox is built in 4 layers:
 │                                                             │
 │  /opt/kortix-master    → symlink to kortix-staging-*/kortix-master
 │  /opt/opencode         → symlink to kortix-staging-*/opencode
-│  /opt/kortix-oc        → symlink (etc.)                     │
+│  (kortix-opencode → /opt/opencode/)                          │
 │  (symlinks are the ACID swap mechanism for OTA updates)     │
 └─────────────────────────────────────────────────────────────┘
 
@@ -146,7 +146,7 @@ With the dev overlay, **code changes are live immediately**. You only need `--bu
 | Local path | Container path |
 |---|---|
 | `packages/sandbox/kortix-master/src` | `/opt/kortix-master/src` |
-| `packages/kortix-oc/runtime` | `/opt/kortix-oc/runtime` |
+| `packages/kortix-opencode/` | `/opt/opencode/` (agents, tools, skills, plugin, commands) |
 | `packages/opencode-channels/src` | `/opt/opencode-channels/src` |
 | `packages/opencode-agent-triggers/src` | `/opt/opencode-agent-triggers/src` |
 
@@ -162,7 +162,7 @@ You **do** need `pnpm dev:sandbox --build` when:
 - `Dockerfile` changes
 - `packages/sandbox/package.json` changes (new/removed dep)
 - `kortix-master/package.json` or `bun.lock` changes
-- `kortix-oc/package.json` changes
+- `kortix-opencode/package.json` changes
 
 ### Restarting services inside the container
 
@@ -241,7 +241,7 @@ pnpm ship --no-docker 0.8.0  # Skip Docker image rebuild/push
 
 1. **Validate** — checks changelog entry exists and inspects whether the GitHub release already exists
 2. **Bump versions** — updates all 4 version locations (package.json, release.json, startup.sh, get-kortix.sh)
-3. **Vendor sources** — runs `bundle-runtime.cjs` which copies `kortix-oc`, `opencode-channels`, `opencode-agent-triggers` into `packages/sandbox/vendor/`
+3. **Vendor sources** — runs `bundle-runtime.cjs` which copies `kortix-opencode`, `opencode-channels`, `opencode-agent-triggers` into `packages/sandbox/vendor/`
 4. **Create OTA tarball** — `sandbox-runtime-{version}.tar.gz` (~5MB, source only, no node_modules)
 5. **GitHub Release** — creates `v{version}` release with changelog as notes, or reuses the existing release and refreshes the OTA tarball
 6. **Docker** — `docker buildx build --platform linux/amd64,linux/arm64 --push` for `kortix/computer`, `kortix/kortix-api`, and `kortix/kortix-frontend` unless you pass `--no-docker`
@@ -276,7 +276,7 @@ Running sandboxes update without Docker rebuilds via a 6-phase ACID flow.
    - Extracts to `/tmp/kortix-ota-extract-{version}/`
    - Runs `postinstall.sh` from the tarball (detected as **staging mode** because `/opt/kortix-master` is a symlink)
 3. `postinstall.sh` in **staging mode**:
-   - Builds new `kortix-master`, `opencode`, `kortix-oc`, `opencode-channels`, `opencode-agent-triggers` into `/opt/kortix-staging-{version}/`
+   - Builds new `kortix-master`, `opencode`, `kortix-opencode`, `opencode-channels`, `opencode-agent-triggers` into `/opt/kortix-staging-{version}/`
    - **Smart dep copy**: if lockfile is unchanged vs. current version, copies `node_modules` instead of running `bun install` (fast path)
    - Writes `/opt/kortix-staging-{version}/.manifest` when done
 4. `update.ts` verifies staging succeeded (manifest exists)
@@ -296,7 +296,7 @@ Running sandboxes update without Docker rebuilds via a 6-phase ACID flow.
 sandbox-runtime-{version}.tar.gz
 ├── kortix-master/          proxy server TypeScript source
 ├── vendor/
-│   ├── kortix-oc/          OpenCode plugin, skills, tools, agents
+│   ├── kortix-opencode/    OpenCode config (agents, tools, skills, plugins)
 │   ├── opencode-channels/  chat adapter source
 │   └── opencode-agent-triggers/  cron/trigger source
 ├── postinstall.sh          staging deployment script
@@ -323,8 +323,7 @@ Everything needed to run, with zero network calls on container start:
 | `/opt/bun-pty-musl/librust_pty.so` | musl-compiled bun-pty Rust lib |
 | `/opt/kortix-staging-{version}/` | Full sandbox runtime (code + node_modules) |
 | `/opt/kortix-master` | Symlink → current staging dir |
-| `/opt/opencode` | Symlink → current staging dir |
-| `/opt/kortix-oc` | Symlink → current staging dir |
+| `/opt/opencode` | OpenCode config dir (agents, tools, skills, plugins) |
 | `/etc/s6-overlay/s6-rc.d/` | Service definitions |
 | `/custom-cont-init.d/` | Init scripts |
 

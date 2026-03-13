@@ -25,8 +25,16 @@ services:
     environment:
       - KORTIX_DEV_MODE=1
     volumes:
-      # Bind-mount local source over the prebaked /opt dirs (flat, no symlinks)
+      # Bind-mount local source over the prebaked /opt dirs
       - ../kortix-master/src:/opt/kortix-master/src:ro
-      - ../../../packages/kortix-oc/runtime:/opt/kortix-oc/runtime:ro
-      - ../../../packages/opencode-channels/src:/opt/opencode-channels/src:ro
-      - ../../../packages/opencode-agent-triggers/src:/opt/opencode-agent-triggers/src:ro
+      # kortix-opencode IS the opencode config dir — mount individual subdirs
+      # to preserve node_modules from the prebaked image
+      - ../../packages/kortix-opencode/plugin:/opt/opencode/plugin:ro
+      - ../../packages/kortix-opencode/agents:/opt/opencode/agents:ro
+      - ../../packages/kortix-opencode/commands:/opt/opencode/commands:ro
+      - ../../packages/kortix-opencode/skills:/opt/opencode/skills:ro
+      - ../../packages/kortix-opencode/tools:/opt/opencode/tools:ro
+      - ../../packages/kortix-opencode/patches:/opt/opencode/patches:ro
+      - ../../packages/kortix-opencode/opencode.jsonc:/opt/opencode/opencode.jsonc:ro
+      - ../../packages/opencode-channels/src:/opt/opencode-channels/src:ro
+      - ../../packages/opencode-agent-triggers/src:/opt/opencode-agent-triggers/src:ro

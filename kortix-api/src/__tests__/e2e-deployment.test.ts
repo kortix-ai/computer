@@ -23,7 +23,7 @@ import { join, resolve } from 'path';
 const REPO_ROOT = resolve(__dirname, '..', '..', '..');
 const SANDBOX_DIR = join(REPO_ROOT, 'sandbox');
 const SANDBOX_DOCKER_DIR = join(REPO_ROOT, 'sandbox', 'docker');
-const KORTIX_OC_RUNTIME_DIR = join(REPO_ROOT, 'packages', 'kortix-oc', 'runtime');
+const KORTIX_OPENCODE_DIR = join(REPO_ROOT, 'packages', 'kortix-opencode');
 const SHIP_SCRIPT = join(REPO_ROOT, 'scripts', 'release', 'ship.cjs');
 const TEST_TIMESTAMP = Date.now();
 const TEST_IMAGE_TAG = `kortix-api:test-${TEST_TIMESTAMP}`;
@@ -466,8 +466,8 @@ describe('Deployment — Sandbox Configuration Integrity', () => {
     expect(pkgJson.dependencies.hono).toBeDefined();
   });
 
-  it('kortix-oc runtime has the expected config files', () => {
-    const opencodePath = KORTIX_OC_RUNTIME_DIR;
+  it('kortix-opencode has the expected config files', () => {
+    const opencodePath = KORTIX_OPENCODE_DIR;
     const expectedFiles = [
       'opencode.jsonc',
       'ocx.jsonc',
@@ -674,7 +674,7 @@ describe('Deployment — Ship Script Validation', () => {
 
 describe.skipIf(!HAS_DOCKER)('Deployment — Docker Compose Validation', () => {
   // Ensure sandbox/docker/.env exists for compose config validation
-  const sandboxEnvFile = join(SANDBOX_DIR, '.env');
+  const sandboxEnvFile = join(SANDBOX_DIR, 'docker', '.env');
   let createdMinimalEnv = false;
 
   beforeAll(() => {

@@ -112,11 +112,11 @@ export function resolveAgentPaths(options: AgentTriggersPluginOptions = {}): str
   const explicit = options.agentPaths?.filter(Boolean)
   if (explicit && explicit.length > 0) return [...new Set(explicit.map((value) => path.resolve(value)))]
 
-  const kortixRuntimeRoot = process.env.KORTIX_OC_RUNTIME_ROOT || "/opt/kortix-oc/runtime"
+  const opencodeConfigDir = process.env.OPENCODE_CONFIG_DIR || "/opt/opencode"
   const roots = [
     options.directory ? path.join(options.directory, ".opencode", "agents") : null,
     path.join(options.homeDir ?? homedir(), ".config", "opencode", "agents"),
-    path.join(kortixRuntimeRoot, "agents"),
+    path.join(opencodeConfigDir, "agents"),
   ].filter(Boolean) as string[]
 
   return [...new Set(roots.map((value) => path.resolve(value)))]

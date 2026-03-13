@@ -934,6 +934,12 @@ importers:
       '@chat-adapter/state-memory':
         specifier: ^4.14.0
         version: 4.16.0
+      '@chat-adapter/telegram':
+        specifier: ^4.20.1
+        version: 4.20.1
+      '@chat-adapter/whatsapp':
+        specifier: ^4.20.1
+        version: 4.20.1
       '@hono/node-server':
         specifier: ^1.13.0
         version: 1.19.10(hono@4.12.3)
@@ -1868,6 +1874,14 @@ packages:
       - supports-color
     dev: false
 
+  /@chat-adapter/shared@4.20.1:
+    resolution: {integrity: sha512-UawGmT7O+3vxvaU9f+lc0PVQKU+TvE0PUxa0zL43qH1rqGkosngtT3cOOhW6JOx+rxt3jox2a99xr8hnJPkshA==}
+    dependencies:
+      chat: 4.20.1
+    transitivePeerDependencies:
+      - supports-color
+    dev: false
+
   /@chat-adapter/slack@4.16.0:
     resolution: {integrity: sha512-5/E6GAzbx3UENZFn2Q3hz5eNScML6sJlCiKTKDEjQmRDFOgg3mBdNlk/Gy7hK5GbuoEIA9BJwyCpkPKMmV2aLA==}
     dependencies:
@@ -1883,6 +1897,24 @@ packages:
     resolution: {integrity: sha512-OF1+ncPOGbHP0lplTvlfKkNizzOT6shsBt1GmJQCciyqAjoAIrj8o+Oh4RxkwI7vGEYpzgHDHz5hvn6UKAeHbA==}
     dependencies:
       chat: 4.16.0
+    transitivePeerDependencies:
+      - supports-color
+    dev: false
+
+  /@chat-adapter/telegram@4.20.1:
+    resolution: {integrity: sha512-0GCMv2XDYrCN0etnCrvHE76ihCfNbV00PslBOQRHqIyqJKRy5jmm9qg+XmfdXm6yuWA7c9RB8gD6m9QPhIvi3Q==}
+    dependencies:
+      '@chat-adapter/shared': 4.20.1
+      chat: 4.20.1
+    transitivePeerDependencies:
+      - supports-color
+    dev: false
+
+  /@chat-adapter/whatsapp@4.20.1:
+    resolution: {integrity: sha512-9EwE+EXHE/fC2pRUAWPblaVPiGa9HzyfmtEW7ExJadNzMryqzXzfNVU8dAXhBp5uwTSY6nq9n9NYjXC0KgDpBQ==}
+    dependencies:
+      '@chat-adapter/shared': 4.20.1
+      chat: 4.20.1
     transitivePeerDependencies:
       - supports-color
     dev: false
@@ -11490,6 +11522,20 @@ packages:
 
   /chat@4.16.0:
     resolution: {integrity: sha512-rO3lA8SX+qPYiQW41/6ft7yTHeovr4BK3kZYAuI8lxiO1XkKD7EgrUPvJp9IWzpXVrhjfUhzJxY8VgHvoy0QYA==}
+    dependencies:
+      '@workflow/serde': 4.1.0-beta.2
+      mdast-util-to-string: 4.0.0
+      remark-gfm: 4.0.1
+      remark-parse: 11.0.0
+      remark-stringify: 11.0.0
+      remend: 1.2.1
+      unified: 11.0.5
+    transitivePeerDependencies:
+      - supports-color
+    dev: false
+
+  /chat@4.20.1:
+    resolution: {integrity: sha512-TwvP1bbzK2g3sYHhD94wot2watxnySCYLQkaMdYjM79T43OTybG8hSSFhOrrp/AXjLHei2sch4GCOQu+4zcfHw==}
     dependencies:
       '@workflow/serde': 4.1.0-beta.2
       mdast-util-to-string: 4.0.0

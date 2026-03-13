@@ -10,14 +10,14 @@
 
 set -e
 
-DEFAULT_KORTIX_SANDBOX_VERSION="0.8.0"
-
 WORKSPACE_UID="${PUID:-1000}"
 WORKSPACE_GID="${PGID:-1000}"
 
 echo "[startup] Preparing Kortix sandbox..."
 
 # ── Workspace dirs ──────────────────────────────────────────────────────────
+# /workspace is the ONLY persistent volume. Everything outside /workspace
+# is ephemeral and gets reset on container recreate/update.
 mkdir -p \
   /workspace/.agent-browser \
   /workspace/.browser-profile \
@@ -31,7 +31,52 @@ mkdir -p \
   /workspace/.kortix-state \
   /workspace/.secrets \
   /workspace/.config \
-  /workspace/.XDG
+  /workspace/.XDG \
+  /workspace/.opencode \
+  /workspace/.opencode/skills
+
+# ── Migrate legacy symlinks to real dirs ────────────────────────────────────
+# Old images created /workspace/.opencode as a symlink to /workspace/.kortix/.opencode.
+# New model: /workspace/.opencode IS the real dir. Migrate data if needed.
+if [ -L /workspace/.opencode ]; then
+  LINK_TARGET=$(readlink /workspace/.opencode 2>/dev/null || true)
+  echo "[startup] Migrating .opencode from symlink ($LINK_TARGET) to real dir..."
+  rm -f /workspace/.opencode
+  mkdir -p /workspace/.opencode/skills
+  # Copy data from old location if it exists
+  if [ -d "$LINK_TARGET" ]; then
+    cp -a "$LINK_TARGET"/. /workspace/.opencode/ 2>/dev/null || true
+  fi
+fi
+
+# Old images created /workspace/.secrets as a symlink to /workspace/.kortix/secrets.
+# New model: /workspace/.secrets IS the real dir. Migrate data if needed.
+if [ -L /workspace/.secrets ]; then
+  LINK_TARGET=$(readlink /workspace/.secrets 2>/dev/null || true)
+  echo "[startup] Migrating .secrets from symlink ($LINK_TARGET) to real dir..."
+  rm -f /workspace/.secrets
+  mkdir -p /workspace/.secrets
+  if [ -d "$LINK_TARGET" ]; then
+    cp -a "$LINK_TARGET"/. /workspace/.secrets/ 2>/dev/null || true
+  fi
+  chmod 700 /workspace/.secrets
+fi
+
+# ── Convenience symlink: OpenCodeConfig → .opencode ─────────────────────────
+# Visible, discoverable alias for users who don't know to look for dotfiles.
+if [ ! -e /workspace/OpenCodeConfig ] && [ ! -L /workspace/OpenCodeConfig ]; then
+  ln -s /workspace/.opencode /workspace/OpenCodeConfig
+fi
+
+# ── Clean stale browser locks ───────────────────────────────────────────────
+# After unclean shutdown, Chromium singletons prevent agent-browser from starting.
+rm -f /workspace/.browser-profile/SingletonLock \
+     /workspace/.browser-profile/SingletonCookie \
+     /workspace/.browser-profile/SingletonSocket 2>/dev/null
+
+# ── Clean stale legacy dirs ─────────────────────────────────────────────────
+# ssl/ was created by old images but never used by anything. Remove if empty.
+[ -d /workspace/ssl ] && [ -z "$(ls -A /workspace/ssl 2>/dev/null)" ] && rmdir /workspace/ssl 2>/dev/null || true
 
 # ── Fix ownership (critical after Docker image updates) ─────────────────────
 # When a container is recreated from a new image, the abc user UID may differ
@@ -60,17 +105,6 @@ fi
 # ── /config symlink (linuxserver base image compat) ─────────────────────────
 if [ ! -L /config ] && [ ! -d /config ]; then
   ln -s /workspace /config
-fi
-
-# ── .opencode symlink ────────────────────────────────────────────────────────
-if [ -L /workspace/.opencode ]; then
-  TARGET=$(readlink /workspace/.opencode 2>/dev/null || true)
-  if [ "$TARGET" != "/workspace/.kortix/.opencode" ]; then
-    rm -f /workspace/.opencode
-    ln -s /workspace/.kortix/.opencode /workspace/.opencode
-  fi
-elif [ ! -e /workspace/.opencode ]; then
-  ln -s /workspace/.kortix/.opencode /workspace/.opencode
 fi
 
 # ── Verify runtime exists ───────────────────────────────────────────────────

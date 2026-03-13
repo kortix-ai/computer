@@ -1,4 +1,0 @@
-runtime/node_modules/
-runtime/.kortix/
-runtime/bun.lock
-**/*.deleted

@@ -5,14 +5,20 @@
 # ONE image. Everything baked at build time. No OTA, no npm, no symlinks.
 # Updates = pull new image + recreate container. User data in /workspace volume.
 #
-# Layout:
+# Container layout:
+#   /opt/opencode/               OpenCode config dir — agents, tools, skills, plugins, deps
 #   /opt/kortix-master/          Hono proxy server + deps
-#   /opt/opencode/               Materialized OpenCode runtime + deps
 #   /opt/opencode-channels/      Chat SDK + deps
 #   /opt/opencode-agent-triggers/ Trigger definitions
 #   /opt/agent-browser-viewer/   Browser viewer HTML
-#   /opt/kortix/                 Version metadata, core contract, changelog
-#   /opt/kortix-oc/              kortix-oc source (shared node_modules with opencode)
+#   /opt/kortix/                 Version metadata, service spec, changelog
+#
+# Source layout (sandbox/):
+#   kortix-master/               Hono proxy + service-spec.json
+#   s6-services/                 s6-rc.d longrun services (+ browser viewer HTML)
+#   init-scripts/                /custom-cont-init.d boot scripts (95-98)
+#   docker/                      Dockerfile, compose files, .env
+#   startup.sh                   Container entrypoint
 #
 
 # ── Stage 1: Build musl-compatible bun-pty Rust library ─────────────────────
@@ -34,11 +40,8 @@ FROM lscr.io/linuxserver/webtop:latest
 
 ARG SANDBOX_VERSION=0.0.0-dev
 
-# ── License + Branding ───────────────────────────────────────────────────────
+# ── License ──────────────────────────────────────────────────────────────────
 COPY LICENSE /LICENSE
-COPY sandbox/assets/wallpaper.png             /usr/share/wallpapers/heyagi/wallpaper.png
-COPY sandbox/assets/kortix-symbol.svg         /usr/share/icons/heyagi/kortix-symbol.svg
-COPY sandbox/assets/kortix-symbol-white.svg   /usr/share/icons/heyagi/kortix-symbol-white.svg
 
 # ── OS packages ──────────────────────────────────────────────────────────────
 RUN --mount=type=cache,target=/var/cache/apk \
@@ -77,6 +80,7 @@ RUN mkdir -p /workspace/.agent-browser /workspace/.browser-profile \
     /workspace/.XDG /workspace/.config \
     /workspace/.kortix \
     /workspace/.secrets \
+    /workspace/.opencode /workspace/.opencode/skills \
     && chmod 700 /workspace/.secrets \
     && chown -R 1000:1000 /workspace \
     && rm -rf /config \
@@ -98,25 +102,22 @@ RUN printf '#!/bin/bash\nPID_FILE="/de-pid"\nif [ ! -r "$PID_FILE" ]; then exit 
 
 # ── Container init scripts ───────────────────────────────────────────────────
 RUN mkdir -p /custom-cont-init.d
-COPY sandbox/config/95-setup-sshd.sh /custom-cont-init.d/95-setup-sshd
-COPY sandbox/config/96-fix-bun-pty.sh /custom-cont-init.d/96-fix-bun-pty
-COPY sandbox/config/97-secrets-to-s6-env.sh /custom-cont-init.d/97-secrets-to-s6-env
-COPY sandbox/config/kortix-env-setup.sh /custom-cont-init.d/98-kortix-env
-COPY sandbox/config/customize.sh /custom-cont-init.d/99-customize
+COPY sandbox/init-scripts/95-setup-sshd.sh /custom-cont-init.d/95-setup-sshd
+COPY sandbox/init-scripts/96-fix-bun-pty.sh /custom-cont-init.d/96-fix-bun-pty
+COPY sandbox/init-scripts/97-secrets-to-s6-env.sh /custom-cont-init.d/97-secrets-to-s6-env
+COPY sandbox/init-scripts/kortix-env-setup.sh /custom-cont-init.d/98-kortix-env
 RUN chmod +x /custom-cont-init.d/*
 
-# ── Copy source packages directly (no bundle-runtime.cjs needed) ─────────────
+# ── Copy source packages to build staging area ──────────────────────────────
 COPY sandbox/kortix-master  /opt/build/kortix-master
-COPY sandbox/browser-viewer /opt/build/browser-viewer
-COPY sandbox/core           /opt/build/core
+COPY sandbox/s6-services/svc-agent-browser-viewer/index.html /opt/build/browser-viewer/index.html
 COPY sandbox/package.json   /opt/build/package.json
 COPY sandbox/CHANGELOG.json /opt/build/CHANGELOG.json
-COPY sandbox/patch-agent-browser.js /opt/build/patch-agent-browser.js
-COPY packages/kortix-oc              /opt/build/kortix-oc
+COPY packages/kortix-opencode         /opt/build/kortix-opencode
 COPY packages/opencode-channels      /opt/build/opencode-channels
 COPY packages/opencode-agent-triggers /opt/build/opencode-agent-triggers
 
-# ── Build sandbox runtime (flat /opt layout, no symlinks) ────────────────────
+# ── Build sandbox runtime ────────────────────────────────────────────────────
 RUN set -e && echo "[docker] Building sandbox runtime v${SANDBOX_VERSION}..." && \
     \
     # ── 1. Wire file: dependency for Docker layout ── \
@@ -140,24 +141,19 @@ RUN set -e && echo "[docker] Building sandbox runtime v${SANDBOX_VERSION}..." &&
     rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
       /opt/build/opencode-agent-triggers/ /opt/opencode-agent-triggers/ && \
     \
-    # ── 5. kortix-oc + materialize opencode runtime ── \
-    mkdir -p /opt/kortix-oc /opt/opencode && \
+    # ── 5. opencode config (kortix-opencode IS the config dir) ── \
+    mkdir -p /opt/opencode && \
     rsync -a --exclude=node_modules --exclude=bun.lock --exclude=.git \
-      /opt/build/kortix-oc/ /opt/kortix-oc/ && \
-    # Wire triggers dependency for kortix-oc runtime \
-    cd /opt/kortix-oc && \
-    if [ -f runtime/package.json ]; then \
-      sed -i 's|"@kortix/opencode-agent-triggers": "[^"]*"|"@kortix/opencode-agent-triggers": "file:../opencode-agent-triggers"|' runtime/package.json; \
-    fi && \
-    bun run bin/kortix-oc.ts materialize /opt/opencode --clean && \
+      --exclude=tests --exclude=infra --exclude=docs --exclude=README.md \
+      /opt/build/kortix-opencode/ /opt/opencode/ && \
+    # Wire triggers dependency for container layout \
+    sed -i 's|"@kortix/opencode-agent-triggers": "[^"]*"|"@kortix/opencode-agent-triggers": "file:../opencode-agent-triggers"|' /opt/opencode/package.json && \
     cd /opt/opencode && bun install && \
-    rm -rf /opt/kortix-oc/node_modules && \
-    ln -s /opt/opencode/node_modules /opt/kortix-oc/node_modules && \
-    bash /opt/kortix-oc/runtime/patches/apply.sh /opt/opencode && \
+    bash /opt/opencode/patches/apply.sh /opt/opencode && \
     \
     # ── 6. Binary patches ── \
-    if [ -f /opt/kortix-oc/runtime/patches/patch-opencode-streaming.js ]; then \
-      node /opt/kortix-oc/runtime/patches/patch-opencode-streaming.js || true; \
+    if [ -f /opt/opencode/patches/patch-opencode-streaming.js ]; then \
+      node /opt/opencode/patches/patch-opencode-streaming.js || true; \
     fi && \
     \
     # ── 7. bun-pty musl patches ── \
@@ -181,11 +177,11 @@ RUN set -e && echo "[docker] Building sandbox runtime v${SANDBOX_VERSION}..." &&
     mkdir -p /opt/kortix/core && \
     echo "{\"version\":\"${SANDBOX_VERSION}\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /opt/kortix/.version && \
     cp /opt/build/CHANGELOG.json /opt/kortix/CHANGELOG.json 2>/dev/null || true && \
-    rsync -a --delete /opt/build/core/ /opt/kortix/core/ && \
+    cp /opt/build/kortix-master/service-spec.json /opt/kortix/core/service-spec.json && \
     \
     # ── 10. Global binary symlinks ── \
     cd /opt/build && npm install --no-audit --no-fund . && \
-    for bin in opencode agent-browser; do \
+    for bin in opencode agent-browser ocx; do \
       SRC="/opt/build/node_modules/.bin/$bin"; \
       [ -f "$SRC" ] && ln -sf "$SRC" "/usr/local/bin/$bin"; \
     done && \
@@ -194,7 +190,7 @@ RUN set -e && echo "[docker] Building sandbox runtime v${SANDBOX_VERSION}..." &&
     rm -f /opt/build/node_modules/opencode-ai/bin/.opencode 2>/dev/null || true && \
     \
     # ── 12. Fix ownership ── \
-    chown -R 1000:1000 /opt/kortix-master /opt/opencode /opt/kortix /opt/kortix-oc \
+    chown -R 1000:1000 /opt/kortix-master /opt/opencode /opt/kortix \
       /opt/opencode-agent-triggers /opt/agent-browser-viewer /opt/opencode-channels \
       2>/dev/null || true && \
     \

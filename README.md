@@ -15,7 +15,7 @@ Supports local machine and VPS/server (HTTPS + reverse proxy) setups.
 - `apps/frontend/` — Next.js dashboard
 - `kortix-api/` — Bun/Hono backend
 - `sandbox/` — sandbox Docker image (Dockerfile, startup, runtime)
-- `packages/kortix-oc/` — OpenCode runtime plugin
+- `packages/kortix-opencode/` — OpenCode config directory (agents, tools, skills, plugins)
 - `packages/opencode-agent-triggers/` — cron + webhook trigger system
 - `packages/lss/` — local semantic search
 - `infra/` — Supabase, production IaC

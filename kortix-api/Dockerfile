@@ -23,7 +23,7 @@ COPY packages/shared ./packages/shared
 COPY packages/db ./packages/db
 COPY packages/agent-tunnel ./packages/agent-tunnel
 COPY packages/opencode-channels ./packages/opencode-channels
-COPY packages/kortix-oc ./packages/kortix-oc
+COPY packages/kortix-opencode ./packages/kortix-opencode
 COPY packages/sandbox/CHANGELOG.json ./packages/sandbox/CHANGELOG.json
 COPY packages/sandbox/package.json ./packages/sandbox/package.json
 

@@ -37,5 +37,4 @@ coverage
 .buildx-cache
 **/.buildx-cache
 *.md
-!packages/*/README.md
-!packages/*/runtime/**/*.md
+!packages/kortix-opencode/**/*.md

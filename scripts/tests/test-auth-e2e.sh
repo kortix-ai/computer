@@ -749,7 +749,7 @@ fi # end sync section
 if [ "$SECTION" = "all" ] || [ "$SECTION" = "sandbox" ] || [ "$SECTION" = "tools" ]; then
 section "9. OpenCode Integration Tools Auth"
 
-TOOLS_DIR="/Users/markokraemer/Projects/heyagi/computer/packages/kortix-oc/runtime/tools"
+TOOLS_DIR="/Users/markokraemer/Projects/heyagi/computer/packages/kortix-opencode/tools"
 TOOLS=(
   "integration-list.ts"
   "integration-search.ts"

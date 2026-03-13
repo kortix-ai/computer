@@ -250,7 +250,7 @@ Once the plugin is loaded, your agents can define `triggers:` directly in their 
 In the Kortix sandbox, this package is intended to be part of the sandbox package stack.
 
 - OpenCode loads it directly from `opencode.jsonc` as an npm plugin
-- `@kortix/kortix-oc` remains the main local runtime plugin for the broader sandbox stack
+- `@kortix/kortix-opencode` is the main OpenCode config for the sandbox stack
 - `packages/sandbox/kortix-master` keeps `/kortix/cron` as a compatibility HTTP API for the frontend and existing consumers
 - the actual scheduler/runtime logic lives in `@kortix/opencode-agent-triggers`
 
