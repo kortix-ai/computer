@@ -2,6 +2,7 @@
 # OpenCode Web UI on port 3111
 
 export HOME=/workspace
+export XDG_DATA_HOME=/workspace/.local/share
 export OPENCODE_CONFIG_DIR=/opt/opencode
 export PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 

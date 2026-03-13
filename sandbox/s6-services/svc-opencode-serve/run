@@ -3,6 +3,7 @@
 # with-contenv loads all s6 env vars (API keys, KORTIX_TOKEN, etc.) automatically.
 
 export HOME=/workspace
+export XDG_DATA_HOME=/workspace/.local/share
 export OPENCODE_CONFIG_DIR=/opt/opencode
 export OPENCODE_FILE_ROOT=/
 export BUN_PTY_LIB=/opt/bun-pty-musl/librust_pty.so
