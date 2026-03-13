@@ -1,5 +1,41 @@
 [
   {
+    "version": "0.8.2",
+    "date": "2026-03-14",
+    "title": "Kortix provider + sandbox stability fixes",
+    "description": "Registers Kortix as a native OpenCode provider routing all LLM calls through the Kortix billing proxy. Fixes sandbox startup race conditions, port conflicts, and token injection.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "Kortix provider in opencode.jsonc — all models route through KORTIX_API_URL/v1/router using KORTIX_TOKEN, no user API keys needed"
+      },
+      {
+        "type": "feature",
+        "text": "Auto-provision sandbox on API startup — creates DB record, generates token, injects KORTIX_TOKEN + KORTIX_API_URL via docker exec"
+      },
+      {
+        "type": "fix",
+        "text": "Core supervisor no longer kills lss-sync and opencode-channels — s6 owns them"
+      },
+      {
+        "type": "fix",
+        "text": "run-opencode-serve.sh reads KORTIX_TOKEN and KORTIX_API_URL from s6 env dir at startup so opencode always has current values"
+      },
+      {
+        "type": "fix",
+        "text": "Core supervisor EADDRINUSE detection stops crash-loop when port 4096 is already bound"
+      },
+      {
+        "type": "fix",
+        "text": "kortix-master re-reads INTERNAL_SERVICE_KEY from s6 env dir on every auth check"
+      },
+      {
+        "type": "fix",
+        "text": "Tool deps (@mendable/firecrawl-js, @tavily/core, replicate) pre-seeded into workspace cache so opencode bundler resolves them offline"
+      }
+    ]
+  },
+  {
     "version": "0.8.1",
     "date": "2026-03-12",
     "title": "E2E update test release",
