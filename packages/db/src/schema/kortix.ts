@@ -84,10 +84,6 @@ export const integrationStatusEnum = kortixSchema.enum('integration_status', [
   'error',
 ]);
 
-export interface ChannelCredentials {
-  [key: string]: unknown;
-}
-
 export interface ChannelPlatformConfig {
   groups?: { enabled?: boolean; allowList?: string[]; [key: string]: unknown };
   dm?: { enabled?: boolean; [key: string]: unknown };
@@ -215,7 +211,6 @@ export const channelConfigs = kortixSchema.table(
     channelType: channelTypeEnum('channel_type').notNull(),
     name: varchar('name', { length: 255 }).notNull(),
     enabled: boolean('enabled').default(true).notNull(),
-    credentials: jsonb('credentials').default({}).$type<ChannelCredentials>(),
     platformConfig: jsonb('platform_config').default({}).$type<ChannelPlatformConfig>(),
     sessionStrategy: sessionStrategyEnum('session_strategy').default('per-user').notNull(),
     systemPrompt: text('system_prompt'),

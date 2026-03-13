@@ -14,7 +14,6 @@ export interface ChannelAdapter {
 
   onChannelCreated?(config: ChannelConfig): Promise<void>;
   onChannelRemoved?(config: ChannelConfig): Promise<void>;
-  validateCredentials?(credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }>;
 }
 
 export abstract class BaseAdapter implements ChannelAdapter {
@@ -24,19 +23,6 @@ export abstract class BaseAdapter implements ChannelAdapter {
 
   abstract registerRoutes(router: Hono): void;
 
-  protected getBotToken(config: ChannelConfig): string | null {
-    const credentials = config.credentials as Record<string, unknown>;
-    return (credentials?.botToken as string) || null;
-  }
-
-  protected getCredential<T>(config: ChannelConfig, key: string): T | undefined {
-    const credentials = config.credentials as Record<string, unknown>;
-    return credentials?.[key] as T | undefined;
-  }
-
   async onChannelCreated(_config: ChannelConfig): Promise<void> {}
   async onChannelRemoved(_config: ChannelConfig): Promise<void> {}
-  async validateCredentials(_credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }> {
-    return { valid: true };
-  }
 }

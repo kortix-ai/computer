@@ -1,7 +1,5 @@
 import type { Context } from 'hono';
-import { findConfigByTeamId, verifySlackSignature } from './utils';
-import { getSlackPlatformCredentials } from '../../lib/platform-credentials';
-import { resolveDirectEndpoint, resolveSandboxTarget } from '../../core/opencode-connector';
+import { verifySlackSignature } from './utils';
 import { config as appConfig } from '../../../config';
 
 export async function proxySlackWebhook(c: Context): Promise<Response> {
@@ -12,19 +10,7 @@ export async function proxySlackWebhook(c: Context): Promise<Response> {
     return c.json({ challenge: payload.challenge });
   }
 
-  const teamId = payload.team_id;
-  if (!teamId) return c.json({ ok: true });
-
-  const channelConfig = await findConfigByTeamId(teamId);
-  if (!channelConfig?.sandboxId) return c.json({ ok: true });
-
-  let signingSecret = appConfig.SLACK_SIGNING_SECRET;
-  if (!signingSecret) {
-    const platformCreds = await getSlackPlatformCredentials(
-      channelConfig.accountId, channelConfig.sandboxId,
-    );
-    signingSecret = platformCreds?.signingSecret || '';
-  }
+  const signingSecret = appConfig.SLACK_SIGNING_SECRET;
   if (signingSecret) {
     const timestamp = c.req.header('X-Slack-Request-Timestamp') || '';
     const signature = c.req.header('X-Slack-Signature') || '';
@@ -32,19 +18,20 @@ export async function proxySlackWebhook(c: Context): Promise<Response> {
     if (!valid) return c.json({ error: 'Invalid signature' }, 401);
   }
 
-  const target = await resolveSandboxTarget(channelConfig.sandboxId);
-  if (!target) return c.json({ ok: true });
+  const sandboxUrl = `http://localhost:${appConfig.SANDBOX_PORT_BASE || 14000}`;
 
-  const { url, headers } = await resolveDirectEndpoint(target);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Slack-Request-Timestamp': c.req.header('X-Slack-Request-Timestamp') || '',
+    'X-Slack-Signature': c.req.header('X-Slack-Signature') || '',
+  };
+  if (appConfig.INTERNAL_SERVICE_KEY) {
+    headers['Authorization'] = `Bearer ${appConfig.INTERNAL_SERVICE_KEY}`;
+  }
 
-  fetch(`${url}/channels/api/webhooks/slack`, {
+  fetch(`${sandboxUrl}/channels/api/webhooks/slack`, {
     method: 'POST',
-    headers: {
-      ...headers,
-      'Content-Type': 'application/json',
-      'X-Slack-Request-Timestamp': c.req.header('X-Slack-Request-Timestamp') || '',
-      'X-Slack-Signature': c.req.header('X-Slack-Signature') || '',
-    },
+    headers,
     body: rawBody,
   }).catch(err => console.error('[SLACK] Proxy to sandbox failed:', err));
 

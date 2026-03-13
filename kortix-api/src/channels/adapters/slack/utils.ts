@@ -1,9 +1,4 @@
-import { eq, and } from 'drizzle-orm';
-import { db } from '../../../shared/db';
-import { channelConfigs } from '@kortix/db';
-import type { ChannelConfig } from '@kortix/db';
 import { config as appConfig } from '../../../config';
-import { decryptCredentials } from '../../lib/credentials';
 import { getSlackPlatformCredentials } from '../../lib/platform-credentials';
 
 export async function verifySlackSignature(
@@ -35,29 +30,6 @@ export async function verifySlackSignature(
     mismatch |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
   }
   return mismatch === 0;
-}
-
-export async function findConfigByTeamId(teamId: string): Promise<ChannelConfig | null> {
-  const configs = await db
-    .select()
-    .from(channelConfigs)
-    .where(
-      and(
-        eq(channelConfigs.channelType, 'slack'),
-        eq(channelConfigs.enabled, true),
-      ),
-    );
-
-  for (const cfg of configs) {
-    const creds = await decryptCredentials(cfg.credentials as Record<string, unknown>);
-    if (creds?.teamId === teamId) {
-      // Attach decrypted credentials so callers don't need to decrypt again
-      cfg.credentials = creds;
-      return cfg;
-    }
-  }
-
-  return null;
 }
 
 export async function verifySlackRequest(

@@ -7,7 +7,6 @@ import { NotFoundError, ValidationError } from '../../errors';
 import type { AppEnv } from '../../types';
 import type { ChannelAdapter } from '../adapters/adapter';
 import type { ChannelType } from '../types';
-import { encryptCredentials, decryptCredentials } from '../lib/credentials';
 import { resolveAccountId } from '../../shared/resolve-account';
 
 const CHANNEL_TYPES = [
@@ -28,7 +27,6 @@ const createChannelSchema = z.object({
   channel_type: z.enum(CHANNEL_TYPES),
   name: z.string().min(1).max(255),
   enabled: z.boolean().default(true),
-  credentials: z.record(z.unknown()).default({}),
   platform_config: z.record(z.unknown()).default({}),
   session_strategy: z.enum(SESSION_STRATEGIES).default('per-user'),
   system_prompt: z.string().nullable().optional(),
@@ -40,7 +38,6 @@ const updateChannelSchema = z.object({
   sandbox_id: z.string().uuid().nullable().optional(),
   name: z.string().min(1).max(255).optional(),
   enabled: z.boolean().optional(),
-  credentials: z.record(z.unknown()).optional(),
   platform_config: z.record(z.unknown()).optional(),
   session_strategy: z.enum(SESSION_STRATEGIES).optional(),
   system_prompt: z.string().nullable().optional(),
@@ -95,16 +92,6 @@ export function createChannelsRouter(adapters: Map<ChannelType, ChannelAdapter>)
       }
     }
 
-    const adapter = adapters.get(parsed.data.channel_type);
-    if (adapter?.validateCredentials) {
-      const validation = await adapter.validateCredentials(parsed.data.credentials);
-      if (!validation.valid) {
-        throw new ValidationError(`Invalid credentials: ${validation.error}`);
-      }
-    }
-
-    const encryptedCreds = await encryptCredentials(parsed.data.credentials);
-
     const [config] = await db
       .insert(channelConfigs)
       .values({
@@ -113,7 +100,6 @@ export function createChannelsRouter(adapters: Map<ChannelType, ChannelAdapter>)
         channelType: parsed.data.channel_type,
         name: parsed.data.name,
         enabled: parsed.data.enabled,
-        credentials: encryptedCreds,
         platformConfig: parsed.data.platform_config,
         sessionStrategy: parsed.data.session_strategy,
         systemPrompt: parsed.data.system_prompt ?? null,
@@ -122,6 +108,7 @@ export function createChannelsRouter(adapters: Map<ChannelType, ChannelAdapter>)
       })
       .returning();
 
+    const adapter = adapters.get(parsed.data.channel_type);
     if (adapter?.onChannelCreated) {
       try {
         await adapter.onChannelCreated(config);
@@ -239,9 +226,6 @@ export function createChannelsRouter(adapters: Map<ChannelType, ChannelAdapter>)
     }
     if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
     if (parsed.data.enabled !== undefined) updateData.enabled = parsed.data.enabled;
-    if (parsed.data.credentials !== undefined) {
-      updateData.credentials = await encryptCredentials(parsed.data.credentials);
-    }
     if (parsed.data.platform_config !== undefined) updateData.platformConfig = parsed.data.platform_config;
     if (parsed.data.session_strategy !== undefined) updateData.sessionStrategy = parsed.data.session_strategy;
     if (parsed.data.system_prompt !== undefined) updateData.systemPrompt = parsed.data.system_prompt;

@@ -78,7 +78,6 @@ export {
 } from './schema/kortix';
 
 export type {
-  ChannelCredentials,
   ChannelPlatformConfig,
   ChannelPlatformUser,
   TunnelMachineInfo,

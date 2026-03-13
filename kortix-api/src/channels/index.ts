@@ -47,7 +47,6 @@ webhooksRouter.post('/telegram', async (c) => {
     headers['Authorization'] = `Bearer ${config.INTERNAL_SERVICE_KEY}`;
   }
 
-  // Fire-and-forget — return 200 immediately (Telegram retries on failure)
   fetch(`${sandboxUrl}/channels/api/webhooks/telegram`, {
     method: 'POST',
     headers,

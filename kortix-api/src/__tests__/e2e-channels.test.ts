@@ -61,7 +61,6 @@ describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', (
         sandbox_id: sandboxId,
         channel_type: 'telegram',
         name: 'Test Telegram Bot',
-        credentials: { botToken: 'fake-token-123' },
         session_strategy: 'per-user',
         system_prompt: 'You are a test bot',
       });

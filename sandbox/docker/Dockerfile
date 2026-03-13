@@ -50,8 +50,7 @@ ARG PORTLESS_VERSION=0.5.2
 COPY LICENSE /LICENSE
 
 # ── OS packages ──────────────────────────────────────────────────────────────
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk update \
+RUN apk update \
     && apk add --no-cache \
         nodejs npm rsync \
         python3-dev py3-pip py3-virtualenv \
@@ -97,7 +96,7 @@ ENV KORTIX_WORKSPACE=/workspace
 
 # ── Services (s6-rc.d longrun) ──────────────────────────────────────────────
 COPY sandbox/s6-services/ /etc/s6-overlay/s6-rc.d/
-RUN for svc in svc-kortix-master svc-sshd; do \
+RUN for svc in svc-kortix-master svc-sshd svc-opencode-serve svc-opencode-web svc-opencode-channels; do \
         touch "/etc/s6-overlay/s6-rc.d/user/contents.d/${svc}"; \
     done \
     && chmod +x /etc/s6-overlay/s6-rc.d/svc-*/run \
