@@ -109,6 +109,8 @@ import { PreWithPaths } from "@/components/common/clickable-path";
 import { parseDiagnosticsFromToolOutput, type LspDiagnostic } from "@/stores/diagnostics-store";
 import { parseMemorySearchOutput } from "@/lib/utils/memory-search-output";
 import { parseMemoryEntryOutput } from "@/lib/utils/memory-entry-output";
+import { useIntegrationConnectStore } from "@/stores/integration-connect-store";
+import { useAuth } from "@/components/AuthProvider";
 
 import {
 	type ApplyPatchFile,
@@ -4423,6 +4425,8 @@ function IntegrationConnectTool({ part, defaultOpen, forceOpen, locked }: ToolPr
 	const input = partInput(part);
 	const status = partStatus(part);
 	const output = partOutput(part);
+	const { user } = useAuth();
+	const { triggerConnect, connectingApp } = useIntegrationConnectStore();
 
 	const app = (input.app as string) || "";
 
@@ -4433,6 +4437,27 @@ function IntegrationConnectTool({ part, defaultOpen, forceOpen, locked }: ToolPr
 
 	const connectUrl: string | undefined = result?.connectUrl;
 	const success: boolean = result?.success ?? false;
+
+	// Extract the app slug and sandbox_id from the connectUrl
+	const { appSlug, sandboxId } = useMemo(() => {
+		if (!connectUrl) return { appSlug: app, sandboxId: undefined };
+		try {
+			const url = new URL(connectUrl, window.location.origin);
+			return {
+				appSlug: url.searchParams.get("connect") || app,
+				sandboxId: url.searchParams.get("sandbox_id") || undefined,
+			};
+		} catch {
+			return { appSlug: app, sandboxId: undefined };
+		}
+	}, [connectUrl, app]);
+
+	const isConnecting = connectingApp === appSlug;
+
+	const handleClick = useCallback(() => {
+		if (!user?.id || isConnecting) return;
+		triggerConnect(appSlug, sandboxId);
+	}, [user?.id, isConnecting, triggerConnect, appSlug, sandboxId]);
 
 	return (
 		<BasicTool
@@ -4448,7 +4473,7 @@ function IntegrationConnectTool({ part, defaultOpen, forceOpen, locked }: ToolPr
 							"text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0",
 							success ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive",
 						)}>
-							{success ? "URL ready" : "failed"}
+							{success ? (isConnecting ? "connecting…" : "ready") : "failed"}
 						</span>
 					)}
 				</div>
@@ -4460,20 +4485,28 @@ function IntegrationConnectTool({ part, defaultOpen, forceOpen, locked }: ToolPr
 			{connectUrl ? (
 				<div className="px-3 py-2.5 space-y-2">
 					<p className="text-[11px] text-muted-foreground leading-relaxed">
-						Click the link below to connect <strong>{app}</strong> via OAuth. After
-						authorizing, use <code className="font-mono text-[10px] bg-muted/60 px-1 py-0.5 rounded">integration_list</code> to verify.
+						Click below to connect <strong>{appSlug}</strong> via OAuth.
 					</p>
-					<a
-						href={connectUrl}
-						target="_blank"
-						rel="noopener noreferrer"
-						className="group flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors"
+					<button
+						type="button"
+						onClick={handleClick}
+						disabled={isConnecting}
+						className={cn(
+							"group flex items-center gap-2 p-2.5 rounded-lg border transition-colors w-full text-left",
+							isConnecting
+								? "bg-muted/40 border-muted cursor-wait"
+								: "bg-primary/5 border-primary/20 hover:bg-primary/10 cursor-pointer",
+						)}
 					>
-						<ExternalLink className="size-3.5 text-primary flex-shrink-0" />
+						{isConnecting ? (
+							<Loader2 className="size-3.5 text-primary flex-shrink-0 animate-spin" />
+						) : (
+							<ExternalLink className="size-3.5 text-primary flex-shrink-0" />
+						)}
 						<span className="text-[11px] font-medium text-primary truncate flex-1 min-w-0">
-							{connectUrl}
+							{isConnecting ? `Connecting ${appSlug}…` : `Connect ${appSlug}`}
 						</span>
-					</a>
+					</button>
 				</div>
 			) : output ? (
 				<ToolOutputFallback output={output} isStreaming={status === "running"} toolName="integration-connect" />

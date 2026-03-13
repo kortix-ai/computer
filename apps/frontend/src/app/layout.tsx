@@ -23,6 +23,8 @@ const RouteChangeTracker = lazy(() => import('@/components/analytics/route-chang
 const AuthEventTracker = lazy(() => import('@/components/analytics/auth-event-tracker').then(mod => ({ default: mod.AuthEventTracker })));
 const CookieVisibility = lazy(() => import('@/components/cookie-visibility').then(mod => ({ default: mod.CookieVisibility })));
 const LocalhostLinkInterceptor = lazy(() => import('@/components/localhost-link-interceptor').then(mod => ({ default: mod.LocalhostLinkInterceptor })));
+// Not lazy — wraps {children} so it must be available for SSR to avoid hydration mismatch
+import { IntegrationConnectProvider } from '@/components/integrations/integration-connect-provider';
 
 
 export const viewport: Viewport = {
@@ -244,7 +246,9 @@ export default function RootLayout({
           <AuthProvider>
             <I18nProvider>
               <ReactQueryProvider>
-                {children}
+                <IntegrationConnectProvider>
+                  {children}
+                </IntegrationConnectProvider>
                 <Toaster />
                 <Suspense fallback={null}>
                   <PlanSelectionModal />
