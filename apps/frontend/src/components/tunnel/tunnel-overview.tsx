@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Cable, Plus, Monitor, Trash2, Search, X, Settings } from 'lucide-react';
+import { Cable, Plus, Monitor, Trash2, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { Ripple } from '@/components/ui/ripple';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +26,8 @@ import { TunnelCreateDialog } from './tunnel-create-dialog';
 import { TunnelSettingsDialog } from './tunnel-settings-dialog';
 import { TunnelPermissionRequestDialog } from './tunnel-permission-request-dialog';
 import { toast } from 'sonner';
+
+// ─── Connection card ─────────────────────────────────────────────────────────
 
 function ConnectionItem({
   connection,
@@ -44,69 +48,71 @@ function ConnectionItem({
     <>
       <motion.div
         layout
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8, scale: 0.97 }}
-        transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.4) }}
+        exit={{ opacity: 0, y: -8, scale: 0.95 }}
+        transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.6) }}
       >
         <SpotlightCard className="bg-card border border-border/50">
-          <div onClick={onClick} className="p-4 flex flex-col h-full cursor-pointer group">
+          <div onClick={onClick} className="p-4 sm:p-5 flex flex-col h-full cursor-pointer group">
             <div className="flex items-center gap-3 mb-3">
-              <div className={cn(
-                'flex items-center justify-center w-9 h-9 rounded-[10px] border shrink-0',
-                isOnline
-                  ? 'bg-emerald-500/10 border-emerald-500/20'
-                  : 'bg-muted border-border/50',
-              )}>
-                <Monitor className={cn(
-                  'h-4 w-4',
-                  isOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
-                )} />
+              <div className="relative">
+                <div className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-muted border border-border/50 shrink-0">
+                  <Monitor className="h-4.5 w-4.5 text-foreground" />
+                </div>
+                {isOnline && (
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-background" />
+                  </span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-foreground truncate">{connection.name}</h3>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-sm font-semibold text-foreground truncate">{connection.name}</h3>
+                  <Badge
+                    variant={isOnline ? 'highlight' : 'secondary'}
+                    className="text-xs shrink-0"
+                  >
+                    {isOnline ? 'Online' : 'Offline'}
+                  </Badge>
+                </div>
                 {machineInfo?.hostname && (
-                  <p className="text-[11px] text-muted-foreground truncate">
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
                     {machineInfo.hostname}
                     {machineInfo.platform && ` · ${machineInfo.platform} ${machineInfo.arch || ''}`}
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="relative flex h-2.5 w-2.5">
-                  {isOnline && (
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  )}
-                  <span className={cn(
-                    'relative inline-flex rounded-full h-2.5 w-2.5',
-                    isOnline ? 'bg-emerald-500' : 'bg-amber-400',
-                  )} />
-                </span>
-              </div>
             </div>
-            <div className="mt-auto flex justify-between items-center pt-1">
-              <span className="text-[11px] text-muted-foreground">
+
+            <div className="h-[34px] mb-3">
+              <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">
                 {connection.lastHeartbeatAt
-                  ? formatRelative(connection.lastHeartbeatAt)
+                  ? `Last seen ${formatRelative(connection.lastHeartbeatAt)}`
                   : 'Never connected'}
-              </span>
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteOpen(true);
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-1">
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:text-destructive h-8 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteOpen(true);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 px-2.5 text-xs">
+                Manage
+              </Button>
             </div>
           </div>
         </SpotlightCard>
       </motion.div>
+
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -131,6 +137,8 @@ function ConnectionItem({
   );
 }
 
+// ─── Empty state ─────────────────────────────────────────────────────────────
+
 function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
   return (
     <div className="relative bg-muted/20 rounded-3xl border border-dashed border-border/50 flex flex-col items-center justify-center py-20 px-4 overflow-hidden">
@@ -152,25 +160,32 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
   );
 }
 
+// ─── Loading skeleton ────────────────────────────────────────────────────────
+
 function LoadingSkeleton() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="rounded-2xl border dark:bg-card p-4">
+        <div key={i} className="rounded-2xl border dark:bg-card p-4 sm:p-5">
           <div className="flex items-center gap-3 mb-3">
             <Skeleton className="h-9 w-9 rounded-[10px]" />
-            <div className="flex-1 space-y-1.5">
-              <Skeleton className="h-4 w-20" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-24" />
               <Skeleton className="h-3 w-32" />
             </div>
-            <Skeleton className="h-2.5 w-2.5 rounded-full" />
           </div>
-          <Skeleton className="h-3 w-16 mt-3" />
+          <Skeleton className="h-3 w-full mb-1" />
+          <Skeleton className="h-3 w-4/5 mb-3" />
+          <div className="flex justify-end">
+            <Skeleton className="h-8 w-16" />
+          </div>
         </div>
       ))}
     </div>
   );
 }
+
+// ─── Main overview ───────────────────────────────────────────────────────────
 
 export function TunnelOverview() {
   const { data: connections = [], isLoading } = useTunnelConnections();
@@ -211,18 +226,45 @@ export function TunnelOverview() {
 
   return (
     <div className="min-h-[100dvh]">
-      <div className="container mx-auto max-w-7xl px-3 sm:px-4 pt-6 sm:pt-8 pb-2 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both">
-        <div className="mb-8 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl border bg-primary/10 border-primary/20">
-              <Cable className="h-5 w-5 text-primary" />
+      {/* Page header */}
+      <div className="container mx-auto max-w-7xl px-3 sm:px-4 py-4 sm:py-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both">
+        <PageHeader icon={Cable}>
+          <div className="space-y-2 sm:space-y-4">
+            <div className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">
+              <span className="text-primary">Tunnel</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">Tunnel</h1>
+          </div>
+        </PageHeader>
+      </div>
+
+      <div className="container mx-auto max-w-7xl px-3 sm:px-4">
+        {/* Search + action bar */}
+        <div className="flex items-center justify-between gap-2 sm:gap-4 pb-3 sm:pb-4 pt-2 sm:pt-3 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both delay-75">
+          <div className="flex-1 max-w-md">
+            <div className="relative group">
+              <input
+                type="text"
+                placeholder="Search connections..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 w-full rounded-2xl border border-input bg-card px-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              />
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                <Search className="h-4 w-4" />
+              </div>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md p-0.5 transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
           <Button
             variant="default"
-            size="sm"
-            className="h-9 px-3 sm:px-4 rounded-xl gap-1.5 sm:gap-2 text-sm"
+            className="px-3 sm:px-4 rounded-2xl gap-1.5 sm:gap-2 text-sm"
             onClick={() => setCreateDialogOpen(true)}
           >
             <Plus className="h-4 w-4" />
@@ -230,51 +272,42 @@ export function TunnelOverview() {
             <span className="xs:hidden">Add</span>
           </Button>
         </div>
-      </div>
 
-      <div className="container mx-auto max-w-7xl px-3 sm:px-4">
-        {/* {hasConnections && (
-          <div className="flex items-center gap-3 mb-4 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-50 fill-mode-both">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search connections..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border bg-background pl-10 pr-9 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
-                >
-                  <X className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-              )}
-            </div>
-          </div>
-        )} */}
-
-        <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-100 fill-mode-both">
+        {/* Content */}
+        <div className="pb-6 sm:pb-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both delay-150">
           {isLoading ? (
             <LoadingSkeleton />
           ) : !hasConnections ? (
             <EmptyState onCreateClick={() => setCreateDialogOpen(true)} />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              <AnimatePresence>
-                {filtered.map((conn, i) => (
-                  <ConnectionItem
-                    key={conn.tunnelId}
-                    connection={conn}
-                    onClick={() => handleSelect(conn)}
-                    onDelete={() => handleDelete(conn.tunnelId)}
-                    index={i}
-                  />
-                ))}
-              </AnimatePresence>
+          ) : filtered.length === 0 && searchQuery ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              No connections matching &ldquo;{searchQuery}&rdquo;
             </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Connections
+                </span>
+                <Badge variant="secondary" className="text-xs tabular-nums">
+                  {filtered.length}
+                </Badge>
+              </div>
+
+              <AnimatePresence mode="popLayout">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filtered.map((conn, i) => (
+                    <ConnectionItem
+                      key={conn.tunnelId}
+                      connection={conn}
+                      onClick={() => handleSelect(conn)}
+                      onDelete={() => handleDelete(conn.tunnelId)}
+                      index={i}
+                    />
+                  ))}
+                </div>
+              </AnimatePresence>
+            </>
           )}
         </div>
       </div>
