@@ -169,7 +169,7 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
     [safeMessages, sessionStatus, isBusy],
   );
 
-  const title = session?.title || 'Session';
+  const title = session?.title || 'New Session';
 
   return (
     <View className={`flex-1 ${isDark ? 'bg-black' : 'bg-white'}`}>
@@ -211,9 +211,12 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
         data={turns}
         renderItem={renderTurn}
         keyExtractor={(item) => item.userMessage.info.id}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 16 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={() => {
+          // Small delay so the layout pass completes before we scroll
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
+        }}
       />
 
       {/* Chat input with toolbar */}

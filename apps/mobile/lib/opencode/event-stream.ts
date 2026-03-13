@@ -171,13 +171,19 @@ export function useOpenCodeEventStream(sandboxUrl: string | undefined) {
         break;
 
       case 'session.updated': {
-        // session.updated carries the full Session object in props.info,
-        // including the updated title. Update both the sessions list and
-        // the individual session query so the header title refreshes.
-        const info = props.info;
-        log.log(`📝 [SSE] session.updated: id=${info?.id}, title="${info?.title}"`);
-        if (info?.id) {
-          queryClient.setQueryData(platformKeys.session(info.id), info);
+        // session.updated carries the full Session object — either directly
+        // in properties (the session IS the properties) or nested under
+        // properties.info. Try both paths.
+        const info = props.info || props;
+        const sessionID = info?.id || props.sessionID;
+        log.log(`📝 [SSE] session.updated: id=${sessionID}, title="${info?.title}", keys=${Object.keys(props).join(',')}`);
+        if (sessionID) {
+          // Direct cache update with session data (if we have the full object)
+          if (info?.title !== undefined) {
+            queryClient.setQueryData(platformKeys.session(sessionID), info);
+          }
+          // Always invalidate both queries to ensure fresh data
+          queryClient.invalidateQueries({ queryKey: platformKeys.session(sessionID) });
           queryClient.invalidateQueries({ queryKey: platformKeys.sessions() });
         } else {
           queryClient.invalidateQueries({ queryKey: platformKeys.sessions() });

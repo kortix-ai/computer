@@ -186,8 +186,8 @@ export function useCreateSession(sandboxUrl: string | undefined) {
       const session = await opencodeFetch<Session>(sandboxUrl, '/session', {
         method: 'POST',
         body: JSON.stringify({
-          title: params.title || 'New Session',
-          directory: params.directory || '/home/user',
+          ...(params.title ? { title: params.title } : {}),
+          ...(params.directory ? { directory: params.directory } : {}),
         }),
       });
 
