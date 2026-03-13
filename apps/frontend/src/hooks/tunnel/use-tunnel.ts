@@ -106,8 +106,10 @@ export function useTunnelConnections() {
       if (!res.success) throw new Error(res.error?.message || 'Failed to fetch connections');
       return res.data!;
     },
-    staleTime: 10_000,
-    refetchInterval: 30_000,
+    staleTime: 2_000,
+    refetchInterval: 5_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -120,8 +122,10 @@ export function useTunnelConnection(tunnelId: string) {
       return res.data!;
     },
     enabled: !!tunnelId,
-    staleTime: 5_000,
-    refetchInterval: 15_000,
+    staleTime: 2_000,
+    refetchInterval: 5_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }
 

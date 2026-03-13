@@ -5,15 +5,13 @@ description: "Interact with the user's local machine via Agent Tunnel. Use when 
 
 # Agent Tunnel
 
-All local-machine operations via a single CLI script. Run with bash — no tool primitive needed.
-
-The CLI lives in `@kortix/agent-tunnel` and is available via:
+All local-machine operations via a single self-contained CLI script. Run with bash — no tool primitive needed, no external dependencies.
 
 ```
-# In sandbox (production):
-TUNNEL=/opt/opencode/node_modules/agent-tunnel/src/client/cli.ts
+# In sandbox (production — shipped at /opt/opencode/skills/):
+TUNNEL=/opt/opencode/skills/agent-tunnel/tunnel.ts
 
-# Via skill wrapper (auto-resolves the package):
+# Or via the config-dir skills path:
 TUNNEL=~/.opencode/skills/agent-tunnel/tunnel.ts
 ```
 
