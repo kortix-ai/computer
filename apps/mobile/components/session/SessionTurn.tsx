@@ -8,6 +8,7 @@ import React, { useMemo } from 'react';
 import { View } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { useColorScheme } from 'nativewind';
+import { SelectableMarkdownText } from '@/components/ui/selectable-markdown';
 import type {
   Turn,
   MessageWithParts,
@@ -201,15 +202,11 @@ export function SessionTurn({
             </View>
           )}
 
-          {/* Response text */}
+          {/* Response text (rendered as markdown) */}
           {!!response && (
-            <Text
-              className={`text-[15px] leading-[22px] ${
-                isDark ? 'text-zinc-200' : 'text-zinc-800'
-              }`}
-            >
+            <SelectableMarkdownText isDark={isDark}>
               {response}
-            </Text>
+            </SelectableMarkdownText>
           )}
 
           {/* Working indicator */}
