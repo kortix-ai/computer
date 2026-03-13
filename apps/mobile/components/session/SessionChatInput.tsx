@@ -85,7 +85,6 @@ export function SessionChatInput({
   const handleSubmit = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
-    if (isBusy) return;
 
     const options: PromptOptions = {};
     if (agent?.name) options.agent = agent.name;
@@ -94,7 +93,7 @@ export function SessionChatInput({
 
     onSend(trimmed, options);
     setText('');
-  }, [text, isBusy, disabled, onSend, agent, modelKey, variant]);
+  }, [text, disabled, onSend, agent, modelKey, variant]);
 
   // Variant display
   const variantLabel = variant

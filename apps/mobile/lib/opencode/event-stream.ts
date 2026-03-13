@@ -54,27 +54,23 @@ export function useOpenCodeEventStream(sandboxUrl: string | undefined) {
         const state = syncStore.getState();
         const existing = state.messages[sessionId] || [];
 
-        // When a real user message arrives from the server, swap out any
-        // optimistic user messages so the bubble doesn't vanish or duplicate.
+        // When a real user message arrives from the server, remove
+        // optimistic user messages. Real parts arrive via message.part.updated.
         if (info.role === 'user' && !isOptimistic(info.id)) {
           const optimisticMsgs = existing.filter(
             (m) => m.info.role === 'user' && isOptimistic(m.info.id),
           );
           if (optimisticMsgs.length > 0) {
-            // Use the optimistic message's parts as bridge so the user
-            // bubble text stays visible until real parts arrive.
-            const bridgeParts = optimisticMsgs[0]?.parts || [];
             const optimisticIdSet = new Set(optimisticMsgs.map((m) => m.info.id));
             const withoutOptimistic = existing.filter(
               (m) => !optimisticIdSet.has(m.info.id),
             );
-            // Insert real message with bridge parts
             syncStore.setState({
               messages: {
                 ...syncStore.getState().messages,
                 [sessionId]: [
                   ...withoutOptimistic,
-                  { info, parts: bridgeParts },
+                  { info, parts: [] },
                 ],
               },
             });

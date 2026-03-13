@@ -7,11 +7,12 @@
  * Sends messages via fire-and-forget promptAsync with agent/model/variant.
  */
 
-import React, { useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import {
   View,
   FlatList,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { useColorScheme } from 'nativewind';
@@ -45,6 +46,7 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { sandboxUrl } = useSandboxContext();
   const flatListRef = useRef<FlatList>(null);
 
@@ -72,13 +74,27 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
   // Group messages into turns
   const turns = useMemo(() => groupMessagesIntoTurns(safeMessages), [safeMessages]);
 
-  // Auto-scroll
-  const messageCount = safeMessages.length;
+  // When a new turn appears, scroll so the latest user bubble is at the top
+  const prevTurnCount = useRef(turns.length);
   useEffect(() => {
-    if (turns.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    if (turns.length > prevTurnCount.current) {
+      // New turn added — scroll it to the top of the viewport
+      const targetIndex = turns.length - 1;
+      setTimeout(() => {
+        try {
+          flatListRef.current?.scrollToIndex({
+            index: targetIndex,
+            viewPosition: 0,
+            viewOffset: 0,
+            animated: true,
+          });
+        } catch {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }
+      }, 150);
     }
-  }, [turns.length, messageCount]);
+    prevTurnCount.current = turns.length;
+  }, [turns.length]);
 
   // Send handler
   const handleSend = useCallback(
@@ -99,8 +115,7 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
         parts: [{ type: 'text', id: partId, text }],
       });
       useSyncStore.getState().setStatus(sessionId, { type: 'busy' });
-
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      // Scroll is handled by the useEffect watching turns.length
 
       // Build prompt payload (matches frontend POST /session/{id}/message)
       const payload: Record<string, any> = {
@@ -157,16 +172,31 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
     }
   }, [sandboxUrl, sessionId]);
 
+  // Track last turn height for footer sizing
+  const turnHeights = useRef<Record<string, number>>({});
+  const [lastTurnHeight, setLastTurnHeight] = useState(80);
+
   const renderTurn = useCallback(
-    ({ item }: { item: Turn }) => (
-      <SessionTurn
-        turn={item}
-        allMessages={safeMessages}
-        sessionStatus={sessionStatus}
-        isBusy={isBusy}
-      />
+    ({ item, index }: { item: Turn; index: number }) => (
+      <View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          turnHeights.current[item.userMessage.info.id] = h;
+          // Update footer when the last turn's height changes
+          if (index === turns.length - 1) {
+            setLastTurnHeight(h);
+          }
+        }}
+      >
+        <SessionTurn
+          turn={item}
+          allMessages={safeMessages}
+          sessionStatus={sessionStatus}
+          isBusy={isBusy}
+        />
+      </View>
     ),
-    [safeMessages, sessionStatus, isBusy],
+    [safeMessages, sessionStatus, isBusy, turns.length],
   );
 
   const title = session?.title || 'New Session';
@@ -211,11 +241,27 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
         data={turns}
         renderItem={renderTurn}
         keyExtractor={(item) => item.userMessage.info.id}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingTop: 16 }}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => {
-          // Small delay so the layout pass completes before we scroll
-          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
+        ListFooterComponent={
+          <View
+            style={{
+              // Fill remaining viewport so the last turn's user bubble
+              // sits at the top. Subtract: header (~60+insets), input (~120+insets),
+              // and the actual measured last turn height.
+              height: Math.max(0, windowHeight - insets.top - insets.bottom - 160 - lastTurnHeight),
+            }}
+          />
+        }
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index: info.index,
+              viewPosition: 0,
+              viewOffset: 0,
+              animated: true,
+            });
+          }, 200);
         }}
       />
 
