@@ -61,19 +61,19 @@ export interface ContinuationConfig {
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
 export const DEFAULT_FEATURES: ContinuationFeatures = {
-	continuation: false,
+	continuation: true,      // passive continuation ON by default — todo enforcer drives it
 	todoEnforcer: true,
 	intentGate: true,
 	planner: false,
 }
 
 export const DEFAULT_THRESHOLDS: ContinuationThresholds = {
-	baseCooldownMs: 3_000,
+	baseCooldownMs: 3_000,         // 3s minimum spacing between injections
 	maxConsecutiveFailures: 5,
-	failureResetWindowMs: 5 * 60_000,  // 5 minutes
-	abortGracePeriodMs: 3_000,
-	minWorkDurationMs: 5_000,
-	maxSessionContinuations: 20,
+	failureResetWindowMs: 5 * 60_000,  // 5-minute hard pause after 5 consecutive failures
+	abortGracePeriodMs: 3_000,    // 3s grace after abort events
+	minWorkDurationMs: 8_000,     // agent must have worked at least 8s before passive kick-in
+	maxSessionContinuations: 50,  // raised from 20 — passive mode is the safety net
 }
 
 export const DEFAULT_CONFIG: ContinuationConfig = {

@@ -29,6 +29,8 @@ import type { LoopState } from "./config"
 import { AUTOWORK_LOOP_CONFIG, INTERNAL_MARKER, createInitialLoopState } from "./config"
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { evaluateTodos, formatRemainingWork } from "./todo-enforcer"
+import type { Todo } from "@opencode-ai/sdk"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -180,12 +182,20 @@ export function checkLoopSafetyGates(
 		return `max consecutive failures (${state.consecutiveFailures}) — pausing for ${Math.round(failureResetWindowMs / 60000)} min`
 	}
 
-	// Exponential backoff: baseCooldown * 2^min(failures, 5)
+	// Exponential backoff on failures: baseCooldown * 2^min(failures, 5)
 	if (state.lastInjectedAt > 0 && state.consecutiveFailures > 0) {
 		const effectiveCooldown = baseCooldownMs * Math.pow(2, Math.min(state.consecutiveFailures, 5))
 		const elapsed = Date.now() - state.lastInjectedAt
 		if (elapsed < effectiveCooldown) {
 			return `backoff cooldown: ${Math.round((effectiveCooldown - elapsed) / 1000)}s remaining (failure ${state.consecutiveFailures})`
+		}
+	}
+
+	// Minimum spacing between injections even in happy path (prevents spam on rapid idle events)
+	if (state.lastInjectedAt > 0 && state.consecutiveFailures === 0) {
+		const elapsed = Date.now() - state.lastInjectedAt
+		if (elapsed < baseCooldownMs) {
+			return `minimum cooldown: ${Math.round((baseCooldownMs - elapsed) / 1000)}s remaining`
 		}
 	}
 
@@ -208,10 +218,12 @@ export interface LoopDecision {
  * @param state - Current loop state
  * @param allAssistantTexts - ALL assistant message texts since loop start
  *                            (not just the last one — critical for promise detection)
+ * @param todos - Current todo list from the session (optional — for enforcement)
  */
 export function evaluateLoop(
 	state: LoopState,
 	allAssistantTexts: string[],
+	todos?: Todo[],
 ): LoopDecision {
 	if (!state.active) {
 		return { action: "stop", prompt: null, reason: "no active loop" }
@@ -243,11 +255,24 @@ export function evaluateLoop(
 		}
 	}
 
-	// DONE found, not yet verified → enter verification phase
+	// DONE found — but first check: do todos say otherwise?
 	if (hasCompletionPromise && !state.inVerification) {
+		// If we have a todo list and it has unfinished items, override DONE — agent claimed done too early
+		if (todos && todos.length > 0) {
+			const todoResult = evaluateTodos(todos)
+			if (todoResult.verdict === "unfinished") {
+				// Agent said DONE but todos disagree — nudge to finish remaining work
+				return {
+					action: "continue",
+					prompt: buildPrematureDonePrompt(state, todoResult),
+					reason: `DONE claimed but ${todoResult.reason} — continuing`,
+				}
+			}
+		}
+		// Todos are done (or no todos) — enter verification
 		return {
 			action: "verify",
-			prompt: buildVerificationPrompt(state),
+			prompt: buildVerificationPrompt(state, todos),
 			reason: "DONE promise detected — entering self-verification",
 		}
 	}
@@ -263,9 +288,20 @@ export function evaluateLoop(
 		}
 		// DONE was emitted again during verification (issues found + fixed)
 		if (hasCompletionPromise) {
+			// Re-check todos before re-entering verification
+			if (todos && todos.length > 0) {
+				const todoResult = evaluateTodos(todos)
+				if (todoResult.verdict === "unfinished") {
+					return {
+						action: "continue",
+						prompt: buildPrematureDonePrompt(state, todoResult),
+						reason: `DONE re-emitted but todos still unfinished — continuing`,
+					}
+				}
+			}
 			return {
 				action: "verify",
-				prompt: buildVerificationPrompt(state),
+				prompt: buildVerificationPrompt(state, todos),
 				reason: "DONE re-emitted during verification — re-verifying",
 			}
 		}
@@ -280,14 +316,14 @@ export function evaluateLoop(
 	// Default: keep working
 	return {
 		action: "continue",
-		prompt: buildLoopContinuationPrompt(state),
+		prompt: buildLoopContinuationPrompt(state, todos),
 		reason: `iteration ${state.iteration + 1}/${config.maxIterations}`,
 	}
 }
 
 // ─── Prompt Builders ──────────────────────────────────────────────────────────
 
-function buildLoopContinuationPrompt(state: LoopState, extraContext?: string): string {
+function buildLoopContinuationPrompt(state: LoopState, todos?: Todo[]): string {
 	const config = AUTOWORK_LOOP_CONFIG
 	const parts: string[] = []
 
@@ -300,22 +336,51 @@ function buildLoopContinuationPrompt(state: LoopState, extraContext?: string): s
 		parts.push("")
 	}
 
-	if (extraContext) {
-		parts.push(extraContext)
-		parts.push("")
+	// Inject live todo state if available
+	if (todos && todos.length > 0) {
+		const todoResult = evaluateTodos(todos)
+		if (todoResult.verdict === "unfinished" && todoResult.remainingItems.length > 0) {
+			parts.push(formatRemainingWork(todoResult))
+			parts.push("")
+		} else if (todoResult.verdict === "done") {
+			parts.push(`[TODO STATUS] All ${todoResult.totalItems} items complete.`)
+			parts.push("")
+		}
 	}
 
-	parts.push(`Continue working. Check your todo list for remaining items.`)
-	parts.push(`When ALL work is complete, emit exactly:`)
+	parts.push(`Continue working on the next pending item.`)
+	parts.push(`When ALL todos are done and work is verified, emit exactly:`)
 	parts.push(config.completionPromise)
 	parts.push(``)
-	parts.push(`Do NOT emit this promise until every todo is done and changes are verified working.`)
+	parts.push(`Do NOT emit this promise while any todo item is still pending or in-progress.`)
 	parts.push(INTERNAL_MARKER)
 
 	return parts.join("\n")
 }
 
-function buildVerificationPrompt(state: LoopState): string {
+function buildPrematureDonePrompt(state: LoopState, todoResult: ReturnType<typeof evaluateTodos>): string {
+	const config = AUTOWORK_LOOP_CONFIG
+	const parts: string[] = []
+
+	parts.push(`[SYSTEM REMINDER - AUTOWORK: PREMATURE DONE DETECTED]`)
+	parts.push(`You emitted <promise>DONE</promise> but your todo list shows unfinished work.`)
+	parts.push(`Do NOT emit DONE until every todo item is completed or cancelled.`)
+	parts.push("")
+
+	if (state.taskPrompt) {
+		parts.push(`Original task: ${state.taskPrompt}`)
+		parts.push("")
+	}
+
+	parts.push(formatRemainingWork(todoResult))
+	parts.push("")
+	parts.push(`Complete the remaining items above, then emit ${config.completionPromise}.`)
+	parts.push(INTERNAL_MARKER)
+
+	return parts.join("\n")
+}
+
+function buildVerificationPrompt(state: LoopState, todos?: Todo[]): string {
 	const config = AUTOWORK_LOOP_CONFIG
 	const parts: string[] = []
 
@@ -326,6 +391,14 @@ function buildVerificationPrompt(state: LoopState): string {
 	if (state.taskPrompt) {
 		parts.push(`Original task: ${state.taskPrompt}`)
 		parts.push("")
+	}
+
+	if (todos && todos.length > 0) {
+		const todoResult = evaluateTodos(todos)
+		if (todoResult.completedItems > 0) {
+			parts.push(`[TODO STATUS] ${todoResult.completedItems}/${todoResult.totalItems} items completed.`)
+			parts.push("")
+		}
 	}
 
 	parts.push(`Verification checklist (non-negotiable):`)

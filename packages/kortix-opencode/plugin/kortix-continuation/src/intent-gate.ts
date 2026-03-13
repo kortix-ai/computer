@@ -38,6 +38,10 @@ const BLOCKED_HUMAN_PATTERNS = [
 	/(?:before i proceed|proceed with|go ahead with)/i,
 	/(?:could you (?:provide|share|clarify|specify))/i,
 	/(?:i need you to|please (?:provide|share|specify|tell me))/i,
+	/(?:can you (?:provide|share|clarify|confirm|let me know))/i,
+	/(?:your (?:input|feedback|approval|confirmation|decision) (?:is needed|needed|required))/i,
+	/(?:once you(?:'ve)? (?:decided|confirmed|reviewed|provided))/i,
+	/(?:how would you like|what would you like me to)/i,
 ]
 
 // Patterns that indicate external blockers
@@ -45,23 +49,40 @@ const BLOCKED_EXTERNAL_PATTERNS = [
 	/(?:api key|api_key|token|credential|secret|password).*(?:not set|missing|required|needed|unavailable)/i,
 	/(?:oauth|authorization|authenticate).*(?:required|needed|first)/i,
 	/(?:connect|configure|set up).*(?:first|before)/i,
+	/(?:environment variable|env var).*(?:not set|missing|required)/i,
+	/(?:cannot|can't|unable to) (?:access|connect|reach|authenticate)/i,
 ]
 
-// Patterns that indicate explicit completion
+// Patterns that indicate explicit completion — require strong, specific signal words.
+// Deliberately conservative: prefer false negatives over false positives.
+// (We do NOT match bare "done" — too many false positives in work-in-progress messages.)
 const COMPLETION_PATTERNS = [
-	/(?:^|\n)(?:all (?:tasks?|items?|todos?) (?:are )?(?:completed?|done|finished))/i,
-	/(?:everything (?:is )?(?:done|complete|finished))/i,
-	/(?:task (?:is )?(?:complete|done|finished))/i,
-	/(?:successfully (?:completed?|implemented|deployed|shipped))/i,
-	/(?:^|\n)done[.!]?\s*$/im,
+	// "all tasks/items/todos are completed/done/finished"
+	/(?:all (?:tasks?|items?|todos?|steps?) (?:are )?(?:now )?(?:completed?|done|finished))/i,
+	// "everything is done/complete/finished"
+	/(?:everything (?:is (?:now )?)?(?:done|complete|finished))/i,
+	// "the task/work/implementation is complete"
+	/(?:the (?:task|work|implementation|feature|refactor) (?:is (?:now )?)?(?:complete|done|finished))/i,
+	// "successfully completed/implemented/deployed/shipped [something]"
+	/(?:successfully (?:completed?|implemented|deployed|shipped|finished)) (?:all|the|this)/i,
+	// "implementation/refactoring/migration is complete"
+	/(?:implementation|refactoring|migration|integration) (?:is (?:now )?)?(?:complete|done|finished)/i,
 ]
 
 // Patterns that indicate answer-only (no action taken)
 const ANSWER_ONLY_PATTERNS = [
 	/(?:^here'?s? (?:the|an|a) (?:explanation|answer|summary))/i,
-	/(?:^in (?:short|summary|brief))/i,
+	/(?:^in (?:short|summary|brief)[,:])/i,
 	/(?:^to answer your question)/i,
 	/(?:^the (?:answer|reason|explanation) is)/i,
+	/(?:^(?:yes|no)[,.]?\s+(?:the|this|that|you|it))/i,
+]
+
+// Patterns indicating the agent is reporting completed work (stop passive continuation)
+const REPORTING_PATTERNS = [
+	/(?:^|\n)(?:here(?:'s| is) what i (?:did|changed|implemented|added|fixed))/i,
+	/(?:^|\n)(?:i(?:'ve| have) (?:completed?|finished|implemented|added|fixed|updated|refactored))/i,
+	/(?:^|\n)(?:the (?:following|above) (?:changes|modifications|updates) (?:have been|were) made)/i,
 ]
 
 // Patterns that indicate the agent used the question tool (awaiting user answer)
@@ -77,6 +98,7 @@ const PLANNING_PATTERNS = [
 	/(?:i'?ll|i will|let me) (?:start|begin) (?:by|with)/i,
 	/(?:step \d|phase \d|first,? i'?ll)/i,
 	/(?:the approach|my approach|implementation plan)/i,
+	/(?:plan of action|here'?s? (?:how|what) i'?ll)/i,
 ]
 
 /**
@@ -105,7 +127,7 @@ export function classifyIntent(
 		}
 	}
 
-	// 1. Check for explicit completion signals
+	// 1. Check for explicit completion signals (strong signals only)
 	for (const pattern of COMPLETION_PATTERNS) {
 		if (pattern.test(text)) {
 			return { intent: "completed", reason: "explicit completion signal", shouldContinue: false }
@@ -144,18 +166,26 @@ export function classifyIntent(
 		}
 	}
 
-	// 6. Check for answer-only patterns
+	// 6. Check for reporting patterns (agent just summarized what it did)
+	for (const pattern of REPORTING_PATTERNS) {
+		if (pattern.test(text)) {
+			return { intent: "completed", reason: "agent reporting completed work", shouldContinue: false }
+		}
+	}
+
+	// 7. Check for answer-only patterns
 	for (const pattern of ANSWER_ONLY_PATTERNS) {
 		if (pattern.test(text)) {
 			return { intent: "answer", reason: "answer-only response", shouldContinue: false }
 		}
 	}
 
-	// 7. Short text without tool calls — likely conversational
-	if (text.length < 200 && !hadToolCalls) {
+	// 8. Short text without tool calls — likely conversational
+	// 300 chars: enough room for brief work summaries but catches most pure Q&A
+	if (text.length < 300 && !hadToolCalls) {
 		return { intent: "answer", reason: "short response without tools", shouldContinue: false }
 	}
 
-	// 8. Fall through — can't classify, let other signals decide
+	// 9. Fall through — can't classify, let other signals decide
 	return { intent: "unknown", reason: "unclassified", shouldContinue: false }
 }

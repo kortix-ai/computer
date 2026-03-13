@@ -322,19 +322,23 @@ const KortixContinuationPlugin: Plugin = async ({ client }) => {
 							return
 						}
 
-						// Fetch messages
-						const messagesRes = await client.session.messages({ path: { id: sessionId } }).catch(() => ({ data: [] as any[] }))
-						const messages = (messagesRes.data ?? []) as any[]
+					// Fetch messages AND todos in parallel — todos needed for DONE enforcement
+					const [messagesRes, loopTodoRes] = await Promise.all([
+						client.session.messages({ path: { id: sessionId } }).catch(() => ({ data: [] as any[] })),
+						client.session.todo({ path: { id: sessionId } }).catch(() => ({ data: [] as Todo[] })),
+					])
+					const messages = (messagesRes.data ?? []) as any[]
+					const loopTodos = (loopTodoRes.data ?? []) as Todo[]
 
-						// Skip if agent is waiting for question answer
-						if (hasPendingQuestion(messages)) {
-							log("info", "[autowork] Skipped: pending question")
-							return
-						}
+					// Skip if agent is waiting for question answer
+					if (hasPendingQuestion(messages)) {
+						log("info", "[autowork] Skipped: pending question")
+						return
+					}
 
-						// Extract ALL assistant texts since loop start
-						const allTexts = extractAssistantTexts(messages, loopState.messageCountAtStart)
-						const loopDecision = evaluateLoop(loopState, allTexts)
+					// Extract ALL assistant texts since loop start
+					const allTexts = extractAssistantTexts(messages, loopState.messageCountAtStart)
+					const loopDecision = evaluateLoop(loopState, allTexts, loopTodos)
 						log("info", `[autowork] ${loopDecision.action} — ${loopDecision.reason}`)
 
 						if (loopDecision.action === "verify" && loopDecision.prompt) {
