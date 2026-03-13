@@ -57,6 +57,7 @@ import { isBillingEnabled } from '@/lib/config';
 import { useTheme } from 'next-themes';
 import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
 import { useAuth } from '@/components/AuthProvider';
+import { useAdminRole } from '@/hooks/admin';
 
 // ============================================================================
 // Helpers
@@ -188,6 +189,8 @@ export function CommandPalette() {
   const { theme, setTheme } = useTheme();
   const billingEnabled = isBillingEnabled();
   const { user: authUser } = useAuth();
+  const { data: adminRoleData } = useAdminRole();
+  const isAdmin = adminRoleData?.isAdmin ?? false;
 
   const firstName = useMemo(() => {
     if (!authUser) return '';
@@ -392,9 +395,10 @@ export function CommandPalette() {
     return getItemsForSurface('commandPalette').filter((item) => {
       if (item.requiresBilling && !billingEnabled) return false;
       if (item.requiresSession && !currentSessionId) return false;
+      if (item.requiresAdmin && !isAdmin) return false;
       return true;
     });
-  }, [billingEnabled, currentSessionId]);
+  }, [billingEnabled, currentSessionId, isAdmin]);
 
   // Filter navigation items client-side so we control the match logic
   const filteredNavItems = useMemo(() => {
