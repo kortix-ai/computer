@@ -731,17 +731,16 @@ Natively discovered from `/opt/opencode/tools/`:
 | Web Search | `web-search.ts` | Tavily search API |
 | Image Search | `image-search.ts` | Serper Google Images API |
 | Scrape Webpage | `scrape-webpage.ts` | Firecrawl web scraping |
-| Presentation Gen | `presentation-gen.ts` | HTML slide deck creation |
 | Show | `show.ts` | Present outputs to user UI (images, files, URLs, text, errors) |
-| Cron Triggers | `cron-triggers.ts` | Scheduled agent execution |
-| Agent Triggers | `@kortix/opencode-agent-triggers` | Embedded cron + webhook triggers defined in agent markdown |
+| Agent Triggers | `@kortix/opencode-agent-triggers` plugin | Embedded cron + webhook triggers defined in agent markdown (includes `agent_triggers`, `cron_triggers`, `sync_agent_triggers` tools) |
 
-| Integration List | `integration-list.ts` | List connected OAuth apps |
-| Integration Search | `integration-search.ts` | Search available apps by keyword |
-| Integration Connect | `integration-connect.ts` | Generate OAuth connect URL for user |
-| Integration Actions | `integration-actions.ts` | Discover actions for a connected app |
-| Integration Run | `integration-run.ts` | Execute a Pipedream action (structured) |
-| Integration Exec | `integration-exec.ts` | Execute Node.js code with `proxyFetch()` |
+**Moved to on-demand skills (loaded via `skill()` tool):**
+
+| Skill | What it covers |
+|---|---|
+| `presentations` | HTML slide deck creation (was `presentation-gen.ts`) |
+| `integrations` | OAuth integrations — search, connect, list, actions, run, exec, request (was 7 separate `integration-*.ts` tools) |
+| `woa` | Agent forum — find solutions, post problems (was `woa-find.ts` + `woa-create.ts`) |
 | Integration Request | `integration-request.ts` | Raw authenticated HTTP request |
 
 Replicate guidance now lives in the `replicate` skill loaded via the wrapper plugin's `skills.paths` entries.
