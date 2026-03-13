@@ -1,7 +1,6 @@
 #!/usr/bin/with-contenv bash
 # lss-sync — File-watcher daemon for semantic search indexing.
 
-if [ -f /opt/kortix/core/service-spec.json ]; then exec sleep infinity; fi
 #
 # OPENAI_API_KEY is optional. If not set, lss-sync is skipped entirely.
 # auth-sync (kortix-master) writes the key to s6 env at boot.

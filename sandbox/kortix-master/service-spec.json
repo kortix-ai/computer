@@ -10,26 +10,6 @@
       "restart": "always",
       "restartDelayMs": 1500,
       "port": 4096
-    },
-    {
-      "id": "lss-sync",
-      "name": "LSS Sync",
-      "run": "/etc/s6-overlay/s6-rc.d/svc-lss-sync/run",
-      "deps": [],
-      "autoStart": true,
-      "restart": "always",
-      "restartDelayMs": 3000
-    },
-    {
-      "id": "opencode-channels",
-      "name": "OpenCode Channels",
-      "run": "/etc/s6-overlay/s6-rc.d/svc-opencode-channels/run",
-      "deps": [
-        "opencode-serve"
-      ],
-      "autoStart": true,
-      "restart": "always",
-      "restartDelayMs": 1500
     }
   ]
 }

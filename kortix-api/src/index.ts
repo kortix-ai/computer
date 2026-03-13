@@ -357,9 +357,22 @@ async function injectSandboxToken(sandboxId: string, accountId: string): Promise
   const dockerHost = rawDockerHost.startsWith('/') ? `unix://${rawDockerHost}` : rawDockerHost;
   const dockerEnv = { ...process.env, DOCKER_HOST: dockerHost };
 
+  // Resolve how sandbox reaches kortix-api (same logic as local-docker.ts)
+  const rawUrl = (config.KORTIX_URL || '').replace(/\/v1\/router\/?$/, '');
+  let kortixApiUrl = `http://host.docker.internal:${config.PORT}`;
+  try {
+    const parsed = new URL(rawUrl || `http://localhost:${config.PORT}`);
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      parsed.hostname = 'host.docker.internal';
+      kortixApiUrl = parsed.toString().replace(/\/$/, '');
+    } else if (rawUrl) {
+      kortixApiUrl = rawUrl.replace(/\/$/, '');
+    }
+  } catch { /* keep default */ }
+
   const dockerExec = (token: string) => {
     execSync(
-      `docker exec kortix-sandbox bash -c "printf '%s' '${token}' > /run/s6/container_environment/KORTIX_TOKEN"`,
+      `docker exec kortix-sandbox bash -c "printf '%s' '${token}' > /run/s6/container_environment/KORTIX_TOKEN && printf '%s' '${kortixApiUrl}' > /run/s6/container_environment/KORTIX_API_URL"`,
       { stdio: 'pipe', env: dockerEnv },
     );
   };
@@ -374,10 +387,21 @@ async function injectSandboxToken(sandboxId: string, accountId: string): Promise
   const newKey = await createApiKey({ sandboxId, accountId, title: 'Sandbox Token', type: 'sandbox' });
   try {
     dockerExec(newKey.secretKey);
-    // Restart opencode so it picks up the new token from s6 env
-    try {
-      execSync(`docker exec kortix-sandbox pkill -f opencode-linux-arm64-musl`, { stdio: 'pipe', env: dockerEnv });
-    } catch { /* process may not be running yet — that's fine */ }
+    // Restart opencode so it picks up the new token — retry until it's running
+    const killOpencode = () => {
+      try {
+        execSync(`docker exec kortix-sandbox pkill -f opencode-linux-arm64-musl`, { stdio: 'pipe', env: dockerEnv });
+        return true;
+      } catch { return false; }
+    };
+    if (!killOpencode()) {
+      // Opencode not running yet — wait and retry a few times
+      await new Promise(r => setTimeout(r, 3000));
+      if (!killOpencode()) {
+        await new Promise(r => setTimeout(r, 5000));
+        killOpencode();
+      }
+    }
     console.log('[startup] KORTIX_TOKEN injected into sandbox');
   } catch (e: any) {
     console.error('[startup] Failed to inject KORTIX_TOKEN:', e?.message);

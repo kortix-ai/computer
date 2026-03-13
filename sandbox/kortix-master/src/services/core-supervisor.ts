@@ -38,8 +38,6 @@ const CORE_SPEC_PATH = '/opt/kortix/core/service-spec.json'
 const LEGACY_S6_SERVICES = [
   'svc-opencode-serve',
   'svc-opencode-web',
-  'svc-lss-sync',
-  'svc-opencode-channels',
   'svc-agent-browser-viewer',
   'svc-presentation-viewer',
   'svc-static-web',

@@ -13,9 +13,11 @@ export PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 [ -z "$ANTHROPIC_BASE_URL" ] && unset ANTHROPIC_BASE_URL
 [ -z "$OPENAI_BASE_URL" ] && unset OPENAI_BASE_URL
 
-# Pick up KORTIX_TOKEN written by kortix-api after container start
+# Pick up vars written by kortix-api after container start
 [ -f /run/s6/container_environment/KORTIX_TOKEN ] && \
   export KORTIX_TOKEN="$(cat /run/s6/container_environment/KORTIX_TOKEN)"
+[ -f /run/s6/container_environment/KORTIX_API_URL ] && \
+  export KORTIX_API_URL="$(cat /run/s6/container_environment/KORTIX_API_URL)"
 
 cd /workspace
 exec /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0

@@ -3,8 +3,6 @@
 # Starts immediately; Slack adapter activates only when credentials are present.
 # After OAuth, kortix-api pushes credentials and restarts this service.
 
-if [ -f /opt/kortix/core/service-spec.json ]; then exec sleep infinity; fi
-
 echo "[opencode-channels] Starting on port 3456"
 
 # Kill any stale process holding the port (e.g. after unclean shutdown)
