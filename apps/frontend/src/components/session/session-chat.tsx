@@ -1154,6 +1154,26 @@ function detectCommandFromText(
 		if (!cmd.template) continue;
 		const tpl = cmd.template.trim();
 
+		// For large templates (e.g. onboarding.md), skip regex entirely and do a
+		// fast exact-match: strip the trailing $ARGUMENTS placeholder and check
+		// if rawText matches the body. This handles commands whose template is the
+		// full file content (which opencode sends verbatim as the user message).
+		if (tpl.length > 2000) {
+			// Strip trailing $ARGUMENTS (with optional surrounding whitespace/newlines)
+			const tplBody = tpl.replace(/\s*\$ARGUMENTS\s*$/, "").trimEnd();
+			// Fast check: does rawText equal the template body exactly?
+			if (tplBody.length > 0 && trimmedRawText === tplBody) {
+				return { name: cmd.name, args: undefined };
+			}
+			// Also handle the case where $ARGUMENTS is at the end and the user
+			// provided some text after the template body.
+			if (tplBody.length > 0 && trimmedRawText.startsWith(tplBody)) {
+				const after = trimmedRawText.slice(tplBody.length).trim();
+				return { name: cmd.name, args: after.length > 0 && after.length < 200 ? after : undefined };
+			}
+			continue;
+		}
+
 		// Find the first placeholder position ($1, $2, ..., $ARGUMENTS)
 		const placeholderMatch = tpl.match(/\$(\d+|\bARGUMENTS\b)/);
 		// Use the text before the first placeholder as the prefix to match
@@ -1197,7 +1217,13 @@ function detectCommandFromText(
 		regexSource += escapeRegExp(tpl.slice(lastIndex));
 		regexSource += "$";
 
-		const fullTemplateMatch = trimmedRawText.match(new RegExp(regexSource));
+		let fullTemplateMatch: RegExpMatchArray | null;
+		try {
+			fullTemplateMatch = trimmedRawText.match(new RegExp(regexSource));
+		} catch {
+			// Regex too large or invalid — skip this command template
+			continue;
+		}
 		if (!fullTemplateMatch) continue;
 
 		let args: string | undefined;

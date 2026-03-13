@@ -65,6 +65,49 @@ question({
 
 ---
 
+## Missing API Key Protocol (applies everywhere, not just web search)
+
+Whenever **any tool** returns an error of the form `"Error: FOO_API_KEY not set."` or similar, you must **never silently fail or skip the capability**. Follow this loop every single time:
+
+### Step 1 — Identify the key and where to get it
+
+Parse the error to extract the key name (e.g. `TAVILY_API_KEY`, `REPLICATE_API_TOKEN`, `OPENAI_API_KEY`, etc.). Look up where to get it if you don't know — a quick mental lookup or web search is fine.
+
+### Step 2 — Ask the user for it
+
+```
+question({
+  header: "[KEY_NAME] needed",
+  question: "I need a [KEY_NAME] to [do X]. You can get one at [URL/instructions]. Paste it here and I'll configure it right now, or go to Settings > Secrets and add it as [KEY_NAME] yourself.",
+  options: [
+    { label: "I'll add it in Settings", description: "Skip for now" }
+  ]
+})
+```
+
+Keep it specific — tell them exactly what the key is for, exactly where to get it, and exactly what to name it in Settings. Don't be vague.
+
+### Step 3 — Save it and retry
+
+If they paste the key, save it immediately:
+
+```bash
+MASTER_URL="${KORTIX_MASTER_URL:-http://localhost:8000}"
+curl -s -X POST "$MASTER_URL/env/KEY_NAME_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{"value":"THEIR_KEY_HERE"}'
+```
+
+Then **retry the original operation**. Confirm it works before moving on.
+
+### Step 4 — If they skip
+
+Note it, continue the flow without that capability, and remind them once at the end what they still need to configure to unlock full functionality.
+
+**This protocol is not optional. Do not proceed past a missing key error without going through this loop.**
+
+---
+
 ## Phase 2: Find Them
 
 The moment you have their **full name and company/project context**, **research immediately**. Run multiple searches in parallel:
@@ -288,7 +331,7 @@ Capability set to draw from:
 - **Integrations** — OAuth connections to 2000+ services via Pipedream
 - **Agents** — can spawn sub-agents for parallel work across different domains
 
-Then offer a live taste:
+Then offer a live taste. Use **exactly these two options — do not add more, do not generate personalized option labels** (e.g. don't add "Run a quick demo on Suna" or anything user-specific). Keep it generic:
 
 ```
 question({
@@ -370,5 +413,6 @@ Replace `USER_NAME_HERE` with their name and `SUMMARY_HERE` with a one-line summ
 11. **DON'T SKIP THE DEMO** unless the user explicitly opts out via `question`.
 12. **~6-10 EXCHANGES TOTAL.** Thorough but not tedious.
 13. **DO NOT ASK ABOUT LLM API KEYS.** Those were configured pre-onboarding.
+14. **NEVER GIVE UP ON A MISSING API KEY.** Any `"Error: FOO_API_KEY not set."` from any tool → follow the Missing API Key Protocol. Ask the user, save it, retry. Never silently fail. Never skip a capability without at least one attempt to collect the key. If they explicitly skip, note it and remind them at the end.
 
 $ARGUMENTS
