@@ -237,6 +237,14 @@ export class LocalDockerProvider implements SandboxProvider {
     if (existing) {
       if (existing.status === 'running') {
         await this.syncCoreEnvVars();
+        // If the caller provided a KORTIX_TOKEN (e.g. POST /init/local registered
+        // a new key in the DB), push it into the running container so the container
+        // token always matches the DB. Without this, a warm-started container keeps
+        // its auto-generated token while the DB has a different one.
+        const callerToken = this._lastCreateOpts?.envVars?.KORTIX_TOKEN;
+        if (callerToken) {
+          await this.syncTokenToContainer(callerToken);
+        }
         return existing;
       }
       console.log(`[LOCAL-DOCKER] Starting stopped sandbox...`);
@@ -656,6 +664,31 @@ export class LocalDockerProvider implements SandboxProvider {
     console.log(`[LOCAL-DOCKER] Core env vars synced via fallback (docker exec): ${Object.keys(stale).join(', ')}`);
   }
 
+  /**
+   * Push a KORTIX_TOKEN into a running container so it matches the DB.
+   *
+   * Called by ensure() when the caller (e.g. POST /init/local) registered a
+   * new token in the DB but the container is already running with a stale one.
+   * Uses the same /env API and docker-exec fallback as syncCoreEnvVars.
+   */
+  private async syncTokenToContainer(token: string): Promise<void> {
+    const containerEnv = await this.getContainerEnv();
+    if (containerEnv['KORTIX_TOKEN'] === token) return; // already in sync
+
+    console.log('[LOCAL-DOCKER] Syncing DB-registered KORTIX_TOKEN into running container...');
+    try {
+      await this.postMasterEnv({ KORTIX_TOKEN: token });
+      console.log('[LOCAL-DOCKER] KORTIX_TOKEN synced to container via /env API');
+    } catch {
+      try {
+        this.syncCoreEnvVarsFallback({ KORTIX_TOKEN: token });
+        console.log('[LOCAL-DOCKER] KORTIX_TOKEN synced to container via docker exec fallback');
+      } catch (err: any) {
+        console.error('[LOCAL-DOCKER] Failed to sync KORTIX_TOKEN into container:', err.message || err);
+      }
+    }
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────
 
   private _lastCreateOpts?: CreateSandboxOpts;
@@ -876,7 +909,6 @@ export class LocalDockerProvider implements SandboxProvider {
     console.log(
       `[LOCAL-DOCKER] Sandbox created and started on ports ${PORT_BASE}-${PORT_BASE + 7}`,
     );
-
   }
 
   /**
