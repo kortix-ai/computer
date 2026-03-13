@@ -50,23 +50,26 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
   useSessionSync(sandboxUrl, sessionId);
 
   // Read messages from sync store (single source of truth)
-  const messages = useSyncStore((s) => s.messages[sessionId] || []);
+  // IMPORTANT: don't use `|| []` — creates new array ref each render → infinite loop
+  const messages = useSyncStore((s) => s.messages[sessionId]);
   const sessionStatus = useSyncStore((s) => s.sessionStatus[sessionId]);
+  const safeMessages = useMemo(() => messages ?? [], [messages]);
 
   // Derive busy state
   const isBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
 
   // Group messages into turns
-  const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
+  const turns = useMemo(() => groupMessagesIntoTurns(safeMessages), [safeMessages]);
 
   // Auto-scroll to bottom on new messages
+  const messageCount = safeMessages.length;
   useEffect(() => {
     if (turns.length > 0) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [turns.length, messages.length]);
+  }, [turns.length, messageCount]);
 
   // Send handler — fire-and-forget promptAsync
   const handleSend = useCallback(
@@ -148,12 +151,12 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
     ({ item }: { item: Turn }) => (
       <SessionTurn
         turn={item}
-        allMessages={messages}
+        allMessages={safeMessages}
         sessionStatus={sessionStatus}
         isBusy={isBusy}
       />
     ),
-    [messages, sessionStatus, isBusy],
+    [safeMessages, sessionStatus, isBusy],
   );
 
   const title = session?.title || 'Session';
