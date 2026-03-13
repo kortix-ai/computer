@@ -14,6 +14,7 @@ permission:
   glob: allow
   grep: allow
   image-search: allow
+  instance_dispose: allow
   ltm_save: allow
   ltm_search: allow
   morph_edit: allow
@@ -65,6 +66,24 @@ permission:
   worktree_create: allow
   worktree_delete: allow
   write: allow
+  # kortix-auto-projects tools
+  project_create: allow
+  project_get: allow
+  project_list: allow
+  project_update: allow
+  milestone_create: allow
+  milestone_update: allow
+  milestone_list: allow
+  task_create: allow
+  task_update: allow
+  task_list: allow
+  task_ready: allow
+  task_complete: allow
+  task_fail: allow
+  task_block_human: allow
+  dep_add: allow
+  dep_remove: allow
+  update_log: allow
 triggers:
   - name: "Weekly Reflection"
     enabled: true
@@ -565,6 +584,46 @@ show(action="show", type="error", content="API rate limit exceeded.", title="Gen
 - **`content` required for `text`/`error` type.** Supports markdown.
 - **`title` strongly recommended.** The frontend uses it as the heading.
 - **Call once per deliverable.** Multiple outputs = multiple calls.
+
+---
+
+## Instance Dispose — Config Reload Protocol
+
+**OpenCode caches skills, agents, tools, config, and MCP connections at startup.** When you
+edit files in `.opencode/` (config, agents, skills, tools, plugins), the server won't pick up
+changes until `instance.dispose()` is called. Dispose tears down cached state and rescans
+everything from disk.
+
+**There is NO automatic file watcher.** Editing `.opencode/` files is safe — nothing will
+abort your session automatically. You must explicitly trigger a dispose when you want changes
+to take effect.
+
+### What dispose does
+- Tears down all cached skills, agents, tools, commands, and config
+- Reconnects all MCP servers (memory, context7, etc.)
+- Emits `server.instance.disposed` SSE event so the frontend refreshes
+- Active sessions may error with "The operation was aborted." if mid-operation
+
+### When dispose happens automatically (you don't need to do anything)
+- **Marketplace installs** — the frontend calls `client.instance.dispose()` after `ocx add`
+- **Skill CRUD via UI** — `skills-api.ts` calls dispose after create/update/delete
+
+### When YOU must trigger dispose (use the `instance_dispose` tool)
+- After editing `opencode.jsonc` or `ocx.jsonc`
+- After editing agent files (`agents/*.md`)
+- After editing tool files (`tools/*.ts`)
+- After editing plugin code (`plugin/**/*`)
+- After editing command files (`commands/*.md`)
+- After editing skill files (`skills/**/*`) outside the marketplace UI
+
+### How to safely edit .opencode/ config files
+
+1. **Finish all current work first.** Complete every pending tool call and operation.
+2. **Make the edit** (opencode.jsonc, agent files, skill files, etc.).
+3. **Call `instance_dispose`** with a reason — this is the LAST action in your turn.
+4. After dispose, the user must send a new message to continue with updated config.
+
+**NEVER** call `instance_dispose` mid-task. It is always the absolute LAST thing you do.
 
 ---
 

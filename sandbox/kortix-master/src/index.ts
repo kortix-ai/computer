@@ -10,7 +10,12 @@ import { buildMergedSpec } from './services/spec-merger'
 import { proxyToOpenCode } from './services/proxy'
 import { SecretStore } from './services/secret-store'
 import { syncAuthToSecrets, startWatcher as startAuthWatcher } from './services/auth-sync'
-import { startHotReload } from './services/opencode-hotreload'
+// REMOVED: opencode-hotreload watcher — it auto-disposed the OpenCode instance on
+// ANY .opencode/ file change, killing all active agent sessions mid-operation.
+// Dispose is now handled explicitly by:
+//   1. Marketplace installs (frontend calls client.instance.dispose() after ocx add)
+//   2. Skill CRUD (skills-api.ts calls client.instance.dispose() after mutations)
+//   3. Agent tool (instance_dispose tool for manual config reload)
 import envRouter from './routes/env'
 import lssRouter from './routes/lss'
 import proxyRouter from './routes/proxy'
@@ -24,6 +29,7 @@ import coreRouter from './routes/core'
 import cronRouter from './routes/cron'
 import triggersRouter from './routes/triggers'
 import marketplaceRouter from './routes/marketplace'
+import projectsRouter from './routes/projects'
 import { coreSupervisor } from './services/core-supervisor'
 import { getCronManager } from './services/cron-manager'
 import { config } from './config'
@@ -100,9 +106,7 @@ await syncAuthToSecrets(secretStore).catch(err =>
 // File watcher: auto-sync when auth.json changes at runtime
 startAuthWatcher(secretStore)
 
-// File watcher: auto-dispose OpenCode instance when skills/agents change on disk
-// Handles marketplace installs (via PTY) and agent-created skills/agents.
-startHotReload()
+// REMOVED: startHotReload() — see comment at top of file for rationale.
 
 // Updates are Docker image-based — no crash recovery needed
 
@@ -329,6 +333,7 @@ app.route('/kortix/core', coreRouter)
 
 // Marketplace — skill/component install from registry
 app.route('/kortix/marketplace', marketplaceRouter)
+app.route('/kortix/projects', projectsRouter)
 
 // Integration proxy — /api/integrations/* forwards to kortix-api
 app.route('/api/integrations', integrationsRouter)
