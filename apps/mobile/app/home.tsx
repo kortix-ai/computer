@@ -11,7 +11,9 @@ import {
   View,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Stack, useRouter } from 'expo-router';
@@ -23,7 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuthContext } from '@/contexts';
 import { useSandboxContext } from '@/contexts/SandboxContext';
-import { useSessions, useCreateSession } from '@/lib/platform/hooks';
+import { useSessions, useCreateSession, useDeleteSession, useArchiveSession, useUnarchiveSession } from '@/lib/platform/hooks';
 import { useSyncStore } from '@/lib/opencode/sync-store';
 import { getAuthToken } from '@/api/config';
 import type { Session } from '@/lib/opencode/types';
@@ -43,17 +45,31 @@ function SessionListItem({
   item,
   isActive,
   onPress,
+  onArchive,
+  onDelete,
 }: {
   item: Session;
   isActive: boolean;
   onPress: (s: Session) => void;
+  onArchive?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const mutedColor = isDark ? '#999999' : '#6e6e6e';
   const status = useSyncStore((s) => s.sessionStatus[item.id]);
   const isSessionBusy = status?.type === 'busy';
 
   return (
     <TouchableOpacity
       onPress={() => onPress(item)}
+      onLongPress={() => {
+        Alert.alert(item.title || 'Session', undefined, [
+          { text: 'Archive', onPress: () => onArchive?.(item.id) },
+          { text: 'Delete', style: 'destructive', onPress: () => onDelete?.(item.id) },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+      }}
       className={`rounded-lg px-3 py-2.5 mb-0.5 ${isActive ? 'bg-accent' : ''}`}
       activeOpacity={0.6}
     >
@@ -69,6 +85,26 @@ function SessionListItem({
         >
           {item.title || 'New Session'}
         </Text>
+        {isActive && (
+          <View className="flex-row items-center ml-2">
+            <TouchableOpacity
+              onPress={() => onArchive?.(item.id)}
+              className="p-1.5 mr-0.5"
+              hitSlop={6}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="archive-outline" size={16} color={mutedColor} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => onDelete?.(item.id)}
+              className="p-1.5"
+              hitSlop={6}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="trash-outline" size={16} color={mutedColor} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -92,6 +128,23 @@ export default function HomeScreen() {
   const { data: sessions = [], isLoading: sessionsLoading } =
     useSessions(sandboxUrl);
   const createSession = useCreateSession(sandboxUrl);
+  const deleteSession = useDeleteSession(sandboxUrl);
+  const archiveSession = useArchiveSession(sandboxUrl);
+  const unarchiveSession = useUnarchiveSession(sandboxUrl);
+
+  // Split sessions into active and archived
+  const activeSessions = useMemo(
+    () => sessions.filter((s) => !(s.time as any).archived),
+    [sessions],
+  );
+  const archivedSessions = useMemo(
+    () => sessions.filter((s) => !!(s.time as any).archived),
+    [sessions],
+  );
+
+  // Collapsible state
+  const [sessionsExpanded, setSessionsExpanded] = useState(true);
+  const [archivedExpanded, setArchivedExpanded] = useState(false);
 
   // Agent/model/variant for dashboard input
   const { data: agents = [] } = useOpenCodeAgents(sandboxUrl);
@@ -126,6 +179,37 @@ export default function HomeScreen() {
   }, []);
 
   const handleBack = useCallback(() => setActiveSessionId(null), []);
+
+  const handleArchive = useCallback((sessionId: string) => {
+    Alert.alert('Archive Session', 'Move this session to archived?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Archive',
+        onPress: () => {
+          if (activeSessionId === sessionId) setActiveSessionId(null);
+          archiveSession.mutate(sessionId);
+        },
+      },
+    ]);
+  }, [archiveSession, activeSessionId]);
+
+  const handleUnarchive = useCallback((sessionId: string) => {
+    unarchiveSession.mutate(sessionId);
+  }, [unarchiveSession]);
+
+  const handleDelete = useCallback((sessionId: string) => {
+    Alert.alert('Delete Session', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          if (activeSessionId === sessionId) setActiveSessionId(null);
+          deleteSession.mutate(sessionId);
+        },
+      },
+    ]);
+  }, [deleteSession, activeSessionId]);
 
   const handleDashboardSend = useCallback(
     async (text: string, options: PromptOptions) => {
@@ -195,7 +279,7 @@ export default function HomeScreen() {
         style={{ paddingTop: insets.top }}
       >
         {/* Search + New session */}
-        <View className="flex-row items-center px-3 pt-2 pb-3">
+        <View className="flex-row items-center px-3 pt-2 pb-2">
           <View className="flex-1 flex-row items-center rounded-xl bg-card border border-border px-3 py-2 mr-2">
             <Ionicons name="search-outline" size={18} color={mutedColor} />
             <Text className="text-sm ml-2 text-muted-foreground">Search</Text>
@@ -209,40 +293,115 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Sessions header */}
-        <View className="flex-row items-center justify-between px-5 pt-2 pb-1">
+        {/* Marketplace */}
+        <TouchableOpacity
+          className="flex-row items-center px-5 py-2.5"
+          activeOpacity={0.6}
+        >
+          <Ionicons name="sparkles-outline" size={18} color={iconColor} />
+          <Text className="text-sm ml-3 text-foreground">Marketplace</Text>
+        </TouchableOpacity>
+
+        {/* Sessions header (collapsible) */}
+        <TouchableOpacity
+          onPress={() => setSessionsExpanded((v) => !v)}
+          className="flex-row items-center justify-between px-5 py-2.5"
+          activeOpacity={0.6}
+        >
           <View className="flex-row items-center">
             <Ionicons name="list-outline" size={18} color={iconColor} />
-            <Text className="text-sm font-medium ml-2 text-foreground">Sessions</Text>
+            <Text className="text-sm font-medium ml-3 text-foreground">Sessions</Text>
           </View>
-          <Ionicons name="chevron-down" size={16} color={mutedColor} />
-        </View>
+          <Ionicons
+            name={sessionsExpanded ? 'chevron-down' : 'chevron-forward'}
+            size={16}
+            color={mutedColor}
+          />
+        </TouchableOpacity>
 
-        {/* Session list */}
+        {/* Session list + Archived */}
         {sessionsLoading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="small" color={mutedColor} />
           </View>
-        ) : (
-          <FlatList
-            data={sessions}
-            keyExtractor={(item) => item.id}
+        ) : sessionsExpanded ? (
+          <ScrollView
+            className="flex-1"
             contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 20 }}
-            renderItem={({ item }) => (
-              <SessionListItem
-                item={item}
-                isActive={item.id === activeSessionId}
-                onPress={handleSessionPress}
-              />
+          >
+            {/* Archived section (collapsible) */}
+            {archivedSessions.length > 0 && (
+              <>
+                <TouchableOpacity
+                  onPress={() => setArchivedExpanded((v) => !v)}
+                  className="flex-row items-center justify-between px-3 py-2.5"
+                  activeOpacity={0.6}
+                >
+                  <View className="flex-row items-center">
+                    <Ionicons name="archive-outline" size={16} color={mutedColor} />
+                    <Text className="text-sm ml-2 text-muted-foreground">Archived</Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <View className="bg-muted rounded-full px-2 py-0.5 mr-1">
+                      <Text className="text-xs text-muted-foreground">{archivedSessions.length}</Text>
+                    </View>
+                    <Ionicons
+                      name={archivedExpanded ? 'chevron-down' : 'chevron-forward'}
+                      size={14}
+                      color={mutedColor}
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                {archivedExpanded && archivedSessions.map((item) => (
+                  <View key={item.id} className="flex-row items-center rounded-lg px-3 py-2.5 mb-0.5">
+                    <Text
+                      className="flex-1 text-sm text-muted-foreground"
+                      numberOfLines={1}
+                    >
+                      {item.title || 'New Session'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => handleUnarchive(item.id)}
+                      className="p-1.5 mr-1"
+                      hitSlop={6}
+                      activeOpacity={0.6}
+                    >
+                      <Ionicons name="archive-outline" size={16} color={mutedColor} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDelete(item.id)}
+                      className="p-1.5"
+                      hitSlop={6}
+                      activeOpacity={0.6}
+                    >
+                      <Ionicons name="trash-outline" size={16} color={mutedColor} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </>
             )}
-            ListEmptyComponent={
+
+            {/* Active sessions */}
+            {activeSessions.length === 0 ? (
               <View className="items-center py-8">
-                <Text className="text-sm text-muted-foreground">
-                  No sessions yet
-                </Text>
+                <Text className="text-sm text-muted-foreground">No sessions yet</Text>
               </View>
-            }
-          />
+            ) : (
+              activeSessions.map((item) => (
+                <SessionListItem
+                  key={item.id}
+                  item={item}
+                  isActive={item.id === activeSessionId}
+                  onPress={handleSessionPress}
+                  onArchive={handleArchive}
+                  onDelete={handleDelete}
+                />
+              ))
+            )}
+          </ScrollView>
+        ) : (
+          <View className="flex-1" />
         )}
 
         {/* Bottom: user info */}
@@ -251,7 +410,6 @@ export default function HomeScreen() {
           style={{ paddingBottom: insets.bottom + 8 }}
         >
           <View className="flex-row items-center">
-            {/* Avatar initial */}
             <View className="h-8 w-8 rounded-full bg-muted items-center justify-center mr-3">
               <Text className="text-xs font-semibold text-muted-foreground uppercase">
                 {userDisplayName.charAt(0)}
@@ -270,13 +428,18 @@ export default function HomeScreen() {
   }, [
     isDark,
     insets,
-    sessions,
+    activeSessions,
+    archivedSessions,
     sessionsLoading,
+    sessionsExpanded,
+    archivedExpanded,
     activeSessionId,
     userDisplayName,
     handleNewSession,
     handleSessionPress,
-    handleDrawerClose,
+    handleArchive,
+    handleUnarchive,
+    handleDelete,
   ]);
 
   // ── Render ──
