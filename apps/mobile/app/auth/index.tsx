@@ -149,7 +149,7 @@ export default function AuthScreen() {
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
       <KeyboardAvoidingView
-        className={`flex-1 ${isDark ? 'bg-black' : 'bg-zinc-50'}`}
+        className="flex-1 bg-background"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View
@@ -158,11 +158,7 @@ export default function AuthScreen() {
         >
           {/* Card */}
           <View
-            className={`w-full max-w-sm rounded-2xl px-6 py-8 ${
-              isDark
-                ? 'bg-zinc-900 border border-zinc-800'
-                : 'bg-white border border-zinc-200'
-            }`}
+            className="w-full max-w-sm rounded-2xl px-6 py-8 bg-card border border-border"
             style={{
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
@@ -173,18 +169,10 @@ export default function AuthScreen() {
           >
             {/* Header */}
             <View className="items-center mb-8">
-              <Text
-                className={`text-xl font-semibold mb-1 ${
-                  isDark ? 'text-white' : 'text-zinc-900'
-                }`}
-              >
+              <Text className="text-xl font-semibold mb-1 text-foreground">
                 Sign in to Kortix
               </Text>
-              <Text
-                className={`text-sm ${
-                  isDark ? 'text-zinc-500' : 'text-zinc-400'
-                }`}
-              >
+              <Text className="text-sm text-muted-foreground">
                 Your AI Computer
               </Text>
             </View>
@@ -195,7 +183,7 @@ export default function AuthScreen() {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email address"
-                placeholderTextColor={isDark ? '#52525b' : '#a1a1aa'}
+                placeholderTextColor={isDark ? '#999999' : '#6e6e6e'}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -203,11 +191,7 @@ export default function AuthScreen() {
                 returnKeyType="next"
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 editable={!loading}
-                className={`rounded-xl px-4 py-3.5 text-base ${
-                  isDark
-                    ? 'bg-zinc-800 text-white'
-                    : 'bg-zinc-100 text-zinc-900'
-                }`}
+                className="rounded-xl px-4 py-3.5 text-base bg-muted text-foreground"
               />
             </View>
 
@@ -218,24 +202,20 @@ export default function AuthScreen() {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Password"
-                placeholderTextColor={isDark ? '#52525b' : '#a1a1aa'}
+                placeholderTextColor={isDark ? '#999999' : '#6e6e6e'}
                 secureTextEntry
                 autoComplete="password"
                 returnKeyType="go"
                 onSubmitEditing={handleSignIn}
                 editable={!loading}
-                className={`rounded-xl px-4 py-3.5 text-base ${
-                  isDark
-                    ? 'bg-zinc-800 text-white'
-                    : 'bg-zinc-100 text-zinc-900'
-                }`}
+                className="rounded-xl px-4 py-3.5 text-base bg-muted text-foreground"
               />
             </View>
 
             {/* Error message */}
             {errorMessage && (
-              <View className="mb-4 rounded-lg bg-red-500/10 px-3 py-2">
-                <Text className="text-sm text-red-500 text-center">
+              <View className="mb-4 rounded-lg bg-destructive/10 px-3 py-2">
+                <Text className="text-sm text-destructive text-center">
                   {errorMessage}
                 </Text>
               </View>
@@ -245,22 +225,18 @@ export default function AuthScreen() {
             <TouchableOpacity
               onPress={handleSignIn}
               disabled={loading}
-              className={`rounded-xl py-3.5 items-center ${
+              className={`rounded-xl py-3.5 items-center bg-primary ${
                 loading ? 'opacity-70' : ''
-              } ${isDark ? 'bg-white' : 'bg-zinc-900'}`}
+              }`}
               activeOpacity={0.8}
             >
               {loading ? (
                 <ActivityIndicator
                   size="small"
-                  color={isDark ? '#18181b' : '#ffffff'}
+                  color={isDark ? '#121215' : '#F8F8F8'}
                 />
               ) : (
-                <Text
-                  className={`text-base font-semibold ${
-                    isDark ? 'text-zinc-900' : 'text-white'
-                  }`}
-                >
+                <Text className="text-base font-semibold text-primary-foreground">
                   Sign in
                 </Text>
               )}

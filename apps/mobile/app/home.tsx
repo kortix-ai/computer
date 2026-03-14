@@ -60,32 +60,22 @@ function SessionListItem({
   return (
     <TouchableOpacity
       onPress={() => onPress(item)}
-      className={`rounded-lg px-3 py-3 mb-1 ${
-        isActive ? (isDark ? 'bg-zinc-800' : 'bg-zinc-100') : ''
-      }`}
+      className={`rounded-lg px-3 py-3 mb-1 ${isActive ? 'bg-accent' : ''}`}
       activeOpacity={0.6}
     >
       <View className="flex-row items-center">
         {isSessionBusy && (
-          <View className="h-2 w-2 rounded-full bg-green-500 mr-2" />
+          <View className="h-2 w-2 rounded-full bg-primary mr-2" />
         )}
         <Text
           className={`flex-1 text-sm ${
-            isActive
-              ? isDark
-                ? 'text-white font-medium'
-                : 'text-zinc-900 font-medium'
-              : isDark
-                ? 'text-zinc-300'
-                : 'text-zinc-700'
+            isActive ? 'text-foreground font-medium' : 'text-muted-foreground'
           }`}
           numberOfLines={1}
         >
           {item.title || 'Untitled session'}
         </Text>
-        <Text
-          className={`text-xs ml-2 ${isDark ? 'text-zinc-600' : 'text-zinc-400'}`}
-        >
+        <Text className="text-xs ml-2 text-muted-foreground/60">
           {dateStr}
         </Text>
       </View>
@@ -203,27 +193,21 @@ export default function HomeScreen() {
   const renderDrawerContent = useCallback(() => {
     return (
       <View
-        className={`flex-1 ${isDark ? 'bg-zinc-950' : 'bg-white'}`}
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top }}
       >
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 py-3">
-          <Text
-            className={`text-lg font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}
-          >
+          <Text className="text-lg font-bold text-foreground">
             Sessions
           </Text>
           <TouchableOpacity
             onPress={handleNewSession}
-            className={`flex-row items-center rounded-lg px-3 py-2 ${
-              isDark ? 'bg-zinc-800' : 'bg-zinc-100'
-            }`}
+            className="flex-row items-center rounded-lg px-3 py-2 bg-accent"
             activeOpacity={0.7}
           >
-            <Ionicons name="add" size={18} color={isDark ? '#fafafa' : '#18181b'} />
-            <Text
-              className={`text-sm font-medium ml-1 ${isDark ? 'text-white' : 'text-zinc-900'}`}
-            >
+            <Ionicons name="add" size={18} color={isDark ? '#F8F8F8' : '#121215'} />
+            <Text className="text-sm font-medium ml-1 text-foreground">
               New
             </Text>
           </TouchableOpacity>
@@ -232,7 +216,7 @@ export default function HomeScreen() {
         {/* Session list */}
         {sessionsLoading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="small" color={isDark ? '#a1a1aa' : '#71717a'} />
+            <ActivityIndicator size="small" color={isDark ? '#999999' : '#6e6e6e'} />
           </View>
         ) : (
           <FlatList
@@ -248,7 +232,7 @@ export default function HomeScreen() {
             )}
             ListEmptyComponent={
               <View className="items-center py-8">
-                <Text className={`text-sm ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                <Text className="text-sm text-muted-foreground">
                   No sessions yet
                 </Text>
               </View>
@@ -258,7 +242,7 @@ export default function HomeScreen() {
 
         {/* Settings */}
         <View
-          className={`border-t px-4 py-3 ${isDark ? 'border-zinc-800' : 'border-zinc-200'}`}
+          className="border-t border-border px-4 py-3"
           style={{ paddingBottom: insets.bottom + 8 }}
         >
           <TouchableOpacity
@@ -269,9 +253,9 @@ export default function HomeScreen() {
             <Ionicons
               name="settings-outline"
               size={20}
-              color={isDark ? '#a1a1aa' : '#71717a'}
+              color={isDark ? '#999999' : '#6e6e6e'}
             />
-            <Text className={`text-sm ml-2 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+            <Text className="text-sm ml-2 text-muted-foreground">
               Settings
             </Text>
           </TouchableOpacity>
@@ -310,12 +294,12 @@ export default function HomeScreen() {
         swipeMinDistance={30}
         renderDrawerContent={renderDrawerContent}
       >
-        <View className={`flex-1 ${isDark ? 'bg-black' : 'bg-white'}`}>
+        <View className="flex-1 bg-background">
           {/* Loading sandbox */}
           {sandboxLoading ? (
             <View className="flex-1 items-center justify-center">
-              <ActivityIndicator size="large" color={isDark ? '#a1a1aa' : '#71717a'} />
-              <Text className={`text-sm mt-3 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+              <ActivityIndicator size="large" color={isDark ? '#999999' : '#6e6e6e'} />
+              <Text className="text-sm mt-3 text-muted-foreground">
                 Connecting to sandbox...
               </Text>
             </View>
@@ -323,10 +307,10 @@ export default function HomeScreen() {
           /* Sandbox error */
           ) : sandboxErrorMsg ? (
             <View className="flex-1 items-center justify-center px-8">
-              <Text className={`text-base font-medium mb-2 ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+              <Text className="text-base font-medium mb-2 text-foreground">
                 Connection Error
               </Text>
-              <Text className={`text-sm text-center ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              <Text className="text-sm text-center text-muted-foreground">
                 {sandboxErrorMsg}
               </Text>
             </View>
@@ -337,10 +321,10 @@ export default function HomeScreen() {
 
           /* Dashboard */
           ) : (
-            <View className={`flex-1 ${isDark ? 'bg-black' : 'bg-white'}`}>
+            <View className="flex-1 bg-background">
               <View
                 style={{ paddingTop: insets.top }}
-                className={`px-4 pb-3 ${isDark ? 'bg-black' : 'bg-white'}`}
+                className="px-4 pb-3 bg-background"
               >
                 <View className="flex-row items-center">
                   <TouchableOpacity
@@ -348,19 +332,19 @@ export default function HomeScreen() {
                     className="mr-3 p-1"
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="menu" size={24} color={isDark ? '#fafafa' : '#18181b'} />
+                    <Ionicons name="menu" size={24} color={isDark ? '#F8F8F8' : '#121215'} />
                   </TouchableOpacity>
-                  <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+                  <Text className="text-lg font-bold text-foreground">
                     Kortix
                   </Text>
                 </View>
               </View>
 
               <View className="flex-1 items-center justify-center px-8">
-                <Text className={`text-2xl font-bold mb-2 ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+                <Text className="text-2xl font-bold mb-2 text-foreground">
                   What can I help with?
                 </Text>
-                <Text className={`text-sm text-center ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                <Text className="text-sm text-center text-muted-foreground">
                   Start a conversation or select a session from the menu.
                 </Text>
               </View>

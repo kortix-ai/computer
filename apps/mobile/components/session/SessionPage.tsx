@@ -202,13 +202,11 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
   const title = session?.title || 'New Session';
 
   return (
-    <View className={`flex-1 ${isDark ? 'bg-black' : 'bg-white'}`}>
+    <View className="flex-1 bg-background">
       {/* Header */}
       <View
         style={{ paddingTop: insets.top }}
-        className={`border-b px-4 pb-3 ${
-          isDark ? 'border-zinc-800 bg-black' : 'border-zinc-200 bg-white'
-        }`}
+        className="border-b border-border bg-background px-4 pb-3"
       >
         <View className="flex-row items-center justify-between">
           <TouchableOpacity
@@ -216,19 +214,19 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
             className="mr-3 p-1"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="chevron-back" size={24} color={isDark ? '#fafafa' : '#18181b'} />
+            <Ionicons name="chevron-back" size={24} color={isDark ? '#F8F8F8' : '#121215'} />
           </TouchableOpacity>
           <View className="flex-1">
             <Text
-              className={`text-base font-semibold ${isDark ? 'text-white' : 'text-zinc-900'}`}
+              className="text-base font-semibold text-foreground"
               numberOfLines={1}
             >
               {title}
             </Text>
             {isBusy && (
               <View className="flex-row items-center mt-0.5">
-                <View className="h-1.5 w-1.5 rounded-full bg-green-500 mr-1" />
-                <Text className="text-xs text-green-500">Working</Text>
+                <View className="h-1.5 w-1.5 rounded-full bg-muted-foreground mr-1" />
+                <Text className="text-xs text-muted-foreground">Working</Text>
               </View>
             )}
           </View>

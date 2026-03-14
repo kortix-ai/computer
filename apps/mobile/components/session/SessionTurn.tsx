@@ -121,16 +121,8 @@ export function SessionTurn({
     <View className="mb-4">
       {/* User message */}
       <View className="flex-row justify-end mb-2 px-4">
-        <View
-          className={`rounded-2xl rounded-br-md px-4 py-3 max-w-[85%] ${
-            isDark ? 'bg-zinc-800' : 'bg-zinc-100'
-          }`}
-        >
-          <Text
-            className={`text-[15px] leading-[22px] ${
-              isDark ? 'text-zinc-100' : 'text-zinc-900'
-            }`}
-          >
+        <View className="rounded-2xl rounded-br-md px-4 py-3 max-w-[85%] bg-card border border-border">
+          <Text className="text-[15px] leading-[22px] text-foreground">
             {userText}
           </Text>
         </View>
@@ -151,26 +143,20 @@ export function SessionTurn({
                 return (
                   <View
                     key={tool.id}
-                    className={`flex-row items-center rounded-lg px-3 py-2 mb-1 ${
-                      isDark ? 'bg-zinc-900' : 'bg-zinc-50'
-                    }`}
+                    className="flex-row items-center rounded-lg px-3 py-2 mb-1 bg-muted/20 border border-border/40"
                   >
                     <Text className="text-xs mr-2">
                       {isRunning ? '⏳' : isError ? '❌' : '✅'}
                     </Text>
                     <Text
-                      className={`text-sm font-medium ${
-                        isDark ? 'text-zinc-300' : 'text-zinc-700'
-                      }`}
+                      className="text-sm font-medium text-foreground"
                       numberOfLines={1}
                     >
                       {info.title}
                     </Text>
                     {info.subtitle && (
                       <Text
-                        className={`text-sm ml-1 flex-1 ${
-                          isDark ? 'text-zinc-500' : 'text-zinc-400'
-                        }`}
+                        className="text-sm ml-1 flex-1 text-muted-foreground"
                         numberOfLines={1}
                       >
                         {info.subtitle}
@@ -184,17 +170,9 @@ export function SessionTurn({
 
           {/* Reasoning */}
           {!!reasoningText && (
-            <View
-              className={`rounded-lg px-3 py-2 mb-2 border-l-2 ${
-                isDark
-                  ? 'bg-zinc-900/50 border-zinc-700'
-                  : 'bg-zinc-50 border-zinc-300'
-              }`}
-            >
+            <View className="rounded-lg px-3 py-2 mb-2 border-l-2 bg-muted/20 border-border/30">
               <Text
-                className={`text-xs italic ${
-                  isDark ? 'text-zinc-500' : 'text-zinc-400'
-                }`}
+                className="text-xs italic text-muted-foreground/65"
                 numberOfLines={3}
               >
                 {reasoningText}
@@ -212,12 +190,8 @@ export function SessionTurn({
           {/* Working indicator */}
           {working && !response && (
             <View className="flex-row items-center py-2">
-              <View className="h-2 w-2 rounded-full bg-green-500 mr-2 animate-pulse" />
-              <Text
-                className={`text-sm ${
-                  isDark ? 'text-zinc-400' : 'text-zinc-500'
-                }`}
-              >
+              <View className="h-2 w-2 rounded-full bg-foreground mr-2 animate-pulse" />
+              <Text className="text-sm text-muted-foreground">
                 {statusText || 'Thinking...'}
               </Text>
             </View>
@@ -226,12 +200,8 @@ export function SessionTurn({
           {/* Working status with response */}
           {working && !!response && (
             <View className="flex-row items-center mt-1">
-              <View className="h-1.5 w-1.5 rounded-full bg-green-500 mr-1.5" />
-              <Text
-                className={`text-xs ${
-                  isDark ? 'text-zinc-500' : 'text-zinc-400'
-                }`}
-              >
+              <View className="h-1.5 w-1.5 rounded-full bg-foreground mr-1.5" />
+              <Text className="text-xs text-muted-foreground">
                 {statusText || 'Working...'}
               </Text>
             </View>
@@ -239,18 +209,14 @@ export function SessionTurn({
 
           {/* Error */}
           {!!turnError && !working && (
-            <View className="mt-2 rounded-lg bg-red-500/10 px-3 py-2">
-              <Text className="text-sm text-red-500">{turnError}</Text>
+            <View className="mt-2 rounded-lg bg-destructive/10 px-3 py-2">
+              <Text className="text-sm text-destructive">{turnError}</Text>
             </View>
           )}
 
           {/* Duration (when done) */}
           {!working && duration && duration > 0 && (
-            <Text
-              className={`text-xs mt-1 ${
-                isDark ? 'text-zinc-600' : 'text-zinc-400'
-              }`}
-            >
+            <Text className="text-xs mt-1 text-muted-foreground/70">
               {formatDuration(duration)}
             </Text>
           )}

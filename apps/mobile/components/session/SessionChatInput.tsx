@@ -170,16 +170,10 @@ export function SessionChatInput({
 
   return (
     <>
-      <View
-        className={`border-t ${isDark ? 'border-zinc-800 bg-black' : 'border-zinc-200 bg-white'}`}
-      >
+      <View className="border-t border-border bg-background">
         {/* Text input area */}
         <View className="px-4 pt-2">
-          <View
-            className={`rounded-2xl px-4 pt-2 pb-1 ${
-              isDark ? 'bg-zinc-900' : 'bg-zinc-100'
-            }`}
-          >
+          <View className="rounded-2xl px-4 pt-2 pb-1 bg-card border border-border">
             {/* Animated placeholder overlay */}
             {showAnimatedPlaceholder && (
               <Animated.Text
@@ -189,7 +183,7 @@ export function SessionChatInput({
                   left: 16,
                   top: Platform.OS === 'ios' ? 14 : 12,
                   fontSize: 16,
-                  color: isDark ? '#52525b' : '#a1a1aa',
+                  color: isDark ? '#999999' : '#6e6e6e',  // muted-foreground
                   opacity: fadeAnim,
                   transform: [{ translateY: slideAnim }],
                 }}
@@ -209,7 +203,7 @@ export function SessionChatInput({
                 maxHeight: 120,
                 fontSize: 16,
                 lineHeight: 22,
-                color: isDark ? '#fafafa' : '#18181b',
+                color: isDark ? '#F8F8F8' : '#121215',  // foreground
                 paddingTop: Platform.OS === 'ios' ? 6 : 4,
                 paddingBottom: Platform.OS === 'ios' ? 6 : 4,
                 minHeight: 36,
@@ -228,23 +222,17 @@ export function SessionChatInput({
                 {agents.length > 0 && (
                   <TouchableOpacity
                     onPress={() => setShowAgentSheet(true)}
-                    className={`flex-row items-center rounded-lg px-2 py-1 mr-1.5 ${
-                      isDark ? 'bg-zinc-800' : 'bg-zinc-200/70'
-                    }`}
+                    className="flex-row items-center rounded-lg px-2 py-1 mr-1.5 bg-muted"
                     activeOpacity={0.6}
                     hitSlop={4}
                   >
-                    <Text
-                      className={`text-xs font-medium capitalize ${
-                        isDark ? 'text-zinc-300' : 'text-zinc-600'
-                      }`}
-                    >
+                    <Text className="text-xs font-medium capitalize text-muted-foreground">
                       {agent?.name || 'Agent'}
                     </Text>
                     <Ionicons
                       name="chevron-down"
                       size={11}
-                      color={isDark ? '#a1a1aa' : '#71717a'}
+                      color={isDark ? '#999999' : '#6e6e6e'}
                       style={{ marginLeft: 2 }}
                     />
                   </TouchableOpacity>
@@ -254,16 +242,12 @@ export function SessionChatInput({
                 {models.length > 0 && (
                   <TouchableOpacity
                     onPress={() => setShowModelSheet(true)}
-                    className={`flex-row items-center rounded-lg px-2 py-1 mr-1.5 ${
-                      isDark ? 'bg-zinc-800' : 'bg-zinc-200/70'
-                    }`}
+                    className="flex-row items-center rounded-lg px-2 py-1 mr-1.5 bg-muted"
                     activeOpacity={0.6}
                     hitSlop={4}
                   >
                     <Text
-                      className={`text-xs font-medium ${
-                        isDark ? 'text-zinc-300' : 'text-zinc-600'
-                      }`}
+                      className="text-xs font-medium text-muted-foreground"
                       numberOfLines={1}
                       style={{ maxWidth: 130 }}
                     >
@@ -272,7 +256,7 @@ export function SessionChatInput({
                     <Ionicons
                       name="chevron-down"
                       size={11}
-                      color={isDark ? '#a1a1aa' : '#71717a'}
+                      color={isDark ? '#999999' : '#6e6e6e'}
                       style={{ marginLeft: 2 }}
                     />
                   </TouchableOpacity>
@@ -283,18 +267,14 @@ export function SessionChatInput({
                   <TouchableOpacity
                     onPress={onVariantCycle}
                     className={`rounded-lg px-2 py-1 ${
-                      variant
-                        ? isDark ? 'bg-blue-500/20' : 'bg-blue-50'
-                        : isDark ? 'bg-zinc-800' : 'bg-zinc-200/70'
+                      variant ? 'bg-primary/10' : 'bg-muted'
                     }`}
                     activeOpacity={0.6}
                     hitSlop={4}
                   >
                     <Text
                       className={`text-xs font-medium ${
-                        variant
-                          ? isDark ? 'text-blue-400' : 'text-blue-600'
-                          : isDark ? 'text-zinc-400' : 'text-zinc-500'
+                        variant ? 'text-foreground' : 'text-muted-foreground'
                       }`}
                     >
                       {variantLabel}
@@ -308,26 +288,24 @@ export function SessionChatInput({
                 {isBusy ? (
                   <TouchableOpacity
                     onPress={onStop}
-                    className="h-7 w-7 items-center justify-center rounded-full bg-red-500"
+                    className="h-7 w-7 items-center justify-center rounded-full bg-primary"
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="stop" size={14} color="white" />
+                    <Ionicons name="stop" size={14} color={isDark ? '#121215' : '#F8F8F8'} />
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
                     onPress={handleSubmit}
                     disabled={!canSend}
                     className={`h-7 w-7 items-center justify-center rounded-full ${
-                      canSend
-                        ? 'bg-zinc-900 dark:bg-white'
-                        : 'bg-zinc-300 dark:bg-zinc-700'
+                      canSend ? 'bg-primary' : 'bg-muted'
                     }`}
                     activeOpacity={0.7}
                   >
                     <Ionicons
                       name="arrow-up"
                       size={16}
-                      color={canSend ? (isDark ? '#18181b' : 'white') : '#a1a1aa'}
+                      color={canSend ? (isDark ? '#121215' : '#F8F8F8') : (isDark ? '#999999' : '#6e6e6e')}
                     />
                   </TouchableOpacity>
                 )}

@@ -112,7 +112,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'ios') {
       const activeScheme = colorScheme ?? 'light';
-      const backgroundColor = activeScheme === 'dark' ? '#000000' : '#FFFFFF';
+      const backgroundColor = activeScheme === 'dark' ? '#121215' : '#F5F5F5';
       SystemUI.setBackgroundColorAsync(backgroundColor);
     }
   }, [colorScheme]);
