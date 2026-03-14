@@ -6,7 +6,7 @@
  * - Main: Either SessionPage (active session) or DashboardHome (new chat input)
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -14,6 +14,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Animated,
+  Platform,
 } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Stack, useRouter } from 'expo-router';
@@ -38,6 +40,84 @@ import {
 } from '@/lib/opencode/hooks/use-opencode-data';
 import { useResolvedConfig } from '@/lib/opencode/hooks/use-local-config';
 import { log } from '@/lib/logger';
+
+// ─── Animated collapsible wrapper ────────────────────────────────────────────
+
+function AnimatedCollapsible({
+  expanded,
+  children,
+}: {
+  expanded: boolean;
+  children: React.ReactNode;
+}) {
+  const [contentHeight, setContentHeight] = useState(0);
+  const anim = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: expanded ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [expanded, anim]);
+
+  const animatedHeight = contentHeight > 0
+    ? anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, contentHeight],
+      })
+    : undefined;
+
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0, 0, 1],
+  });
+
+  return (
+    <View>
+      {/* Hidden measurer — always present, unconstrained by animated height */}
+      <View
+        style={{ position: 'absolute', opacity: 0, zIndex: -1, left: 0, right: 0 }}
+        pointerEvents="none"
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && h !== contentHeight) setContentHeight(h);
+        }}
+      >
+        {children}
+      </View>
+      {/* Animated container */}
+      <Animated.View style={{ height: animatedHeight, opacity, overflow: 'hidden' }}>
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
+// ─── Animated chevron ───────────────────────────────────────────────────────
+
+function AnimatedChevron({ expanded, color, size = 16 }: { expanded: boolean; color: string; size?: number }) {
+  const rotation = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(rotation, {
+      toValue: expanded ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [expanded, rotation]);
+
+  const rotate = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-90deg', '0deg'],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Ionicons name="chevron-down" size={size} color={color} />
+    </Animated.View>
+  );
+}
 
 // ─── Session list item (extracted to avoid re-renders) ──────────────────────
 
@@ -312,11 +392,7 @@ export default function HomeScreen() {
             <Ionicons name="list-outline" size={18} color={iconColor} />
             <Text className="text-sm font-medium ml-3 text-foreground">Sessions</Text>
           </View>
-          <Ionicons
-            name={sessionsExpanded ? 'chevron-down' : 'chevron-forward'}
-            size={16}
-            color={mutedColor}
-          />
+          <AnimatedChevron expanded={sessionsExpanded} color={mutedColor} size={16} />
         </TouchableOpacity>
 
         {/* Session list + Archived */}
@@ -324,84 +400,82 @@ export default function HomeScreen() {
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="small" color={mutedColor} />
           </View>
-        ) : sessionsExpanded ? (
+        ) : (
           <ScrollView
             className="flex-1"
             contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 20 }}
           >
-            {/* Archived section (collapsible) */}
-            {archivedSessions.length > 0 && (
-              <>
-                <TouchableOpacity
-                  onPress={() => setArchivedExpanded((v) => !v)}
-                  className="flex-row items-center justify-between px-3 py-2.5"
-                  activeOpacity={0.6}
-                >
-                  <View className="flex-row items-center">
-                    <Ionicons name="archive-outline" size={16} color={mutedColor} />
-                    <Text className="text-sm ml-2 text-muted-foreground">Archived</Text>
-                  </View>
-                  <View className="flex-row items-center">
-                    <View className="bg-muted rounded-full px-2 py-0.5 mr-1">
-                      <Text className="text-xs text-muted-foreground">{archivedSessions.length}</Text>
-                    </View>
-                    <Ionicons
-                      name={archivedExpanded ? 'chevron-down' : 'chevron-forward'}
-                      size={14}
-                      color={mutedColor}
-                    />
-                  </View>
-                </TouchableOpacity>
-
-                {archivedExpanded && archivedSessions.map((item) => (
-                  <View key={item.id} className="flex-row items-center rounded-lg px-3 py-2.5 mb-0.5">
-                    <Text
-                      className="flex-1 text-sm text-muted-foreground"
-                      numberOfLines={1}
-                    >
-                      {item.title || 'New Session'}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => handleUnarchive(item.id)}
-                      className="p-1.5 mr-1"
-                      hitSlop={6}
-                      activeOpacity={0.6}
-                    >
+            <AnimatedCollapsible expanded={sessionsExpanded}>
+              {/* Archived section (collapsible) */}
+              {archivedSessions.length > 0 && (
+                <>
+                  <TouchableOpacity
+                    onPress={() => setArchivedExpanded((v) => !v)}
+                    className="flex-row items-center justify-between px-3 py-2.5"
+                    activeOpacity={0.6}
+                  >
+                    <View className="flex-row items-center">
                       <Ionicons name="archive-outline" size={16} color={mutedColor} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDelete(item.id)}
-                      className="p-1.5"
-                      hitSlop={6}
-                      activeOpacity={0.6}
-                    >
-                      <Ionicons name="trash-outline" size={16} color={mutedColor} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </>
-            )}
+                      <Text className="text-sm ml-2 text-muted-foreground">Archived</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <View className="bg-muted rounded-full px-2 py-0.5 mr-1">
+                        <Text className="text-xs text-muted-foreground">{archivedSessions.length}</Text>
+                      </View>
+                      <AnimatedChevron expanded={archivedExpanded} color={mutedColor} size={14} />
+                    </View>
+                  </TouchableOpacity>
 
-            {/* Active sessions */}
-            {activeSessions.length === 0 ? (
-              <View className="items-center py-8">
-                <Text className="text-sm text-muted-foreground">No sessions yet</Text>
-              </View>
-            ) : (
-              activeSessions.map((item) => (
-                <SessionListItem
-                  key={item.id}
-                  item={item}
-                  isActive={item.id === activeSessionId}
-                  onPress={handleSessionPress}
-                  onArchive={handleArchive}
-                  onDelete={handleDelete}
-                />
-              ))
-            )}
+                  <AnimatedCollapsible expanded={archivedExpanded}>
+                    {archivedSessions.map((item) => (
+                      <View key={item.id} className="flex-row items-center rounded-lg px-3 py-2.5 mb-0.5">
+                        <Text
+                          className="flex-1 text-sm text-muted-foreground"
+                          numberOfLines={1}
+                        >
+                          {item.title || 'New Session'}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => handleUnarchive(item.id)}
+                          className="p-1.5 mr-1"
+                          hitSlop={6}
+                          activeOpacity={0.6}
+                        >
+                          <Ionicons name="archive-outline" size={16} color={mutedColor} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDelete(item.id)}
+                          className="p-1.5"
+                          hitSlop={6}
+                          activeOpacity={0.6}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={mutedColor} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </AnimatedCollapsible>
+                </>
+              )}
+
+              {/* Active sessions */}
+              {activeSessions.length === 0 ? (
+                <View className="items-center py-8">
+                  <Text className="text-sm text-muted-foreground">No sessions yet</Text>
+                </View>
+              ) : (
+                activeSessions.map((item) => (
+                  <SessionListItem
+                    key={item.id}
+                    item={item}
+                    isActive={item.id === activeSessionId}
+                    onPress={handleSessionPress}
+                    onArchive={handleArchive}
+                    onDelete={handleDelete}
+                  />
+                ))
+              )}
+            </AnimatedCollapsible>
           </ScrollView>
-        ) : (
-          <View className="flex-1" />
         )}
 
         {/* Bottom: user info */}
