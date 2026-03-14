@@ -300,7 +300,7 @@ export default function HomeScreen() {
         open={drawerOpen}
         onOpen={handleDrawerOpen}
         onClose={handleDrawerClose}
-        drawerType="front"
+        drawerType="slide"
         drawerStyle={{ width: '80%', backgroundColor: 'transparent' }}
         overlayStyle={{
           backgroundColor: isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.2)',
