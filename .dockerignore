@@ -16,6 +16,8 @@ docs
 **/docs
 tests
 **/tests
+!sandbox/tests
+!sandbox/tests/**
 *.test.ts
 *.test.tsx
 *.spec.ts

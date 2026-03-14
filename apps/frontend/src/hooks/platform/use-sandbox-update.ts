@@ -81,8 +81,9 @@ export function useSandboxUpdate(currentVersion: string | null) {
     queryKey: ['sandbox', 'latest-version'],
     queryFn: getLatestSandboxVersion,
     enabled: !!sandbox,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,        // re-fetch from GitHub at most every 5 min
+    refetchInterval: 10 * 60 * 1000, // background poll every 10 min
+    refetchOnWindowFocus: true,       // re-check when user returns to the tab
   });
 
   const latestVersion = latestQuery.data?.version ?? null;

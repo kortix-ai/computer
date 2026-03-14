@@ -524,10 +524,12 @@ export async function getSandboxUpdateStatus(
 }
 
 /**
- * Get the latest available sandbox version from the platform.
+ * Get the latest available sandbox version — proxied through the platform API
+ * which fetches from GitHub raw release.json, so it always reflects the true
+ * published version regardless of which API image the user is running.
  */
 export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
-  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/version`, {
+  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/version/latest`, {
     headers: { 'Accept': 'application/json' },
   });
   if (!res.ok) throw new Error(`Version check failed: ${res.status}`);
