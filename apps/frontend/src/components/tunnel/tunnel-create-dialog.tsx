@@ -17,6 +17,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getEnv } from '@/lib/env-config';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -337,7 +338,7 @@ function ConnectStep({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token || cancelled) return;
 
-      const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+      const apiBase = getEnv().BACKEND_URL;
       const url = `${apiBase}/tunnel/permission-requests/stream`;
       const stream = createSSEStream({
         url,

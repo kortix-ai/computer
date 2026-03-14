@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion, useScroll } from 'framer-motion';
 import { backendApi } from '@/lib/api-client';
+import { getEnv } from '@/lib/env-config';
 import {
   Download,
   Share2,
@@ -182,7 +183,7 @@ export default function TemplateSharePage() {
   const { data: template, isLoading, error } = useQuery({
     queryKey: ['template-public', templateId],
     queryFn: async () => {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+      const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
       const response = await fetch(`${backendUrl}/templates/public/${templateId}`);
       if (!response.ok) {
         throw new Error('Template not found');

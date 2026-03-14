@@ -300,12 +300,15 @@ ENV CUSTOM_PORT=6080
 ENV CUSTOM_HTTPS_PORT=6081
 ENV TITLE="Kortix Computer"
 # Resolution: auto-adapt to iframe/browser size (no manual lock)
+# Display: pixel perfect (HiDPI) mode, 225% UI scaling (216 DPI)
 # Encoder: x264enc locked, 60 FPS locked, CRF 18 (near-lossless), full 4:4:4 color
 ENV SELKIES_ENCODER="x264enc"
 ENV SELKIES_FRAMERATE="60"
 ENV SELKIES_H264_CRF="18"
 ENV SELKIES_H264_FULLCOLOR=true
-ENV SELKIES_USE_CSS_SCALING=true
+ENV SELKIES_USE_CSS_SCALING=false
+# UI scaling: 225% DPI (96 * 2.25 = 216)
+ENV SELKIES_SCALING_DPI="216"
 # Paint-overs: high quality for static scenes (sharp text/UI)
 ENV SELKIES_USE_PAINT_OVER_QUALITY=true
 ENV SELKIES_PAINT_OVER_JPEG_QUALITY="90"

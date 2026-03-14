@@ -16,8 +16,8 @@ import { useAuthenticatedPreviewUrl } from '@/hooks/use-authenticated-preview-ur
  * user full desktop control — they can interact with any application, resize windows,
  * open terminals, etc.
  *
- * Resolution is fixed at 1920x1080 (set via Selkies env vars in Dockerfile).
- * SELKIES_USE_CSS_SCALING=true ensures the stream scales to fit the iframe.
+ * Resolution auto-adapts to iframe/browser size (set via Selkies env vars in Dockerfile).
+ * SELKIES_USE_CSS_SCALING=false enables pixel perfect (HiDPI) mode with 225% UI scaling.
  */
 export function DesktopTabContent() {
   const iframeRef = useRef<HTMLIFrameElement>(null);

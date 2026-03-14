@@ -1,10 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CompactClient } from "@morphllm/morphsdk";
 
 // These are internal to the plugin but duplicated here for testing.
-// Keep in sync with index.ts.
 const EXISTING_CODE_MARKER = "// ... existing code ...";
 
 function normalizeCodeEditInput(codeEdit: string): string {
@@ -17,6 +24,58 @@ function normalizeCodeEditInput(codeEdit: string): string {
     return lines.slice(1, -1).join("\n");
   }
   return codeEdit;
+}
+
+async function importPluginWithEnv(
+  env: Record<string, string | undefined>,
+): Promise<{
+  default: (input: any) => Promise<Record<string, any>>;
+}> {
+  const previous = new Map<string, string | undefined>();
+
+  for (const [key, value] of Object.entries(env)) {
+    previous.set(key, process.env[key]);
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+
+  try {
+    const cacheBuster = `plugin-test-${Date.now()}-${Math.random()}`;
+    return await import(`./index.ts?${cacheBuster}`);
+  } finally {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+function makePluginInput(directory: string, worktree = directory) {
+  return {
+    client: {
+      app: {
+        log: async () => {},
+      },
+    },
+    project: {},
+    directory,
+    worktree,
+    serverUrl: new URL("http://localhost"),
+    $: {},
+  };
+}
+
+function makeToolContext(directory: string, worktree = directory) {
+  return {
+    sessionID: "session-test",
+    messageID: "message-test",
+    agent: "coder",
+    directory,
+    worktree,
+    abort: new AbortController().signal,
+    metadata: () => {},
+    ask: async () => {},
+  };
 }
 
 describe("EXISTING_CODE_MARKER", () => {
@@ -41,6 +100,8 @@ describe("packaged tool-selection instructions", () => {
     expect(content).toContain("`edit`");
     expect(content).toContain("New file creation");
     expect(content).toContain("`write`");
+    expect(content).toContain("`warpgrep_github_search`");
+    expect(content).toContain("Public GitHub repo exploration");
     expect(content).toContain("Tool Exposure Requirement");
     expect(content).toContain("morph_edit: true");
   });
@@ -53,7 +114,9 @@ describe("packaged tool-selection instructions", () => {
     );
     expect(content).toContain("morph_edit");
     expect(content).toContain("warpgrep_codebase_search");
+    expect(content).toContain("warpgrep_github_search");
     expect(content).toContain("MORPH_API_KEY");
+    expect(content).toContain("MORPH_WARPGREP_GITHUB");
     expect(content).toContain("Safety guards");
   });
 });
@@ -399,8 +462,51 @@ function estimateTotalChars(messages: FakeMessage[]): number {
   return total;
 }
 
-function hashMessageIds(messages: { info: { id: string } }[]): string {
-  return messages.map((m) => m.info.id).join("|");
+type FakeCompactCacheChunk = {
+  messageKeys: string[];
+  result: { output: string };
+};
+
+function getMessageCacheKey(message: FakeMessage): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        id: message.info.id,
+        role: message.info.role,
+        parts: message.parts.map((part) => ({
+          type: part.type,
+          content: serializePart(part),
+        })),
+      }),
+    )
+    .digest("hex");
+}
+
+function getMessageCacheKeys(messages: FakeMessage[]): string[] {
+  return messages.map(getMessageCacheKey);
+}
+
+function getMatchedCompactChunks(
+  cachedChunks: FakeCompactCacheChunk[],
+  messageKeys: string[],
+): { matchedChunks: FakeCompactCacheChunk[]; matchedMessageCount: number } {
+  const matchedChunks: FakeCompactCacheChunk[] = [];
+  let matchedMessageCount = 0;
+
+  for (const chunk of cachedChunks) {
+    const nextCount = matchedMessageCount + chunk.messageKeys.length;
+    if (nextCount > messageKeys.length) break;
+
+    const matches = chunk.messageKeys.every(
+      (key, index) => messageKeys[matchedMessageCount + index] === key,
+    );
+    if (!matches) break;
+
+    matchedChunks.push(chunk);
+    matchedMessageCount = nextCount;
+  }
+
+  return { matchedChunks, matchedMessageCount };
 }
 
 // Helpers to build fake messages for tests
@@ -608,22 +714,63 @@ describe("estimateTotalChars", () => {
   });
 });
 
-describe("hashMessageIds", () => {
-  test("joins message IDs with pipe", () => {
+describe("getMessageCacheKey", () => {
+  test("is stable for the same message", () => {
+    const message = makeTextMsg("abc", "user", "hello");
+    expect(getMessageCacheKey(message)).toBe(getMessageCacheKey(message));
+  });
+
+  test("changes when message role changes", () => {
+    const userMessage = makeTextMsg("abc", "user", "hello");
+    const assistantMessage = makeTextMsg("abc", "assistant", "hello");
+    expect(getMessageCacheKey(userMessage)).not.toBe(
+      getMessageCacheKey(assistantMessage),
+    );
+  });
+
+  test("changes when serialized content changes", () => {
+    const first = makeToolMsg("tool-1", "read", { path: "/a" }, "one");
+    const second = makeToolMsg("tool-1", "read", { path: "/a" }, "two");
+    expect(getMessageCacheKey(first)).not.toBe(getMessageCacheKey(second));
+  });
+});
+
+describe("getMatchedCompactChunks", () => {
+  test("matches cached prefix chunks in order", () => {
     const messages = [
-      { info: { id: "abc" } },
-      { info: { id: "def" } },
-      { info: { id: "ghi" } },
+      makeTextMsg("1", "user", "a"),
+      makeTextMsg("2", "assistant", "b"),
+      makeTextMsg("3", "user", "c"),
+      makeTextMsg("4", "assistant", "d"),
     ];
-    expect(hashMessageIds(messages)).toBe("abc|def|ghi");
+    const keys = getMessageCacheKeys(messages);
+    const cachedChunks: FakeCompactCacheChunk[] = [
+      { messageKeys: keys.slice(0, 2), result: { output: "chunk-1" } },
+      { messageKeys: keys.slice(2, 3), result: { output: "chunk-2" } },
+    ];
+
+    expect(getMatchedCompactChunks(cachedChunks, keys)).toEqual({
+      matchedChunks: cachedChunks,
+      matchedMessageCount: 3,
+    });
   });
 
-  test("returns empty string for empty array", () => {
-    expect(hashMessageIds([])).toBe("");
-  });
+  test("stops matching when the prefix diverges", () => {
+    const messages = [
+      makeTextMsg("1", "user", "a"),
+      makeTextMsg("2", "assistant", "b"),
+      makeTextMsg("3", "user", "c"),
+    ];
+    const keys = getMessageCacheKeys(messages);
+    const cachedChunks: FakeCompactCacheChunk[] = [
+      { messageKeys: keys.slice(0, 2), result: { output: "chunk-1" } },
+      { messageKeys: ["wrong-key"], result: { output: "chunk-2" } },
+    ];
 
-  test("handles single message", () => {
-    expect(hashMessageIds([{ info: { id: "only" } }])).toBe("only");
+    expect(getMatchedCompactChunks(cachedChunks, keys)).toEqual({
+      matchedChunks: [cachedChunks[0]!],
+      matchedMessageCount: 2,
+    });
   });
 });
 
@@ -687,7 +834,7 @@ describe("compaction integration", () => {
 
   test("proactive compaction threshold logic", () => {
     // Simulate the decision flow from experimental.chat.messages.transform
-    const THRESHOLD = 140000;
+    const THRESHOLD = 100000;
     const PRESERVE_RECENT = 6;
 
     // Below threshold — no compaction
@@ -717,17 +864,35 @@ describe("compaction integration", () => {
     expect(compactInput.length).toBe(14);
     expect(compactInput.every((m) => m.content.length > 0)).toBe(true);
 
-    // Hash is stable
-    const hash1 = hashMessageIds(older);
-    const hash2 = hashMessageIds(older);
-    expect(hash1).toBe(hash2);
+    const olderKeys = getMessageCacheKeys(older);
+    expect(olderKeys).toHaveLength(14);
+    expect(olderKeys[0]).toHaveLength(64);
+  });
 
-    // Hash changes when messages change
-    const differentOlder = [
-      ...older.slice(0, -1),
-      makeTextMsg("new-id", "user", "different"),
+  test("prefix reuse leaves small uncached deltas un-compacted", () => {
+    const PRESERVE_RECENT = 6;
+    const older = [
+      makeTextMsg("1", "user", "x".repeat(35000)),
+      makeTextMsg("2", "assistant", "x".repeat(35000)),
+      makeTextMsg("3", "user", "x".repeat(35000)),
+      makeTextMsg("4", "assistant", "x".repeat(4000)),
     ];
-    expect(hashMessageIds(differentOlder)).not.toBe(hash1);
+    const recent = Array.from({ length: PRESERVE_RECENT }, (_, i) =>
+      makeTextMsg(`recent-${i}`, i % 2 === 0 ? "user" : "assistant", "recent"),
+    );
+    const messages = [...older, ...recent];
+    const olderKeys = getMessageCacheKeys(older);
+    const cachedChunks: FakeCompactCacheChunk[] = [
+      { messageKeys: olderKeys.slice(0, 3), result: { output: "cached-prefix" } },
+    ];
+
+    const { matchedMessageCount } = getMatchedCompactChunks(cachedChunks, olderKeys);
+    const uncachedOlderMessages = older.slice(matchedMessageCount);
+
+    expect(estimateTotalChars(messages)).toBeGreaterThan(100000);
+    expect(estimateTotalChars(uncachedOlderMessages)).toBeLessThan(16000);
+    expect(matchedMessageCount).toBe(3);
+    expect(uncachedOlderMessages).toHaveLength(1);
   });
 
   test("too few messages does not trigger compaction", () => {
@@ -751,5 +916,84 @@ describe("feature flags", () => {
     expect(content).toContain("MORPH_EDIT");
     expect(content).toContain("MORPH_WARPGREP");
     expect(content).toContain("MORPH_COMPACT");
+  });
+});
+
+describe("plugin runtime hooks", () => {
+  test("tool.definition appends runtime notes for morph_edit", async () => {
+    const { default: MorphPlugin } = await importPluginWithEnv({
+      MORPH_API_KEY: undefined,
+      MORPH_ALLOW_READONLY_AGENTS: undefined,
+    });
+
+    const hooks = await MorphPlugin(makePluginInput("/tmp/morph-plugin"));
+    const output = {
+      description: "Base description",
+      parameters: {},
+    };
+
+    await hooks["tool.definition"]?.({ toolID: "morph_edit" }, output);
+
+    expect(output.description).toContain("Runtime notes:");
+    expect(output.description).toContain(
+      "Currently unavailable until MORPH_API_KEY is configured.",
+    );
+    expect(output.description).toContain(
+      "Blocked in readonly agents: plan, explore.",
+    );
+  });
+
+  test("system transform injects concise morph routing guidance", async () => {
+    const { default: MorphPlugin } = await importPluginWithEnv({
+      MORPH_API_KEY: "sk-test-key",
+    });
+
+    const hooks = await MorphPlugin(makePluginInput("/tmp/morph-plugin"));
+    const output = { system: [] as string[] };
+
+    await hooks["experimental.chat.system.transform"]?.(
+      {
+        sessionID: "session-test",
+        model: {},
+      },
+      output,
+    );
+
+    const combined = output.system.join("\n");
+    expect(combined).toContain("Morph plugin routing hints:");
+    expect(combined).toContain(
+      "Prefer morph_edit for large or scattered edits inside existing files.",
+    );
+    expect(combined).toContain("Use write for brand new files.");
+  });
+});
+
+describe("ToolContext path resolution", () => {
+  test("morph_edit resolves relative paths from context.directory", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "morph-plugin-"));
+    const sessionDir = join(tempRoot, "nested");
+    mkdirSync(sessionDir, { recursive: true });
+
+    try {
+      const { default: MorphPlugin } = await importPluginWithEnv({
+        MORPH_API_KEY: "sk-test-key",
+      });
+
+      const hooks = await MorphPlugin(makePluginInput(tempRoot));
+      const result = await hooks.tool.morph_edit.execute(
+        {
+          target_filepath: "created.ts",
+          instructions: "I am creating a test file",
+          code_edit: "export const created = true;\n",
+        },
+        makeToolContext(sessionDir, tempRoot),
+      );
+
+      expect(result).toContain("Created new file: created.ts");
+      expect(existsSync(join(sessionDir, "created.ts"))).toBe(true);
+      expect(existsSync(join(tempRoot, "created.ts"))).toBe(false);
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 });

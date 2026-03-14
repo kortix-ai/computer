@@ -10,6 +10,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { RefreshCw, Copy, Check, TerminalSquare } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { toast } from '@/lib/toast';
+import { getEnv } from '@/lib/env-config';
 import { backendApi } from '@/lib/api-client';
 import { fileListKeys } from '@/features/files';
 
@@ -69,7 +70,7 @@ const lightTheme: ITheme = {
 };
 
 const getWebSocketUrl = () => {
-  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008';
+  const baseUrl = getEnv().BACKEND_URL || 'http://localhost:8008';
   return baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
 };
 

@@ -4,7 +4,7 @@ import { pricingTiers, type PricingTier } from '@/lib/pricing-config';
 export type { PricingTier } from '@/lib/pricing-config';
 
 export const siteConfig = {
-  url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  url: process.env.KORTIX_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000',
   nav: {
     links: [
       { id: 1, name: 'Computer', href: '/' },

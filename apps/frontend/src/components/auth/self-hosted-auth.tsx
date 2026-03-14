@@ -15,6 +15,7 @@ import { resetClient } from '@/lib/opencode-sdk';
 import { invalidateTokenCache, authenticatedFetch } from '@/lib/auth-token';
 import { setBootstrapAuthToken } from '@/lib/auth-token';
 import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { getEnv } from '@/lib/env-config';
 
 /* ─── Installer Form Component ─────────────────────────────────────────────── */
 
@@ -127,7 +128,7 @@ export function useInstallStatus() {
   const [defaultProvider, setDefaultProvider] = useState<SandboxProviderName>('local_docker');
 
   useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
     let retries = 0;
     const MAX_RETRIES = 3;
 
@@ -465,7 +466,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
 
     const checkExisting = async () => {
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+        const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
 
         // Get current JWT — prefer jwtRef (just signed up), fall back to Supabase session (refresh)
         let jwt = jwtRef.current;
@@ -714,7 +715,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   // ── Retry sandbox provisioning after an error ──
   const handleRetryProvision = useCallback(async () => {
     const provider = chosenProvider || defaultProvider || 'local_docker';
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
 
     // Get current JWT — prefer jwtRef (just signed up), fall back to Supabase session
     let jwt = jwtRef.current;
@@ -733,7 +734,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   // ── User picks a sandbox provider (multi-provider flow) ──
   const handleSandboxProviderSelect = useCallback(async (provider: SandboxProviderName) => {
     setChosenProvider(provider);
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
     const jwt = jwtRef.current;
     if (jwt) {
       await provisionSandbox(jwt, backendUrl, provider);
@@ -760,7 +761,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
     sessionStorage.setItem('setup_complete', 'true');
 
     // Mark setup complete in the backend (fire-and-forget)
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
     try {
       const { authenticatedFetch: authFetch } = await import('@/lib/auth-token');
       await authFetch(`${backendUrl}/setup/setup-complete`, { method: 'POST' });

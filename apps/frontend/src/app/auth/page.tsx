@@ -732,6 +732,7 @@ function LoginContent() {
 import { isSelfHosted, isBillingEnabled } from '@/lib/config';
 import { SelfHostedForm, useInstallStatus } from '@/components/auth/self-hosted-auth';
 import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { getEnv } from '@/lib/env-config';
 
 function SelfHostedLoginContent() {
   const router = useRouter();
@@ -758,7 +759,7 @@ function SelfHostedLoginContent() {
     let cancelled = false;
     const fetchStep = async () => {
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+        const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
         const supabaseClient = createBrowserSupabaseClient();
         const { data } = await supabaseClient.auth.getSession();
         const jwt = data.session?.access_token;
@@ -786,7 +787,7 @@ function SelfHostedLoginContent() {
     wizardStepRef.current = step;
     setWizardStep(step);
     // Persist step to backend (fire-and-forget)
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
     const supabaseClient = createBrowserSupabaseClient();
     supabaseClient.auth.getSession().then(({ data }) => {
       const jwt = data.session?.access_token;
@@ -806,7 +807,7 @@ function SelfHostedLoginContent() {
 
     const checkSandboxReady = async () => {
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+        const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008/v1';
         const supabaseClient = createBrowserSupabaseClient();
         const { data } = await supabaseClient.auth.getSession();
         const jwt = data.session?.access_token;

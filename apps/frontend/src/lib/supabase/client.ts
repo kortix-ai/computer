@@ -1,9 +1,11 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { KORTIX_SUPABASE_AUTH_COOKIE } from './constants'
+import { getEnv } from '@/lib/env-config'
 
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const runtimeEnv = getEnv()
+  const url = runtimeEnv.SUPABASE_URL
+  const key = runtimeEnv.SUPABASE_ANON_KEY
 
   if (!url || !key) {
     if (typeof window !== 'undefined') {

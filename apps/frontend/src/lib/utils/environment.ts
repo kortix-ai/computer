@@ -1,5 +1,7 @@
+import { getEnv } from '@/lib/env-config';
+
 const getEnvironment = () => {
-  return process.env.NEXT_PUBLIC_ENV_MODE;
+  return getEnv().ENV_MODE;
 };
 
 export const isLocal = () => {

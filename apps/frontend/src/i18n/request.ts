@@ -3,6 +3,7 @@ import { cookies, headers } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { locales, defaultLocale, type Locale } from './config';
 import { KORTIX_SUPABASE_AUTH_COOKIE } from '@/lib/supabase/constants';
+import { getServerPublicEnv } from '@/lib/public-env-server';
 
 export default getRequestConfig(async ({ requestLocale }) => {
   let locale: Locale = defaultLocale;
@@ -24,9 +25,10 @@ export default getRequestConfig(async ({ requestLocale }) => {
   // Only call getUser() if no cookie preference exists (optimization)
   // This ALWAYS takes precedence over geo-detection - user explicitly set it in settings
   try {
+    const runtimeEnv = getServerPublicEnv();
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.SUPABASE_SERVER_URL || process.env.SUPABASE_URL || runtimeEnv.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY || runtimeEnv.SUPABASE_ANON_KEY,
       {
         cookieOptions: {
           name: KORTIX_SUPABASE_AUTH_COOKIE,

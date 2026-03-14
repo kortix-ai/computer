@@ -68,7 +68,7 @@ const TIERS: SubscriptionTiers = {
 
 export const config: Config = {
   SUBSCRIPTION_TIERS: TIERS,
-  BILLING_ENABLED: process.env.NEXT_PUBLIC_BILLING_ENABLED === 'true',
+  BILLING_ENABLED: getEnv().BILLING_ENABLED === 'true',
 };
 
 /**
@@ -77,7 +77,7 @@ export const config: Config = {
  * to disable all billing UI and restrictions. Defaults to false.
  */
 export const isBillingEnabled = (): boolean => {
-  return config.BILLING_ENABLED;
+  return getEnv().BILLING_ENABLED === 'true';
 };
 
 /**
@@ -87,6 +87,7 @@ export const isBillingEnabled = (): boolean => {
  * The first user to sign up becomes the owner.
  */
 export const isSelfHosted = (): boolean => {
-  return !config.BILLING_ENABLED;
+  return !isBillingEnabled();
 };
+import { getEnv } from '@/lib/env-config';
 

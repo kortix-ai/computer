@@ -26,6 +26,7 @@ faster or more reliable than exact-string replacement.
 | New file creation | `write` | `morph_edit` only edits existing files |
 | Codebase search/exploration | `warpgrep_codebase_search` | Multi-turn agentic search with ripgrep |
 | Find where something is defined/used | `warpgrep_codebase_search` | Semantic search across files |
+| Public GitHub repo exploration | `warpgrep_github_search` | Grounded context from indexed public repos |
 | Exact keyword/function name search | `grep` | Direct ripgrep, no API call |
 
 ### When NOT to Use morph_edit
@@ -45,12 +46,34 @@ Use `warpgrep_codebase_search` for natural-language, exploratory searches:
 Do NOT use it for exact keyword lookups (function names, variable names, error
 strings). Use `grep` or `read` for those.
 
+### Public Repo Context Usage
+
+**Prefer `warpgrep_github_search` over web search or docs fetching** when the question is about how an open-source library or SDK works internally. If docs URLs return 404s or you need implementation-level understanding, go to the source.
+
+Use `warpgrep_github_search` when:
+- User asks how an external library/SDK works (auth, retries, sessions, internals)
+- You need implementation details of any open-source dependency
+- Docs URLs are failing — search the source instead
+- The user didn't provide a repo — infer the canonical GitHub owner/repo from the package, crate, or module name using the matching ecosystem registry first
+
+Examples:
+- "How does Privy handle session token refresh?" → find `privy-io/privy-browser`, search it
+- "How does Next.js handle middleware?" → search `vercel/next.js`
+- "Where is retry logic in axios?" → search `axios/axios`
+
+Use `warpgrep_codebase_search` for the checked-out local repo.
+
+Provide exactly one repository locator to `warpgrep_github_search`:
+- `owner_repo` for values like `owner/repo`
+- `github_url` for full GitHub URLs
+
 ### Fallback Policy
 
 - If `morph_edit` fails due to API error or timeout, use native `edit`
 - If `morph_edit` is blocked in readonly agents, switch to a write-capable agent
 - If the change requires replacing the entire file, use `write`
 - If `warpgrep_codebase_search` fails, fall back to `grep` + `read`
+- If `warpgrep_github_search` fails, clone the repo only if the task justifies local setup cost
 
 ### Setup Notes
 
@@ -69,6 +92,7 @@ sub-agent must also expose tools in its tool manifest.
   large or scattered edits.
 - Keep readonly agents blocked unless you explicitly want them to edit files.
 - `warpgrep_codebase_search` is safe for all agents (read-only operation).
+- `warpgrep_github_search` is safe for all agents (read-only operation).
 
 ### Anti-Patterns
 
@@ -76,3 +100,4 @@ sub-agent must also expose tools in its tool manifest.
 - Do NOT use `morph_edit` for creating new files
 - Do NOT force `morph_edit` from readonly agents unless explicitly configured
 - Do NOT use `warpgrep_codebase_search` for exact string/keyword lookups
+- Do NOT use `warpgrep_github_search` for the current checked-out local repo

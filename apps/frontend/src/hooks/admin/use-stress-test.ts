@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+import { getEnv } from '@/lib/env-config';
 
 export interface StressTestConfig {
   num_requests: number;
@@ -124,7 +123,7 @@ export function useStressTest() {
 
       abortControllerRef.current = new AbortController();
 
-      const response = await fetch(`${API_URL}/admin/stress-test/run`, {
+      const response = await fetch(`${getEnv().BACKEND_URL}/admin/stress-test/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

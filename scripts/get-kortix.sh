@@ -35,7 +35,7 @@ KORTIX_LOCAL_TAG="${KORTIX_LOCAL_TAG:-latest}"
 KORTIX_BUILD_LOCAL_IMAGES="${KORTIX_BUILD_LOCAL_IMAGES:-0}"
 KORTIX_PULL_PARALLELISM="${KORTIX_PULL_PARALLELISM:-4}"
 TTY_AVAILABLE="0"
-if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+if [ -t 0 ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
   TTY_AVAILABLE="1"
 fi
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
@@ -678,30 +678,59 @@ prompt_owner_account() {
   echo "  ${DIM}The initial owner is created by the installer so the frontend can stay focused on sign-in and product onboarding.${NC}"
   echo ""
 
-  if [ -z "$OWNER_EMAIL" ]; then
+  while [ -z "${OWNER_EMAIL// }" ]; do
     printf "    Owner email: "
     prompt_read OWNER_EMAIL
-  fi
+    OWNER_EMAIL="${OWNER_EMAIL#${OWNER_EMAIL%%[![:space:]]*}}"
+    OWNER_EMAIL="${OWNER_EMAIL%${OWNER_EMAIL##*[![:space:]]}}"
+    if [ -z "$OWNER_EMAIL" ]; then
+      warn "Owner email cannot be empty."
+      continue
+    fi
+    case "$OWNER_EMAIL" in
+      *@*.*) ;;
+      *)
+        warn "Owner email must look like a real email address."
+        OWNER_EMAIL=""
+        ;;
+    esac
+  done
 
-  if [ -z "$OWNER_PASSWORD" ]; then
-    while true; do
+  while true; do
+    if [ -z "$OWNER_PASSWORD" ]; then
       printf "    Owner password: "
       prompt_read_secret OWNER_PASSWORD
       echo ""
-      printf "    Confirm password: "
-      prompt_read_secret owner_password_confirm
-      echo ""
-      if [ "$OWNER_PASSWORD" = "$owner_password_confirm" ]; then
-        break
-      fi
-      warn "Passwords do not match. Please try again."
-      OWNER_PASSWORD=""
-    done
-  fi
+    fi
 
-  [ -n "$OWNER_EMAIL" ] || fatal "Owner email is required."
-  [ -n "$OWNER_PASSWORD" ] || fatal "Owner password is required."
-  [ ${#OWNER_PASSWORD} -ge 6 ] || fatal "Owner password must be at least 6 characters."
+    if [ -z "$OWNER_PASSWORD" ]; then
+      warn "Owner password cannot be empty."
+      continue
+    fi
+
+    if [ ${#OWNER_PASSWORD} -lt 6 ]; then
+      warn "Owner password must be at least 6 characters."
+      OWNER_PASSWORD=""
+      continue
+    fi
+
+    printf "    Confirm password: "
+    prompt_read_secret owner_password_confirm
+    echo ""
+
+    if [ -z "$owner_password_confirm" ]; then
+      warn "Password confirmation cannot be empty."
+      OWNER_PASSWORD=""
+      continue
+    fi
+
+    if [ "$OWNER_PASSWORD" = "$owner_password_confirm" ]; then
+      break
+    fi
+
+    warn "Passwords do not match. Please try again."
+    OWNER_PASSWORD=""
+  done
 
   echo ""
 }
@@ -1171,19 +1200,27 @@ ${supabase_ports}
     # In local mode, both use http://localhost:13740 (Kong exposed on host).
     # The frontend container uses extra_hosts to resolve localhost to the host.
     if [ "$DEPLOY_MODE" = "local" ]; then
-      frontend_supabase_env="      - NEXT_PUBLIC_SUPABASE_URL=http://localhost:13740
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      frontend_supabase_env="      - KORTIX_PUBLIC_SUPABASE_URL=http://localhost:13740
+      - KORTIX_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - KORTIX_PUBLIC_BACKEND_URL=\${API_PUBLIC_URL}/v1
+      - KORTIX_PUBLIC_BILLING_ENABLED=false
+      - KORTIX_PUBLIC_ENV_MODE=local
+      - KORTIX_PUBLIC_APP_URL=\${PUBLIC_URL}
       - SUPABASE_URL=http://localhost:13740
       - SUPABASE_SERVER_URL=http://supabase-kong:8000
       - SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
-      - BACKEND_URL=http://kortix-api:8008/v1"
+      - BACKEND_URL=\${API_PUBLIC_URL}/v1"
     else
-      frontend_supabase_env="      - NEXT_PUBLIC_SUPABASE_URL=\${SUPABASE_PUBLIC_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      frontend_supabase_env="      - KORTIX_PUBLIC_SUPABASE_URL=\${SUPABASE_PUBLIC_URL}
+      - KORTIX_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - KORTIX_PUBLIC_BACKEND_URL=\${API_PUBLIC_URL}/v1
+      - KORTIX_PUBLIC_BILLING_ENABLED=false
+      - KORTIX_PUBLIC_ENV_MODE=local
+      - KORTIX_PUBLIC_APP_URL=\${PUBLIC_URL}
       - SUPABASE_URL=\${SUPABASE_PUBLIC_URL}
       - SUPABASE_SERVER_URL=http://supabase-kong:8000
       - SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
-      - BACKEND_URL=http://kortix-api:8008/v1
+      - BACKEND_URL=\${API_PUBLIC_URL}/v1
       - NODE_TLS_REJECT_UNAUTHORIZED=0"
     fi
 
@@ -1193,11 +1230,15 @@ ${supabase_ports}
   else
     # External mode — no Supabase containers
     api_depends="    # External Supabase — no local dependencies"
-    frontend_supabase_env="      - NEXT_PUBLIC_SUPABASE_URL=\${SUPABASE_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+    frontend_supabase_env="      - KORTIX_PUBLIC_SUPABASE_URL=\${SUPABASE_URL}
+      - KORTIX_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - KORTIX_PUBLIC_BACKEND_URL=\${API_PUBLIC_URL}/v1
+      - KORTIX_PUBLIC_BILLING_ENABLED=false
+      - KORTIX_PUBLIC_ENV_MODE=local
+      - KORTIX_PUBLIC_APP_URL=\${PUBLIC_URL}
       - SUPABASE_URL=\${SUPABASE_URL}
       - SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
-      - BACKEND_URL=http://kortix-api:8008/v1"
+      - BACKEND_URL=\${API_PUBLIC_URL}/v1"
     supabase_url_env="      - SUPABASE_URL=\${SUPABASE_URL}"
     supabase_db_env="      - DATABASE_URL=\${DATABASE_URL}"
   fi
@@ -1215,8 +1256,6 @@ ${frontend_ports}
       - "localhost:host-gateway"
     environment:
 ${frontend_supabase_env}
-      - NEXT_PUBLIC_BACKEND_URL=\${API_PUBLIC_URL}/v1
-      - NEXT_PUBLIC_BILLING_ENABLED=false
     depends_on:
       kortix-api:
         condition: service_started
@@ -1555,6 +1594,32 @@ _rebuild_local_images() {
   bash "$build_script" --tag "$LOCAL_TAG"
 }
 
+_reset_stack() {
+  local yes_flag="${1:-}"
+  if [ "$yes_flag" != "--yes" ]; then
+    printf "  Reset local data and recreate the stack? [y/N]: "
+    prompt_read reset_confirm
+    echo "$reset_confirm" | grep -qi '^y' || {
+      echo "  ${Y}Reset cancelled.${N}"
+      exit 0
+    }
+  fi
+
+  echo "  ${C}Stopping and removing stack...${N}"
+  docker compose --profile vps down -v --remove-orphans 2>/dev/null || docker compose down -v --remove-orphans 2>/dev/null || true
+  docker rm -f kortix-sandbox 2>/dev/null || true
+  docker volume rm kortix-sandbox-data 2>/dev/null || true
+  [ "$(_mode)" = "local" ] && _free_kortix_ports
+
+  echo "  ${C}Starting fresh stack...${N}"
+  if [ "$(_mode)" = "vps" ]; then
+    docker compose --profile vps up -d || true
+  else
+    docker compose up -d || true
+  fi
+  echo "  ${G}Reset complete.${N}"
+}
+
 case "${1:-help}" in
   start)
     # Free ports and clean up lingering containers before starting
@@ -1623,6 +1688,10 @@ case "${1:-help}" in
   credentials)
     [ -f "$DIR/.credentials" ] && cat "$DIR/.credentials" || echo "  ${D}No credentials (local mode or auth disabled)${N}"
     ;;
+  reset)
+    shift
+    _reset_stack "${1:-}"
+    ;;
   uninstall)
     echo "  ${C}Stopping services...${N}"
     docker compose --profile vps down 2>/dev/null || docker compose down 2>/dev/null || true
@@ -1654,6 +1723,7 @@ case "${1:-help}" in
     echo "  ${C}status${N}        Show service status"
     echo "  ${C}setup${N}         Open sign-in page"
     echo "  ${C}update${N}        Update to the configured release"
+    echo "  ${C}reset${N}         Wipe local stack state and recreate it"
     echo "  ${C}credentials${N}   Show admin credentials (VPS mode)"
     echo "  ${C}uninstall${N}     Remove Kortix completely"
     echo "  ${C}version${N}       Show version"

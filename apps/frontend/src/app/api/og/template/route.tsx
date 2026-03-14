@@ -1,10 +1,12 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
+import { getServerPublicEnv } from '@/lib/public-env-server';
 
 export const runtime = 'edge';
 
 export async function GET(request: NextRequest) {
   try {
+    const runtimeEnv = getServerPublicEnv();
     const { searchParams } = new URL(request.url);
     const shareId = searchParams.get('shareId');
 
@@ -13,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     const templateResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1'}/templates/public/${shareId}`
+      `${runtimeEnv.BACKEND_URL}/templates/public/${shareId}`
     );
 
     if (!templateResponse.ok) {

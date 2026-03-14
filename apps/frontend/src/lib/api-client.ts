@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/client';
+import { getEnv } from '@/lib/env-config';
 import { handleApiError, handleNetworkError, ErrorContext, ApiError } from './error-handler';
 import { parseBillingError, RequestTooLargeError } from './api/errors';
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+const getApiUrl = () => getEnv().BACKEND_URL || '';
 
 export interface ApiClientOptions {
   showErrors?: boolean;
@@ -251,38 +252,38 @@ export const supabaseClient = {
 
 export const backendApi = {
   get: <T = any>(endpoint: string, options?: Omit<RequestInit & ApiClientOptions, 'method' | 'body'>) =>
-    makeRequest<T>(`${API_URL}${endpoint}`, { ...options, method: 'GET' }),
+    makeRequest<T>(`${getApiUrl()}${endpoint}`, { ...options, method: 'GET' }),
 
   post: <T = any>(endpoint: string, data?: any, options?: Omit<RequestInit & ApiClientOptions, 'method'>) =>
-    makeRequest<T>(`${API_URL}${endpoint}`, {
+    makeRequest<T>(`${getApiUrl()}${endpoint}`, {
       ...options,
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
   put: <T = any>(endpoint: string, data?: any, options?: Omit<RequestInit & ApiClientOptions, 'method'>) =>
-    makeRequest<T>(`${API_URL}${endpoint}`, {
+    makeRequest<T>(`${getApiUrl()}${endpoint}`, {
       ...options,
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
   patch: <T = any>(endpoint: string, data?: any, options?: Omit<RequestInit & ApiClientOptions, 'method'>) =>
-    makeRequest<T>(`${API_URL}${endpoint}`, {
+    makeRequest<T>(`${getApiUrl()}${endpoint}`, {
       ...options,
       method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
   delete: <T = any>(endpoint: string, options?: Omit<RequestInit & ApiClientOptions, 'method' | 'body'>) =>
-    makeRequest<T>(`${API_URL}${endpoint}`, { ...options, method: 'DELETE' }),
+    makeRequest<T>(`${getApiUrl()}${endpoint}`, { ...options, method: 'DELETE' }),
 
   upload: <T = any>(endpoint: string, formData: FormData, options?: Omit<RequestInit & ApiClientOptions, 'method' | 'body'>) => {
     const { headers, ...restOptions } = options || {};
     const uploadHeaders = { ...headers as Record<string, string> };
     delete uploadHeaders['Content-Type'];
 
-    return makeRequest<T>(`${API_URL}${endpoint}`, {
+    return makeRequest<T>(`${getApiUrl()}${endpoint}`, {
       ...restOptions,
       method: 'POST',
       body: formData,
@@ -295,7 +296,7 @@ export const backendApi = {
     const uploadHeaders = { ...headers as Record<string, string> };
     delete uploadHeaders['Content-Type'];
 
-    return makeRequest<T>(`${API_URL}${endpoint}`, {
+    return makeRequest<T>(`${getApiUrl()}${endpoint}`, {
       ...restOptions,
       method: 'PUT',
       body: formData,

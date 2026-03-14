@@ -3,12 +3,11 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
+import { getEnv } from '@/lib/env-config';
 import { useTunnelStore } from '@/stores/tunnel-store';
 import { createSSEStream, type SSEStream } from '@/lib/utils/sse-stream';
 import { tunnelKeys } from './use-tunnel';
 import type { TunnelPermissionRequest } from './use-tunnel';
-
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
 export function useTunnelRealtimeSync() {
   const queryClient = useQueryClient();
@@ -29,7 +28,7 @@ export function useTunnelRealtimeSync() {
         sseStreamRef.current = null;
       }
 
-      const url = `${API_URL}/tunnel/permission-requests/stream`;
+      const url = `${getEnv().BACKEND_URL}/tunnel/permission-requests/stream`;
       const stream = createSSEStream({
         url,
         token: session.access_token,

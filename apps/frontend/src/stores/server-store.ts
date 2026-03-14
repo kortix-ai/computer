@@ -117,16 +117,24 @@ interface ServerStore {
  * resolves this via Docker DNS on the shared network.
  * Same URL pattern for all providers: /v1/p/{sandboxId}/{port}/*
  */
-const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '');
-const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/p/kortix-sandbox/8000`;
-const SERVERS_API = `${BACKEND_URL}/servers`;
+function getBackendUrl(): string {
+  return (getEnv().BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '');
+}
+
+function getDefaultSandboxUrl(): string {
+  return `${getBackendUrl()}/p/kortix-sandbox/8000`;
+}
+
+function getServersApi(): string {
+  return `${getBackendUrl()}/servers`;
+}
 
 /**
  * Derive the proxy URL for a managed sandbox entry.
  * Always computed fresh — never persisted — so route renames can't go stale.
  */
 function getSandboxServerUrl(sandboxId: string): string {
-  return `${BACKEND_URL}/p/${sandboxId}/8000`;
+  return `${getBackendUrl()}/p/${sandboxId}/8000`;
 }
 
 /**
@@ -136,7 +144,7 @@ function getSandboxServerUrl(sandboxId: string): string {
  */
 export function resolveServerUrl(server: ServerEntry): string {
   if (server.sandboxId) return getSandboxServerUrl(server.sandboxId);
-  return server.url || DEFAULT_SANDBOX_URL;
+  return server.url || getDefaultSandboxUrl();
 }
 
 const DEFAULT_SERVER_ID = 'default';
@@ -174,7 +182,7 @@ function toApiPayload(s: ServerEntry) {
 
 function syncServerToApi(server: ServerEntry) {
   if (isManagedEntry(server)) return; // managed entries are not persisted to API
-  authenticatedFetch(`${SERVERS_API}`, {
+  authenticatedFetch(`${getServersApi()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(toApiPayload(server)),
@@ -183,7 +191,7 @@ function syncServerToApi(server: ServerEntry) {
 
 function deleteServerFromApi(id: string) {
   if (isManagedEntry(id)) return;
-  authenticatedFetch(`${SERVERS_API}/${id}`, { method: 'DELETE' },
+  authenticatedFetch(`${getServersApi()}/${id}`, { method: 'DELETE' },
     { retryOnAuthError: false }).catch(() => {});
 }
 
@@ -191,7 +199,7 @@ function deleteServerFromApi(id: string) {
 function syncAllToApi(servers: ServerEntry[]) {
   const custom = servers.filter((s) => !isManagedEntry(s));
   if (custom.length === 0) return;
-  authenticatedFetch(`${SERVERS_API}/sync`, {
+  authenticatedFetch(`${getServersApi()}/sync`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ servers: custom.map(toApiPayload) }),
@@ -201,7 +209,7 @@ function syncAllToApi(servers: ServerEntry[]) {
 /** Load servers from API, merging authTokens from localStorage entries. */
 async function loadFromApi(localServers: ServerEntry[]): Promise<ServerEntry[] | null> {
   try {
-    const res = await authenticatedFetch(SERVERS_API, undefined,
+    const res = await authenticatedFetch(getServersApi(), undefined,
       { retryOnAuthError: false });
     if (!res.ok) return null;
     const rows: Array<{
@@ -232,7 +240,7 @@ async function loadFromApi(localServers: ServerEntry[]): Promise<ServerEntry[] |
 const createDefaultServer = (): ServerEntry => ({
   id: DEFAULT_SERVER_ID,
   label: 'Local Sandbox',
-  url: DEFAULT_SANDBOX_URL,
+  url: getDefaultSandboxUrl(),
   isDefault: true,
   provider: 'local_docker',
 });
@@ -401,12 +409,12 @@ export const useServerStore = create<ServerStore>()(
           if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID || isBillingEnabled()) return '';
            // For local mode (empty activeServerId or 'default'), fall back
            // to DEFAULT_SANDBOX_URL so the app works during the rehydration gap.
-          return DEFAULT_SANDBOX_URL;
+           return getDefaultSandboxUrl();
         }
         // Sandbox entries: always derive URL fresh (never stale)
         if (active.sandboxId) return getSandboxServerUrl(active.sandboxId);
         // Custom entries: use the user-provided URL
-        return active.url || DEFAULT_SANDBOX_URL;
+        return active.url || getDefaultSandboxUrl();
       },
 
       clearStatuses: () => {
@@ -563,7 +571,7 @@ export function getActiveServerMappedPort(containerPort: string): string | null 
  */
 export function getBackendPort(): number {
   try {
-    const url = new URL(BACKEND_URL);
+    const url = new URL(getBackendUrl());
     return parseInt(url.port, 10) || (url.protocol === 'https:' ? 443 : 80);
   } catch {
     return 8008; // fallback for local dev
@@ -640,3 +648,4 @@ export function deriveSubdomainOpts(
 
 /** Stable server IDs for managed sandbox entries */
 export { DEFAULT_SERVER_ID, CLOUD_SANDBOX_SERVER_ID };
+import { getEnv } from '@/lib/env-config';

@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getEnv } from '@/lib/env-config';
 
 interface LegacyThread {
   thread_id: string;
@@ -32,7 +33,7 @@ interface MigrationResult {
 }
 
 function getApiUrl(): string {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  const backendUrl = getEnv().BACKEND_URL;
   return backendUrl || 'http://localhost:8008/v1';
 }
 

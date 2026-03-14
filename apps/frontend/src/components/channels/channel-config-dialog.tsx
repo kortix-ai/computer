@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getEnv } from '@/lib/env-config';
 import {
   Users,
   Mic,
@@ -67,7 +68,7 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
   const needsSlackWizard = !isCloudMode() && slackCredStatus.data?.source !== 'env';
 
   const resolveBackendOrigin = () => {
-    const explicitBackend = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/v1\/?$/, '');
+    const explicitBackend = getEnv().BACKEND_URL.replace(/\/v1\/?$/, '');
     if (explicitBackend) {
       return explicitBackend;
     }

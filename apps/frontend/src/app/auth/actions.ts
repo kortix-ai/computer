@@ -2,6 +2,7 @@
 
 import { createTrialCheckout } from '@/lib/api/billing';
 import { createClient } from '@/lib/supabase/server';
+import { getServerPublicEnv } from '@/lib/public-env-server';
 import { redirect } from 'next/navigation';
 
 
@@ -76,7 +77,7 @@ export async function signUp(prevState: any, formData: FormData) {
   // Check access control — if signups are closed and email isn't allowlisted, block
   let shouldCreateUser = true;
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const backendUrl = getServerPublicEnv().BACKEND_URL || 'http://localhost:8008/v1';
     const res = await fetch(`${backendUrl}/access/check-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -141,7 +142,7 @@ export async function requestAccess(prevState: any, formData: FormData) {
   }
 
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const backendUrl = getServerPublicEnv().BACKEND_URL || 'http://localhost:8008/v1';
     const res = await fetch(`${backendUrl}/access/request-access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -323,7 +324,7 @@ export async function signUpWithPassword(prevState: any, formData: FormData) {
 
   const supabase = await createClient();
 
-  const baseUrl = origin || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+  const baseUrl = origin || getServerPublicEnv().APP_URL || 'http://localhost:3000';
   const emailRedirectTo = `${baseUrl}/auth/callback?returnUrl=${encodeURIComponent(returnUrl || '/dashboard')}`;
 
   const { error } = await supabase.auth.signUp({
@@ -488,12 +489,13 @@ export async function verifyOtp(prevState: any, formData: FormData) {
   const authEvent = isNewUser ? 'signup' : 'login';
 
   // For new cloud users with no plan yet, send them to /subscription first.
-  const billingEnabled = process.env.NEXT_PUBLIC_BILLING_ENABLED === 'true';
+  const runtimeEnv = getServerPublicEnv();
+  const billingEnabled = runtimeEnv.BILLING_ENABLED === 'true';
   let finalDestination = returnUrl || '/dashboard';
 
   if (billingEnabled && isNewUser && data.session?.access_token) {
     try {
-      const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || '').replace(/\/v1\/?$/, '');
+      const backendUrl = (process.env.BACKEND_URL || runtimeEnv.BACKEND_URL || '').replace(/\/v1\/?$/, '');
       if (backendUrl) {
         const accountStateRes = await fetch(`${backendUrl}/v1/billing/account-state`, {
           headers: { 'Authorization': `Bearer ${data.session.access_token}` },

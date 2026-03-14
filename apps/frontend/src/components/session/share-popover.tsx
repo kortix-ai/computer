@@ -12,6 +12,7 @@ import {
 } from '@/hooks/opencode/use-opencode-sessions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { getEnv } from '@/lib/env-config';
 
 // ── Social icons ──
 
@@ -40,8 +41,7 @@ function toOurShareUrl(serverUrl: string): string {
         : segments[segments.length - 1];
     const appBase =
       (typeof window !== 'undefined' ? window.location.origin : '') ||
-      process.env.NEXT_PUBLIC_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
+      getEnv().APP_URL ||
       'https://www.kortix.com';
     return `${appBase}/share/${shareId}`;
   } catch {

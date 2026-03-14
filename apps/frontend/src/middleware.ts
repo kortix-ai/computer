@@ -205,8 +205,8 @@ export async function middleware(request: NextRequest) {
   // used for server-side auth calls. SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL is the
   // public-facing URL that the browser uses. The middleware runs server-side inside
   // the Docker container, so it needs the internal URL to reach Supabase.
-  const supabaseUrl = process.env.SUPABASE_SERVER_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabaseUrl = process.env.SUPABASE_SERVER_URL || process.env.SUPABASE_URL || process.env.KORTIX_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.KORTIX_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createServerClient(
     supabaseUrl,
     supabaseAnonKey,
@@ -318,7 +318,7 @@ export async function middleware(request: NextRequest) {
 
     // Skip billing checks when billing is not enabled (self-hosted deployments).
     // Onboarding enforcement is handled client-side in layout-content.tsx.
-    const billingEnabled = process.env.NEXT_PUBLIC_BILLING_ENABLED === 'true';
+    const billingEnabled = (process.env.KORTIX_PUBLIC_BILLING_ENABLED || process.env.NEXT_PUBLIC_BILLING_ENABLED) === 'true';
     if (!billingEnabled) {
       return supabaseResponse;
     }
@@ -343,7 +343,7 @@ export async function middleware(request: NextRequest) {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
 
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || '';
+      const backendUrl = process.env.BACKEND_URL || process.env.KORTIX_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '';
       if (!backendUrl || !accessToken) {
         // Can't reach backend — let the request through, client-side will handle it
         return supabaseResponse;

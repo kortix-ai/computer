@@ -38,8 +38,6 @@ const CORE_SPEC_PATH = '/opt/kortix/core/service-spec.json'
 const LEGACY_S6_SERVICES = [
   'svc-opencode-serve',
   'svc-opencode-web',
-  'svc-agent-browser-viewer',
-  'svc-static-web',
 ] as const
 
 async function run(cmd: string): Promise<{ ok: boolean; output: string }> {
@@ -132,13 +130,9 @@ export class CoreSupervisor {
       'sudo bash /etc/s6-overlay/s6-rc.d/svc-opencode-serve/run',
       'sudo bash /etc/s6-overlay/s6-rc.d/svc-opencode-web/run',
       'sudo bash /etc/s6-overlay/s6-rc.d/svc-opencode-channels/run',
-      'sudo bash /etc/s6-overlay/s6-rc.d/svc-static-web/run',
-      'sudo bash /etc/s6-overlay/s6-rc.d/svc-agent-browser-viewer/run',
       '/usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0',
       '/usr/local/bin/opencode web --port 3111 --hostname 0.0.0.0',
       '/opt/opencode-channels/src/index.ts',
-      '/opt/services/static-web.js',
-      '/opt/services/agent-browser-viewer.js',
       '/tmp/static-web-server.js', // legacy temp file
     ]
 

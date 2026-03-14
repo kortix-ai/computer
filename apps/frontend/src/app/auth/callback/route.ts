@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getServerPublicEnv } from '@/lib/public-env-server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -20,11 +21,12 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('returnUrl') || searchParams.get('redirect') || '/dashboard'
   const termsAccepted = searchParams.get('terms_accepted') === 'true'
   const email = searchParams.get('email') || '' // Email passed from magic link redirect URL
+  const runtimeEnv = getServerPublicEnv()
 
   // Use request origin for redirects (most reliable for local dev)
   // This ensures localhost:3000 redirects stay on localhost, not staging
   const requestOrigin = request.nextUrl.origin
-  const baseUrl = requestOrigin || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
+  const baseUrl = requestOrigin || runtimeEnv.APP_URL || 'http://localhost:3000'
   const error = searchParams.get('error')
   const errorCode = searchParams.get('error_code')
   const errorDescription = searchParams.get('error_description')
@@ -150,11 +152,11 @@ export async function GET(request: NextRequest) {
         }
 
         // Check subscription status via backend API (has direct DB access)
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || '';
+        const backendUrl = process.env.BACKEND_URL || runtimeEnv.BACKEND_URL || '';
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token;
 
-        const billingEnabled = process.env.NEXT_PUBLIC_BILLING_ENABLED === 'true';
+        const billingEnabled = runtimeEnv.BILLING_ENABLED === 'true';
         if (billingEnabled && backendUrl && accessToken) {
           try {
             const accountStateRes = await fetch(`${backendUrl}/v1/billing/account-state`, {

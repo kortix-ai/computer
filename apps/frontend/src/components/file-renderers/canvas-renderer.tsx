@@ -25,6 +25,7 @@ import {
   Palette,
 } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
+import { getEnv } from '@/lib/env-config';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -1177,7 +1178,7 @@ function FloatingToolbar({
       const imageBase64 = await getImageAsBase64(element.src);
 
       // Call backend OCR endpoint
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/canvas-ai/ocr`, {
+      const response = await fetch(`${getEnv().BACKEND_URL}/canvas-ai/ocr`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1421,7 +1422,7 @@ function FloatingToolbar({
       const imageBase64 = await getImageAsBase64(element.src);
 
       // Call backend Canvas AI API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/canvas-ai/process`, {
+      const response = await fetch(`${getEnv().BACKEND_URL}/canvas-ai/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2221,7 +2222,7 @@ function MultiSelectToolbar({
       );
 
       // Send to backend - use correct backend URL
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008';
+      const backendUrl = getEnv().BACKEND_URL || 'http://localhost:8008';
       const response = await fetch(`${backendUrl}/canvas-ai/merge`, {
         method: 'POST',
         headers: {
@@ -3260,7 +3261,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
     setGeneratedPreviews([]);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/canvas-ai/generate`, {
+      const response = await fetch(`${getEnv().BACKEND_URL}/canvas-ai/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3849,7 +3850,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
                 }
 
                 // Call backend API for SVG conversion
-                const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/canvas-ai/convert-svg`, {
+                const response = await fetch(`${getEnv().BACKEND_URL}/canvas-ai/convert-svg`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',

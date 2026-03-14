@@ -246,12 +246,8 @@ if (DOCKER) {
     --push "${ROOT}"`, { stdio: 'inherit' })
   ok(`kortix/kortix-api:${version} pushed`)
 
-  // Frontend
+  // Frontend (multi-stage Docker build — no host build needed)
   info('Building frontend...')
-  runPnpm(['--dir', 'apps/frontend', 'build'], {
-    stdio: 'inherit',
-    env: { NEXT_OUTPUT: 'standalone' },
-  })
   run(`docker buildx build \
     --platform linux/amd64,linux/arm64 \
     -f apps/frontend/Dockerfile \

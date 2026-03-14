@@ -28,9 +28,9 @@ const getBackendUrl = (): string => {
 };
 
 const nextConfig = (): NextConfig => ({
-  output: (process.env.NEXT_OUTPUT as 'standalone') || undefined,
-  // Pin the tracing root to the monorepo root so standalone output uses
-  // `apps/frontend/server.js` instead of `computer/apps/frontend/server.js`.
+  output: 'standalone',
+  // Pin tracing root to monorepo root so standalone preserves
+  // the correct `apps/frontend/server.js` path structure.
   outputFileTracingRoot: path.join(__dirname, '../../'),
 
   // Skip type checking during build (done in CI via `pnpm typecheck`)
@@ -62,8 +62,6 @@ const nextConfig = (): NextConfig => ({
 
   // Performance optimizations
   experimental: {
-    // Limit build parallelism in Docker to prevent OOM (standalone builds)
-    ...(process.env.NEXT_OUTPUT === 'standalone' ? { cpus: 2 } : {}),
     // Optimize package imports for faster builds and smaller bundles
     optimizePackageImports: [
       'lucide-react',

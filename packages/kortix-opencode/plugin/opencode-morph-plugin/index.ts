@@ -723,12 +723,13 @@ const MorphPlugin: Plugin = async ({ directory, client }) => {
     } catch {}
   };
 
-  if (!MORPH_API_KEY) {
+  const morphConfigured = Boolean(MORPH_API_KEY);
+
+  if (!morphConfigured) {
     await log(
       "warn",
-      "MORPH_API_KEY not set - morph plugin disabled",
+      "MORPH_API_KEY not set - morph plugin remote tools disabled",
     );
-    return {};
   } else {
     const features = [
       MORPH_EDIT_ENABLED && "edit",
@@ -742,7 +743,7 @@ const MorphPlugin: Plugin = async ({ directory, client }) => {
   // Build tool map conditionally based on feature flags
   const tools: Record<string, ReturnType<typeof tool>> = {};
 
-  if (MORPH_EDIT_ENABLED) {
+  if (morphConfigured && MORPH_EDIT_ENABLED) {
     tools.morph_edit = tool({
         description: `Edit existing files using partial code snippets with "// ... existing code ..." markers. Morph's AI merges your changes into the full file.
 
@@ -971,7 +972,7 @@ ${udiff.slice(0, 3000)}${udiff.length > 3000 ? "\n... (truncated)" : ""}
     });
   }
 
-  if (MORPH_WARPGREP_ENABLED) {
+  if (morphConfigured && MORPH_WARPGREP_ENABLED) {
     tools.warpgrep_codebase_search = tool({
         description: `Fast agentic codebase search. Uses ripgrep, file reading, and directory listing across multiple turns to find relevant code contexts.
 
@@ -1047,7 +1048,7 @@ Try rephrasing your search term or using grep for exact keyword searches.`;
     });
   }
 
-  if (MORPH_WARPGREP_GITHUB_ENABLED) {
+  if (morphConfigured && MORPH_WARPGREP_GITHUB_ENABLED) {
     tools.warpgrep_github_search = tool({
         description: `Grounded code context search for public GitHub repositories. Uses Morph's hosted WarpGrep to search indexed public repos without cloning them locally.
 
