@@ -1,20 +1,25 @@
 import { Hono } from 'hono';
-import { supabaseAuth } from '../middleware/auth';
+import { supabaseAuth, combinedAuth } from '../middleware/auth';
 import { createAdapters } from './adapters/registry';
 import { createChannelsRouter } from './routes/channels';
-import { createPlatformCredentialsRouter } from './routes/platform-credentials';
 import { createSlackWizardRouter } from './routes/slack-wizard';
 import { webhooksRouter } from './routes/webhooks';
 import { filesRouter } from './routes/files';
 import { startChannels, stopChannels, getChannelsStatus } from './core/lifecycle';
 import { config } from '../config';
+import { createInternalChannelsRouter } from './routes/channels-internal';
 
 const adapters = createAdapters();
 
 const channelsApp = new Hono();
 
+// Internal route for sandbox → api calls (Kortix token auth, not user JWT)
+// Must be registered BEFORE the supabaseAuth middleware on /v1/channels/*
+channelsApp.use('/v1/channels/internal/*', combinedAuth);
+channelsApp.route('/v1/channels/internal', createInternalChannelsRouter());
+
 channelsApp.use('/v1/channels/*', supabaseAuth);
-channelsApp.route('/v1/channels/platform-credentials', createPlatformCredentialsRouter());
+// NOTE: platform-credentials router REMOVED — all creds now live in sandbox SecretStore
 channelsApp.route('/v1/channels/slack-wizard', createSlackWizardRouter());
 channelsApp.route('/v1/channels', createChannelsRouter(adapters));
 channelsApp.route('/v1/files', filesRouter);

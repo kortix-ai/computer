@@ -62,10 +62,44 @@ import {
 import { useTabStore, openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { useSandboxConnectionStore } from '@/stores/sandbox-connection-store';
+import { useChannelSession } from '@/hooks/channels';
+import { SlackIcon } from '@/components/ui/icons/slack';
+import { TelegramIcon } from '@/components/ui/icons/telegram';
+import { DiscordIcon } from '@/components/ui/icons/discord';
 
 import { childMapByParent, sortSessions, allDescendantIds } from '@/ui';
 import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import Link from 'next/link';
+
+// ── Channel platform badge ─────────────────────────────────────────────────
+
+function ChannelBadge({ sessionId }: { sessionId: string }) {
+  const { data: channelCtx } = useChannelSession(sessionId);
+  if (!channelCtx) return null;
+
+  const platform = channelCtx.platform;
+  const label = channelCtx.channelName || platform;
+
+  let Icon: React.ComponentType<{ className?: string }> | null = null;
+  if (platform === 'slack') Icon = SlackIcon;
+  else if (platform === 'telegram') Icon = TelegramIcon;
+  else if (platform === 'discord') Icon = DiscordIcon;
+
+  if (!Icon) return null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex-shrink-0 flex items-center justify-center h-4 w-4 opacity-60">
+          <Icon className="h-3 w-3" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="text-xs">
+        Via {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 // ============================================================================
 // Session Item (supports depth for tree rendering)
@@ -180,6 +214,9 @@ function SessionItem({
             </TooltipContent>
           </Tooltip>
         )}
+
+        {/* Channel platform badge — only for depth-0 sessions triggered via a channel */}
+        {depth === 0 && <ChannelBadge sessionId={session.id} />}
 
         {/* Title */}
         <span

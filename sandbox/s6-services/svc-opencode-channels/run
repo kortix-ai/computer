@@ -14,6 +14,9 @@ if [ "$(id -u)" -eq 0 ]; then
         OPENCODE_URL=http://localhost:4096 \
         PORT=3456 \
         PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
+        KORTIX_API_URL="${KORTIX_API_URL:-http://localhost:8008}" \
+        KORTIX_TOKEN="${KORTIX_TOKEN:-}" \
+        CHANNEL_CONFIG_ID="${CHANNEL_CONFIG_ID:-}" \
     /opt/bun/bin/bun run /opt/opencode-channels/src/index.ts
 fi
 
@@ -21,4 +24,7 @@ exec env HOME=/workspace \
     OPENCODE_URL=http://localhost:4096 \
     PORT=3456 \
     PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
+    KORTIX_API_URL="${KORTIX_API_URL:-http://localhost:8008}" \
+    KORTIX_TOKEN="${KORTIX_TOKEN:-}" \
+    CHANNEL_CONFIG_ID="${CHANNEL_CONFIG_ID:-}" \
   /opt/bun/bin/bun run /opt/opencode-channels/src/index.ts

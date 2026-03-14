@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../../shared/db';
-import { channelConfigs, channelMessages, sandboxes } from '@kortix/db';
+import { channelConfigs, channelMessages, channelSessions, sandboxes } from '@kortix/db';
 import { NotFoundError, ValidationError } from '../../errors';
 import type { AppEnv } from '../../types';
 import type { ChannelAdapter } from '../adapters/adapter';
@@ -118,6 +118,61 @@ export function createChannelsRouter(adapters: Map<ChannelType, ChannelAdapter>)
     }
 
     return c.json({ success: true, data: config }, 201);
+  });
+
+  /**
+   * GET /sessions/:sessionId
+   * Reverse lookup: given an OpenCode session ID, return its channel context.
+   * MUST be registered before GET /:id so Hono doesn't treat "sessions" as a channel config ID.
+   */
+  app.get('/sessions/:sessionId', async (c) => {
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+    const sessionId = c.req.param('sessionId');
+
+    // Find the channelSession record
+    const [record] = await db
+      .select()
+      .from(channelSessions)
+      .where(eq(channelSessions.sessionId, sessionId));
+
+    if (!record) {
+      return c.json({ success: true, data: null });
+    }
+
+    // Verify the channel config belongs to this account
+    const [config] = await db
+      .select()
+      .from(channelConfigs)
+      .where(
+        and(
+          eq(channelConfigs.channelConfigId, record.channelConfigId),
+          eq(channelConfigs.accountId, accountId),
+        ),
+      );
+
+    if (!config) {
+      // Session exists but belongs to another account — return null (not 403)
+      return c.json({ success: true, data: null });
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        channelSessionId: record.channelSessionId,
+        channelConfigId: record.channelConfigId,
+        sessionId: record.sessionId,
+        strategyKey: record.strategyKey,
+        lastUsedAt: record.lastUsedAt,
+        metadata: record.metadata,
+        createdAt: record.createdAt,
+        // Channel context
+        channelType: config.channelType,
+        channelName: config.name,
+        platform: config.channelType,
+        sandboxId: config.sandboxId,
+      },
+    });
   });
 
   app.get('/', async (c) => {
@@ -458,6 +513,55 @@ export function createChannelsRouter(adapters: Map<ChannelType, ChannelAdapter>)
       .offset(offset);
 
     return c.json({ success: true, data: messages, total: messages.length });
+  });
+
+  // ── Channel Sessions ────────────────────────────────────────────────────────
+  // NOTE: POST /:id/sessions is in channels-internal.ts (sandbox auth via KORTIX_TOKEN)
+
+  /**
+   * GET /:id/sessions
+   * List all OpenCode sessions triggered via this channel, most recent first.
+   * User-authenticated.
+   */
+  app.get('/:id/sessions', async (c) => {
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+    const configId = c.req.param('id');
+    const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 100);
+    const offset = parseInt(c.req.query('offset') || '0', 10);
+
+    const [config] = await db
+      .select()
+      .from(channelConfigs)
+      .where(
+        and(
+          eq(channelConfigs.channelConfigId, configId),
+          eq(channelConfigs.accountId, accountId),
+        ),
+      );
+
+    if (!config) {
+      throw new NotFoundError('Channel config', configId);
+    }
+
+    const sessions = await db
+      .select()
+      .from(channelSessions)
+      .where(eq(channelSessions.channelConfigId, configId))
+      .orderBy(desc(channelSessions.lastUsedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return c.json({
+      success: true,
+      data: sessions.map(s => ({
+        ...s,
+        channelType: config.channelType,
+        channelName: config.name,
+        platform: config.channelType,
+      })),
+      total: sessions.length,
+    });
   });
 
   return app;

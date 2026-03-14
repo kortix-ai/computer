@@ -1,59 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { backendApi } from '@/lib/api-client';
-import type { ChannelType } from './use-channels';
+/**
+ * Platform credential hooks — sandbox-first architecture.
+ *
+ * All channel credentials now live in the sandbox's SecretStore.
+ * The frontend pushes them directly to the sandbox via the OpenCode proxy
+ * (authenticatedFetch to the sandbox's /env endpoint).
+ *
+ * The `channel_platform_credentials` DB table is NO LONGER USED.
+ */
 
-export interface PlatformCredentialStatus {
-  configured: boolean;
-  source: 'env' | 'db' | 'none';
-  fields: Record<string, boolean>;
-}
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { authenticatedFetch } from '@/lib/auth-token';
+import { getActiveOpenCodeUrl } from '@/stores/server-store';
 
-export interface PlatformCredentialEntry {
-  id: string;
-  channelType: ChannelType;
-  sandboxId: string | null;
-  sandboxName: string | null;
-  configured: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export function usePlatformCredentialStatus(channelType: ChannelType | null, sandboxId?: string | null) {
-  return useQuery({
-    queryKey: ['platform-credentials', channelType, sandboxId ?? null],
-    queryFn: async () => {
-      if (!channelType) return null;
-      const params = sandboxId ? `?sandbox_id=${sandboxId}` : '';
-      const res = await backendApi.get<PlatformCredentialStatus>(
-        `/channels/platform-credentials/${channelType}${params}`,
-        { showErrors: false },
-      );
-      if (!res.success || !res.data) {
-        throw new Error('Failed to fetch platform credential status');
-      }
-      return res.data;
-    },
-    enabled: !!channelType,
-  });
-}
-
-export function usePlatformCredentialsList() {
-  return useQuery({
-    queryKey: ['platform-credentials-list'],
-    queryFn: async () => {
-      const res = await backendApi.get<{ success: boolean; data: PlatformCredentialEntry[] }>(
-        '/channels/platform-credentials',
-        { showErrors: false },
-      );
-      if (!res.success || !res.data) {
-        throw new Error('Failed to fetch platform credentials list');
-      }
-      return res.data.data;
-    },
-    staleTime: 30_000,
-  });
-}
-
+/**
+ * Push platform credentials directly to the sandbox's SecretStore.
+ * Replaces the old `useSavePlatformCredentials` that wrote to kortix-api DB.
+ */
 export function useSavePlatformCredentials() {
   const queryClient = useQueryClient();
 
@@ -61,67 +23,102 @@ export function useSavePlatformCredentials() {
     mutationFn: async ({
       channelType,
       credentials,
-      sandboxId,
     }: {
-      channelType: ChannelType;
+      channelType: string;
       credentials: Record<string, string>;
       sandboxId?: string | null;
     }) => {
-      const body: Record<string, unknown> = { ...credentials };
-      if (sandboxId) {
-        body.sandbox_id = sandboxId;
+      const baseUrl = getActiveOpenCodeUrl();
+      if (!baseUrl) throw new Error('No active instance found');
+
+      // Map credential fields to env var names
+      const envKeys: Record<string, string> = {};
+      if (channelType === 'slack') {
+        if (credentials.clientId) envKeys.SLACK_CLIENT_ID = credentials.clientId;
+        if (credentials.clientSecret) envKeys.SLACK_CLIENT_SECRET = credentials.clientSecret;
+        if (credentials.signingSecret) envKeys.SLACK_SIGNING_SECRET = credentials.signingSecret;
+      } else if (channelType === 'telegram') {
+        if (credentials.botToken) envKeys.TELEGRAM_BOT_TOKEN = credentials.botToken;
+      } else if (channelType === 'discord') {
+        if (credentials.botToken) envKeys.DISCORD_BOT_TOKEN = credentials.botToken;
       }
-      const res = await backendApi.put(
-        `/channels/platform-credentials/${channelType}`,
-        body,
-      );
-      if (!res.success) {
-        throw new Error(
-          (res.error as any)?.message || 'Failed to save platform credentials',
-        );
+
+      if (Object.keys(envKeys).length === 0) {
+        throw new Error('No credentials to save');
       }
-      return res.data;
+
+      // Push each key to the sandbox's /env endpoint
+      for (const [key, value] of Object.entries(envKeys)) {
+        const res = await authenticatedFetch(`${baseUrl}/env/${key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value }),
+        });
+        if (!res.ok) {
+          const err = await res.text().catch(() => 'unknown');
+          throw new Error(`Failed to set ${key}: ${err}`);
+        }
+      }
+
+      return { success: true };
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ['platform-credentials', variables.channelType],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['platform-credentials-list'],
-      });
+    onSuccess: () => {
+      // Invalidate any cached credential status queries
+      queryClient.invalidateQueries({ queryKey: ['platform-credentials'] });
     },
   });
 }
 
-export function useDeletePlatformCredentials() {
-  const queryClient = useQueryClient();
+// ── Stubs for backward compatibility ──────────────────────────────────────────
+// These types/hooks are still imported in a few places but no longer need real
+// DB-backed implementations. We keep them as no-ops or simple stubs.
 
+export interface PlatformCredentialStatus {
+  configured: boolean;
+  source: 'env' | 'db' | 'sandbox' | 'none';
+  fields: Record<string, boolean>;
+}
+
+export interface PlatformCredentialEntry {
+  id: string;
+  channelType: string;
+  sandboxId: string | null;
+  sandboxName: string | null;
+  configured: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Check if platform credentials are configured.
+ * Now always returns 'sandbox' source — the actual check happens
+ * when kortix-api reads from the sandbox during OAuth install.
+ */
+export function usePlatformCredentialStatus(
+  _channelType: string | null,
+  _sandboxId?: string | null,
+) {
+  // Always indicate "not from env" so the wizard is shown (users push creds to sandbox)
+  return {
+    data: { configured: false, source: 'none' as const, fields: {} } as PlatformCredentialStatus,
+    isLoading: false,
+    error: null,
+  };
+}
+
+export function usePlatformCredentialsList() {
+  return {
+    data: [] as PlatformCredentialEntry[],
+    isLoading: false,
+    error: null,
+  };
+}
+
+export function useDeletePlatformCredentials() {
   return useMutation({
-    mutationFn: async ({
-      channelType,
-      sandboxId,
-    }: {
-      channelType: ChannelType;
-      sandboxId?: string | null;
-    }) => {
-      const params = sandboxId ? `?sandbox_id=${sandboxId}` : '';
-      const res = await backendApi.delete(
-        `/channels/platform-credentials/${channelType}${params}`,
-      );
-      if (!res.success) {
-        throw new Error(
-          (res.error as any)?.message || 'Failed to delete platform credentials',
-        );
-      }
-      return res.data;
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ['platform-credentials', variables.channelType],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['platform-credentials-list'],
-      });
+    mutationFn: async (_params: { channelType: string; sandboxId?: string | null }) => {
+      // No-op — credentials are managed in the sandbox
+      return { success: true };
     },
   });
 }

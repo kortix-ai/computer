@@ -1,6 +1,8 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/auth-token';
-import { getActiveOpenCodeUrl } from '@/stores/server-store';
+import { getActiveOpenCodeUrl, useServerStore } from '@/stores/server-store';
+import { backendApi } from '@/lib/api-client';
+import { ensureSandbox } from '@/lib/platform-client';
 
 export interface DetectUrlResult {
   url: string;
@@ -86,13 +88,17 @@ export function useTelegramDetectUrl() {
  * service, and set the Telegram webhook — all sandbox-direct, no DB.
  */
 export function useTelegramConnect() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       botToken,
       publicUrl,
+      botUsername,
     }: {
       botToken: string;
       publicUrl: string;
+      botUsername?: string;
     }) => {
       const baseUrl = getActiveOpenCodeUrl();
       if (!baseUrl) throw new Error('No active instance found');
@@ -149,7 +155,42 @@ export function useTelegramConnect() {
         throw new Error(`Failed to set webhook: ${whData.description || 'unknown'}`);
       }
 
+      // 4. Create a channel config DB record so it shows up in the channels list
+      let sandboxId: string | null = null;
+      try {
+        const result = await ensureSandbox();
+        sandboxId = result.sandbox.sandbox_id;
+      } catch {
+        // Try from server store
+        const store = useServerStore.getState();
+        for (const s of store.servers) {
+          if (s.sandboxId) { sandboxId = s.sandboxId; break; }
+        }
+      }
+
+      const channelName = botUsername ? `@${botUsername}` : 'Telegram Bot';
+      try {
+        await backendApi.post('/channels', {
+          sandbox_id: sandboxId,
+          channel_type: 'telegram',
+          name: channelName,
+          enabled: true,
+          platform_config: {
+            webhook_url: webhookUrl,
+            bot_username: botUsername || null,
+          },
+          session_strategy: 'per-thread',
+        });
+      } catch (err) {
+        // Channel may already exist for this sandbox — not fatal
+        console.warn('[telegram-wizard] Failed to create channel config (may already exist):', err);
+      }
+
       return { webhookUrl, secretToken };
+    },
+    onSuccess: () => {
+      // Invalidate channels list so it shows up immediately
+      queryClient.invalidateQueries({ queryKey: ['channels'] });
     },
   });
 }

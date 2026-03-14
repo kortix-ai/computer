@@ -1,8 +1,19 @@
-import { eq, and, isNull } from 'drizzle-orm';
-import { db } from '../../shared/db';
-import { channelPlatformCredentials } from '@kortix/db';
+/**
+ * Platform credential resolution — sandbox-first architecture.
+ *
+ * All channel credentials (Slack client_id/secret/signing_secret, Telegram bot token, etc.)
+ * live inside the SANDBOX SecretStore. kortix-api reads them from the sandbox when needed
+ * (OAuth install, OAuth callback, webhook signature verification).
+ *
+ * Resolution order:
+ *   1. kortix-api env vars (SLACK_CLIENT_ID, etc.) — backward compat for cloud mode
+ *   2. Sandbox env vars via GET {sandboxUrl}/env/{KEY} — the primary source in local mode
+ *
+ * The `channel_platform_credentials` DB table is NO LONGER USED.
+ */
+
 import { config } from '../../config';
-import { decryptCredentials } from './credentials';
+import { resolveDirectEndpoint, resolveSandboxTarget } from '../core/opencode-connector';
 
 export interface SlackPlatformCreds {
   clientId: string;
@@ -10,114 +21,87 @@ export interface SlackPlatformCreds {
   signingSecret: string;
 }
 
+// In-memory cache with short TTL (credentials rarely change mid-session)
 interface CacheEntry {
   creds: SlackPlatformCreds | null;
   expiresAt: number;
 }
 
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 120_000; // 2 minutes
 const cache = new Map<string, CacheEntry>();
 
 export function clearPlatformCredentialsCache(): void {
   cache.clear();
 }
 
+/**
+ * Get Slack platform credentials.
+ *
+ * Resolution:
+ *   1. env vars on kortix-api (SLACK_CLIENT_ID, etc.) — always checked first
+ *   2. sandbox env vars via GET {sandboxUrl}/env/{KEY} — if sandboxId provided
+ */
 export async function getSlackPlatformCredentials(
-  accountId?: string,
+  _accountId?: string,
   sandboxId?: string | null,
 ): Promise<SlackPlatformCreds | null> {
-  // Cloud mode: always use env vars
-  if (config.isCloud()) {
-    return envCreds();
-  }
-
-  // Local mode: if env vars are fully set, use them (backward compat)
+  // 1. Check kortix-api env vars (backward compat, cloud mode)
   const fromEnv = envCreds();
-  if (fromEnv) {
-    return fromEnv;
-  }
+  if (fromEnv) return fromEnv;
 
-  // Local mode, env vars missing: resolve from DB
-  if (!accountId) return null;
+  // 2. Read from sandbox
+  if (!sandboxId) return null;
 
-  const cacheKey = `${accountId}:${sandboxId || 'default'}`;
+  const cacheKey = `sandbox:${sandboxId}`;
   const now = Date.now();
   const cached = cache.get(cacheKey);
-  if (cached && cached.expiresAt > now) {
-    return cached.creds;
-  }
+  if (cached && cached.expiresAt > now) return cached.creds;
 
   try {
-    // 1. Try sandbox-scoped credentials first
-    if (sandboxId) {
-      const result = await loadCredsFromDb(accountId, sandboxId);
-      if (result) {
-        cache.set(cacheKey, { creds: result, expiresAt: now + CACHE_TTL_MS });
-        return result;
-      }
-    }
-
-    // 2. Fall back to account-level default (sandboxId = NULL)
-    const fallbackKey = `${accountId}:default`;
-    const fallbackCached = cache.get(fallbackKey);
-    if (fallbackCached && fallbackCached.expiresAt > now) {
-      if (sandboxId) {
-        cache.set(cacheKey, fallbackCached);
-      }
-      return fallbackCached.creds;
-    }
-
-    const result = await loadCredsFromDb(accountId, null);
-    cache.set(fallbackKey, { creds: result, expiresAt: now + CACHE_TTL_MS });
-    if (sandboxId) {
-      cache.set(cacheKey, { creds: result, expiresAt: now + CACHE_TTL_MS });
-    }
-    return result;
+    const creds = await readSlackCredsFromSandbox(sandboxId);
+    cache.set(cacheKey, { creds, expiresAt: now + CACHE_TTL_MS });
+    return creds;
   } catch (err) {
-    console.error('[PLATFORM-CREDS] Failed to load Slack platform credentials from DB:', err);
+    console.error('[PLATFORM-CREDS] Failed to read Slack creds from sandbox:', err);
     return null;
   }
 }
 
-async function loadCredsFromDb(
-  accountId: string,
-  sandboxId: string | null,
-): Promise<SlackPlatformCreds | null> {
-  const conditions = [
-    eq(channelPlatformCredentials.accountId, accountId),
-    eq(channelPlatformCredentials.channelType, 'slack'),
-  ];
-
-  if (sandboxId) {
-    conditions.push(eq(channelPlatformCredentials.sandboxId, sandboxId));
-  } else {
-    conditions.push(isNull(channelPlatformCredentials.sandboxId));
-  }
-
-  const [row] = await db
-    .select()
-    .from(channelPlatformCredentials)
-    .where(and(...conditions));
-
-  if (!row || !row.credentials) {
+/**
+ * Read Slack app credentials directly from the sandbox's env vars.
+ * Uses GET {sandboxUrl}/env/{KEY} to read individual keys.
+ */
+async function readSlackCredsFromSandbox(sandboxId: string): Promise<SlackPlatformCreds | null> {
+  const target = await resolveSandboxTarget(sandboxId);
+  if (!target) {
+    console.warn('[PLATFORM-CREDS] Sandbox not found:', sandboxId);
     return null;
   }
 
-  const decrypted = await decryptCredentials(
-    row.credentials as Record<string, unknown>,
+  const { url, headers } = await resolveDirectEndpoint(target);
+
+  // Read all three keys in parallel
+  const keys = ['SLACK_CLIENT_ID', 'SLACK_CLIENT_SECRET', 'SLACK_SIGNING_SECRET'] as const;
+  const results = await Promise.all(
+    keys.map(async (key) => {
+      try {
+        const res = await fetch(`${url}/env/${key}`, {
+          headers,
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) return null;
+        const data = await res.json() as { value?: string };
+        return data.value || null;
+      } catch {
+        return null;
+      }
+    }),
   );
 
-  const creds: SlackPlatformCreds = {
-    clientId: (decrypted.clientId as string) || '',
-    clientSecret: (decrypted.clientSecret as string) || '',
-    signingSecret: (decrypted.signingSecret as string) || '',
-  };
+  const [clientId, clientSecret, signingSecret] = results;
+  if (!clientId || !clientSecret || !signingSecret) return null;
 
-  if (!creds.clientId || !creds.clientSecret || !creds.signingSecret) {
-    return null;
-  }
-
-  return creds;
+  return { clientId, clientSecret, signingSecret };
 }
 
 function envCreds(): SlackPlatformCreds | null {

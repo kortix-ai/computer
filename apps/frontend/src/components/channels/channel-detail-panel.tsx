@@ -29,12 +29,15 @@ import {
   Link,
   Unlink,
   AlertTriangle,
+  ExternalLink,
+  Bot,
 } from 'lucide-react';
 import {
   useUpdateChannel,
   useDeleteChannel,
   useToggleChannel,
   useChannelMessages,
+  useChannelSessions,
   useLinkChannel,
   useUnlinkChannel,
   type ChannelConfig,
@@ -46,6 +49,8 @@ import { SlackIcon } from '@/components/ui/icons/slack';
 import { TelegramIcon } from '@/components/ui/icons/telegram';
 import { DiscordIcon } from '@/components/ui/icons/discord';
 import { WhatsAppIcon } from '@/components/ui/icons/whatsapp';
+import { openTabAndNavigate } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 
 const getChannelIcon = (channelType: string): React.ComponentType<{ className?: string }> => {
   switch (channelType) {
@@ -79,7 +84,7 @@ interface ChannelEditDialogProps {
 }
 
 export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDialogProps) {
-  const [tab, setTab] = useState<'settings' | 'messages'>('settings');
+  const [tab, setTab] = useState<'settings' | 'messages' | 'sessions'>('settings');
   const [name, setName] = useState(channel.name);
   const [systemPrompt, setSystemPrompt] = useState(channel.systemPrompt || '');
   const [isDirty, setIsDirty] = useState(false);
@@ -94,6 +99,9 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
   const unlinkMutation = useUnlinkChannel();
   const { data: messages = [] } = useChannelMessages(
     tab === 'messages' ? channel.channelConfigId : '',
+  );
+  const { data: channelSessions = [], isLoading: sessionsLoading } = useChannelSessions(
+    tab === 'sessions' ? channel.channelConfigId : '',
   );
 
   // Sync state when channel prop changes
@@ -227,6 +235,17 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
             >
               Messages
             </button>
+            <button
+              onClick={() => setTab('sessions')}
+              className={cn(
+                "px-4 py-1.5 text-sm font-medium rounded-xl transition-colors",
+                tab === 'sessions'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Sessions
+            </button>
           </div>
         </div>
 
@@ -354,7 +373,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                 </div>
               </div>
             </div>
-          ) : (
+          ) : tab === 'messages' ? (
             <div className="space-y-2">
               {messages.length === 0 ? (
                 <div className="text-center py-8">
@@ -395,6 +414,83 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                     </p>
                   </div>
                 ))
+              )}
+            </div>
+          ) : (
+            /* Sessions tab */
+            <div className="space-y-2">
+              {sessionsLoading ? (
+                <div className="text-center py-8">
+                  <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Loading sessions...</p>
+                </div>
+              ) : channelSessions.length === 0 ? (
+                <div className="text-center py-8">
+                  <Bot className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No sessions yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sessions will appear here once users message via this channel
+                  </p>
+                </div>
+              ) : (
+                channelSessions.map((cs) => {
+                  const shortId = cs.sessionId.slice(0, 8);
+                  const threadKey = cs.strategyKey.split(':').slice(-1)[0] ?? cs.strategyKey;
+                  const lastUsed = new Date(cs.lastUsedAt);
+                  const now = Date.now();
+                  const diffMs = now - lastUsed.getTime();
+                  const diffMins = Math.floor(diffMs / 60_000);
+                  const diffHours = Math.floor(diffMins / 60);
+                  const diffDays = Math.floor(diffHours / 24);
+                  const relTime = diffDays > 0
+                    ? `${diffDays}d ago`
+                    : diffHours > 0
+                      ? `${diffHours}h ago`
+                      : diffMins > 0
+                        ? `${diffMins}m ago`
+                        : 'just now';
+
+                  return (
+                    <div
+                      key={cs.channelSessionId}
+                      className="rounded-xl border bg-muted/20 hover:bg-muted/40 transition-colors p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Bot className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <span className="text-xs font-mono text-foreground font-medium truncate">
+                              {shortId}…
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            Thread: <span className="font-mono">{threadKey.slice(0, 32)}{threadKey.length > 32 ? '…' : ''}</span>
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{relTime}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 rounded-lg"
+                            onClick={() => {
+                              openTabAndNavigate({
+                                id: cs.sessionId,
+                                title: `Session ${shortId}`,
+                                type: 'session',
+                                href: `/sessions/${cs.sessionId}`,
+                                serverId: useServerStore.getState().activeServerId,
+                              });
+                              onOpenChange(false);
+                            }}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           )}

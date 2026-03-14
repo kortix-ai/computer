@@ -106,6 +106,50 @@ export function TelegramSetupWizard({ onCreated, onBack }: TelegramSetupWizardPr
 
   const ngrokInstalled = ngrokQuery.data?.ngrokInstalled ?? false;
 
+  const fullWebhookUrl = publicUrl.trim()
+    ? `${publicUrl.replace(/\/$/, '')}/webhooks/telegram`
+    : null;
+
+  const handleVerifyToken = async () => {
+    if (!botToken.trim()) return;
+    try {
+      const result = await verifyMutation.mutateAsync({ botToken: botToken.trim() });
+      if (!result.valid) {
+        toast.error(result.error ?? 'Invalid bot token');
+        return;
+      }
+      setBotUsername(result.bot?.username ?? '');
+      setBotVerified(true);
+      setStep(2);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to verify token');
+    }
+  };
+
+  const handleStartNgrok = async () => {
+    try {
+      const result = await ngrokStart.mutateAsync({ port: TUNNEL_PORT });
+      if (result.url) setPublicUrl(result.url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to start ngrok');
+    }
+  };
+
+  const handleConnect = async () => {
+    if (!publicUrl.trim()) return;
+    try {
+      await connectMutation.mutateAsync({
+        botToken: botToken.trim(),
+        publicUrl: publicUrl.trim(),
+        botUsername: botUsername || undefined,
+      });
+      toast.success('Telegram bot connected!');
+      onCreated();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to connect bot');
+    }
+  };
+
   return (
     <div>
       <StepIndicator current={step} />
