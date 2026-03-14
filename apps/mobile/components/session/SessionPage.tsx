@@ -41,9 +41,10 @@ import { SessionTurn } from './SessionTurn';
 interface SessionPageProps {
   sessionId: string;
   onBack: () => void;
+  onOpenDrawer?: () => void;
 }
 
-export function SessionPage({ sessionId, onBack }: SessionPageProps) {
+export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
@@ -204,22 +205,22 @@ export function SessionPage({ sessionId, onBack }: SessionPageProps) {
 
   return (
     <View className="flex-1 bg-background">
-      {/* Header */}
+      {/* Header — matches dashboard layout exactly */}
       <View
         style={{ paddingTop: insets.top }}
-        className="border-b border-border bg-background px-4 pb-3"
+        className="px-4 pb-3 bg-background"
       >
-        <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center">
           <TouchableOpacity
-            onPress={onBack}
+            onPress={onOpenDrawer}
             className="mr-3 p-1"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="chevron-back" size={24} color={isDark ? '#F8F8F8' : '#121215'} />
+            <Ionicons name="menu" size={24} color={isDark ? '#F8F8F8' : '#121215'} />
           </TouchableOpacity>
           <View className="flex-1">
             <Text
-              className="text-base font-semibold text-foreground"
+              className="text-lg font-bold text-foreground"
               numberOfLines={1}
             >
               {title}

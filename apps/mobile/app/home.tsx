@@ -532,7 +532,7 @@ export default function HomeScreen() {
         overlayStyle={{
           backgroundColor: isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.2)',
         }}
-        swipeEnabled={!activeSessionId}
+        swipeEnabled
         swipeEdgeWidth={80}
         swipeMinDistance={30}
         renderDrawerContent={renderDrawerContent}
@@ -560,7 +560,7 @@ export default function HomeScreen() {
 
           /* Active session */
           ) : activeSessionId ? (
-            <SessionPage sessionId={activeSessionId} onBack={handleBack} />
+            <SessionPage sessionId={activeSessionId} onBack={handleBack} onOpenDrawer={handleDrawerOpen} />
 
           /* Dashboard */
           ) : (
