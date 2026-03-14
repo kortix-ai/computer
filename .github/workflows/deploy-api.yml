@@ -31,9 +31,10 @@ jobs:
             set -e
 
             cd ~/computer
-            git fetch origin main
+            git -c fetch.recurseSubmodules=false fetch origin main
             git reset --hard origin/main
-            git submodule update --init --recursive
+            git submodule sync --recursive
+            git submodule update --init --recursive --force
 
             # Stop and remove old containers first to avoid name conflicts
             docker compose --project-directory . -f scripts/compose/docker-compose.yml --profile backend down --remove-orphans || true
