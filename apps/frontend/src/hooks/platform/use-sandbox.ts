@@ -189,6 +189,4 @@ export function useProviders() {
   });
 }
 
-/** @deprecated Use CLOUD_SANDBOX_SERVER_ID from '@/stores/server-store' directly */
-export const SANDBOX_SERVER_ID = 'cloud-sandbox';
 export type { SandboxProviderName };

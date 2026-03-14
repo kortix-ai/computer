@@ -15,6 +15,7 @@
  */
 
 import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getEnv } from '@/lib/env-config';
 import type { ServerEntry } from '@/stores/server-store';
 
 // ─── Sandbox Port Constants ──────────────────────────────────────────────────
@@ -48,7 +49,7 @@ export function getDirectPortUrl(
   containerPort: string,
 ): string | null {
   if (server.sandboxId && server.sandboxId !== 'undefined') {
-    return `${PLATFORM_URL}/p/${server.sandboxId}/${containerPort}`;
+    return `${getPlatformUrl()}/p/${server.sandboxId}/${containerPort}`;
   }
   return null;
 }
@@ -61,7 +62,7 @@ export function getDirectPortUrl(
 function getPlatformUrl(): string {
   // Server-side: prefer BACKEND_URL (internal Docker hostname) over
   // NEXT_PUBLIC_BACKEND_URL (browser-facing localhost, unreachable from container)
-  const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
+  const backendUrl = process.env.BACKEND_URL || getEnv().BACKEND_URL;
   if (backendUrl) {
     return backendUrl;
   }
@@ -69,8 +70,6 @@ function getPlatformUrl(): string {
   // Fallback for local dev
   return 'http://localhost:8008/v1';
 }
-
-const PLATFORM_URL = getPlatformUrl();
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -125,7 +124,7 @@ async function platformFetch<T>(
     ...options.headers as Record<string, string>,
   };
 
-  const res = await fetch(`${PLATFORM_URL}${path}`, {
+  const res = await fetch(`${getPlatformUrl()}${path}`, {
     ...options,
     headers,
   });
@@ -159,7 +158,7 @@ export function getSandboxUrl(sandbox: SandboxInfo): string {
     );
   }
 
-  return `${PLATFORM_URL}/p/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
+  return `${getPlatformUrl()}/p/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
 }
 
 /**
@@ -171,7 +170,7 @@ export function getSandboxPortUrl(
   containerPort: string,
 ): string | null {
   if (sandbox.external_id) {
-    return `${PLATFORM_URL}/p/${sandbox.external_id}/${containerPort}`;
+    return `${getPlatformUrl()}/p/${sandbox.external_id}/${containerPort}`;
   }
   return null;
 }
@@ -230,12 +229,6 @@ export async function ensureSandbox(opts?: {
 }
 
 /**
- * Backwards-compatible alias for ensureSandbox.
- * @deprecated Use ensureSandbox() directly.
- */
-export const initAccount = ensureSandbox;
-
-/**
  * Get the user's sandbox.
  * Returns null if no sandbox exists (call ensureSandbox first).
  */
@@ -280,7 +273,7 @@ export async function createSandbox(opts?: {
       'Authorization': `Bearer ${token}`,
     };
 
-    const initRes = await fetch(`${PLATFORM_URL}/platform/init/local`, {
+    const initRes = await fetch(`${getPlatformUrl()}/platform/init/local`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -315,7 +308,7 @@ export async function createSandbox(opts?: {
       for (let attempt = 0; attempt < 360; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        const statusRes = await fetch(`${PLATFORM_URL}/platform/init/local/status`, {
+        const statusRes = await fetch(`${getPlatformUrl()}/platform/init/local/status`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -517,7 +510,7 @@ export interface SandboxUpdateStatus {
 export async function getSandboxUpdateStatus(
   _sandbox?: SandboxInfo,
 ): Promise<SandboxUpdateStatus> {
-  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/update/status`, {
+  const res = await fetch(`${getPlatformUrl()}/platform/sandbox/update/status`, {
     headers: { 'Accept': 'application/json' },
   });
   if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
@@ -530,7 +523,7 @@ export async function getSandboxUpdateStatus(
  * published version regardless of which API image the user is running.
  */
 export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
-  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/version/latest`, {
+  const res = await fetch(`${getPlatformUrl()}/platform/sandbox/version/latest`, {
     headers: { 'Accept': 'application/json' },
   });
   if (!res.ok) throw new Error(`Version check failed: ${res.status}`);
@@ -541,7 +534,7 @@ export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
  * Get the full changelog from the platform.
  */
 export async function getFullChangelog(): Promise<ChangelogEntry[]> {
-  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/version/changelog`, {
+  const res = await fetch(`${getPlatformUrl()}/platform/sandbox/version/changelog`, {
     headers: { 'Accept': 'application/json' },
   });
   if (!res.ok) throw new Error(`Changelog fetch failed: ${res.status}`);
@@ -560,7 +553,7 @@ export async function triggerSandboxUpdate(
   _sandbox: SandboxInfo,
   version: string,
 ): Promise<SandboxUpdateResult> {
-  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/update`, {
+  const res = await fetch(`${getPlatformUrl()}/platform/sandbox/update`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -579,7 +572,7 @@ export async function triggerSandboxUpdate(
  * Reset the update status on kortix-api (e.g. after a failed update to allow retry).
  */
 export async function resetSandboxUpdateStatus(): Promise<void> {
-  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/update/reset`, {
+  const res = await fetch(`${getPlatformUrl()}/platform/sandbox/update/reset`, {
     method: 'POST',
     headers: { 'Accept': 'application/json' },
   });

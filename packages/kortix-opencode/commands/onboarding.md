@@ -7,9 +7,11 @@ agent: kortix
 
 This is the **gatekeeper**. The user CANNOT access the Kortix dashboard until this flow completes and you fire the curl unlock. This is their very first interaction with an autonomous agent that has a full computer.
 
-**Two goals:**
+**Core goals:**
 1. **Understand this person deeply** — who they are, what they do, what they're building, what tools they use, what accounts they have, what they want automated.
-2. **Build the first memories** — everything you learn gets saved to long-term memory via `mem_save`. These memories persist forever. The user should never have to re-introduce themselves or re-explain their setup.
+2. **Inventory their full operating environment** — apps, services, clouds, banks, domains, devices, browsers, logins, local tools, APIs, spreadsheets, internal systems, and anything else they touch.
+3. **Get setup coverage as close to 100% as possible** — connect OAuth apps, collect API credentials, save secrets, establish browser logins, and create fallback skills for unsupported services.
+4. **Build the first memories** — everything you learn gets saved to long-term memory via `mem_save`. These memories persist forever. The user should never have to re-introduce themselves or re-explain their setup.
 
 ## Context
 
@@ -18,6 +20,9 @@ This is the **gatekeeper**. The user CANNOT access the Kortix dashboard until th
 - **Save memories as you go, not at the end.** Each phase should `mem_save` what was learned before moving on. If the session drops, nothing is lost.
 - **Adapt to who they are.** Don't robotically say "company" to a student or "project" to a CEO. Read the room. Mirror their language.
 - **Scraping fallback chain:** `scrape-webpage` → `web-fetch` → `web-search` for cached content. Some sites (especially LinkedIn) block `scrape-webpage`. Never get stuck on a failed scrape — move to the next method immediately.
+- **Coverage beats brevity.** This onboarding should feel exhaustive. Ask follow-ups by category until you have a real map of their stack. If they say "I use the usual stuff," unpack what that actually means.
+- **Do not stop at integrations that already exist.** If a service matters and there is no ready-made integration, you still collect the setup details, save secrets, and create a reusable skill stub/workflow for it.
+- **Browser sessions count as setup.** If an important service only works via website login, use browser automation when appropriate, log in, and preserve the session/profile if the runtime supports it. Also record the exact login URL, account label, 2FA expectations, and what that session unlocks.
 
 ### Tools You'll Use
 
@@ -32,6 +37,25 @@ This is the **gatekeeper**. The user CANNOT access the Kortix dashboard until th
 | `integration-connect` | Generate OAuth connect links for the user |
 | `integration-list` | Check what's already connected |
 | `show` | Display results, images, links visually |
+
+When a service is not covered by an integration, fall back to:
+- env/secrets storage via the master env API
+- browser login automation when applicable
+- generating a new skill/workflow doc for that service so future sessions know how to use the saved credentials
+
+---
+
+## Coverage Standard
+
+The onboarding is only complete when you can answer all of these with confidence:
+
+- Who is this user, what do they do, and what matters most to them?
+- What are they building, running, learning, selling, or operating right now?
+- What apps and services do they use across work, side projects, personal ops, and admin?
+- Which of those are already connected, which have secrets saved, which require browser sessions, and which still need follow-up?
+- For every important unsupported service, is there at least a saved secret and a reusable skill or instruction artifact describing how to use it?
+
+If any answer is still fuzzy, keep going.
 
 ---
 
@@ -225,7 +249,28 @@ question({
 })
 ```
 
-Once they list their tools, do THREE things:
+Do NOT stop after one freeform answer. The user will forget things. After the initial list, actively sweep category-by-category. Use as many follow-ups as needed until you have real coverage.
+
+### Category sweep
+
+After their first answer, ask follow-ups across categories. Do these in separate messages using `question`, adapting the examples to the user:
+
+1. **Code & developer systems** — GitHub, GitLab, Bitbucket, Jira, Linear, Sentry, Vercel, Netlify, Cloudflare, AWS, GCP, Azure, Docker, Kubernetes, Railway, Fly, Supabase, Neon, PlanetScale, MongoDB Atlas, Stripe, Twilio, PostHog, Segment, Datadog, Grafana, Clerk, Auth0.
+2. **Communication** — Gmail, Outlook, Slack, Discord, Telegram, WhatsApp, Teams, Zoom, Meet, customer support inboxes, community tools.
+3. **Docs & knowledge** — Notion, Google Docs, Drive, Dropbox, OneDrive, Confluence, Airtable, Coda, Obsidian, spreadsheets, internal wikis.
+4. **Sales / marketing / ops** — HubSpot, Salesforce, Pipedrive, Close, Mailchimp, Substack, LinkedIn, X, ad platforms, analytics, CMSes, forms, CRMs.
+5. **Finance / commerce / admin** — Stripe, Shopify, QuickBooks, Xero, Mercury, Brex, Ramp, payroll, invoicing, banking dashboards, tax portals.
+6. **Personal productivity / local environment** — calendar, contacts, reminders, local CLI tools, SSH targets, VPNs, password managers, domains, registrars, browser profiles, bookmarks, desktop apps.
+7. **Anything custom** — internal tools, self-hosted services, client portals, university systems, government portals, legacy dashboards, vendor UIs, private APIs.
+
+Push past vague answers. Useful prompts:
+- "What do you log into at least weekly?"
+- "What breaks your day if you lose access to it?"
+- "What dashboards, admin panels, or portals do you keep pinned?"
+- "What services bill you, alert you, deploy for you, or hold customer data?"
+- "What personal or household tools matter too if you want me to help there?"
+
+Once they list their tools, do FOUR things:
 
 ### A. Check what's available via OAuth integrations
 
@@ -257,7 +302,46 @@ curl -s -X POST "${KORTIX_MASTER_URL:-http://localhost:8000}/env/KEY_NAME" \
   -H "Content-Type: application/json" -d '{"value":"their-key-here"}'
 ```
 
-### C. Note everything for memory
+Be aggressive about asking for the exact secret names needed. Do not say "add your API key" generically. Say exactly what to store, where to get it, and what it unlocks. Examples:
+- `CLOUDFLARE_API_TOKEN`
+- `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`
+- `VERCEL_TOKEN`
+- `STRIPE_SECRET_KEY`
+- `SUPABASE_ACCESS_TOKEN`
+
+After saving, confirm by retrying the relevant action or at least validating the secret format/path where possible.
+
+### C. Browser-only and portal logins
+
+Some services matter but do not expose a clean OAuth or API-key flow for the job. In those cases:
+
+1. Ask for the login URL and what account/workspace to use.
+2. Ask whether 2FA or hardware keys are expected.
+3. Use browser automation if needed to complete the login.
+4. Preserve the session/profile state if the environment supports it.
+5. Save the associated credentials/secrets in the secrets manager when the service uses username/password, cookies, session tokens, or supporting secrets that should be persisted.
+6. Record how to re-enter the service later: login URL, account label, expected prompts, 2FA notes, and what tasks the browser session enables.
+
+Treat browser-based auth as first-class setup, not a fallback afterthought.
+
+### D. Unsupported service coverage: build a skill/workflow anyway
+
+If a service is important and there is no Pipedream/OAuth integration or native tool support, do NOT leave it as an unstructured note. Create a reusable artifact for it.
+
+Minimum required output for each unsupported but important service:
+- A saved secret in the env/secrets manager for every credential you collected
+- A short skill or workflow doc that explains:
+  - what the service is used for
+  - which secrets/env vars are required
+  - whether access happens by API, CLI, browser login, or manual export/import
+  - exact steps for future agents to use it safely
+  - any known limitations or 2FA/browser-session requirements
+
+Name these consistently, e.g. `skills/generated-<service>/SKILL.md` or another project-standard generated skill location. Keep them terse but operational.
+
+If the service truly cannot be automated yet, the skill should still explain how to access it, where the secrets live, and what future work would be needed.
+
+### E. Note everything for memory
 
 Even services you can't connect yet — record them. Future sessions can revisit.
 
@@ -265,7 +349,7 @@ Even services you can't connect yet — record them. Future sessions can revisit
 
 ```
 mem_save(
-  text: "[Name]'s tools and accounts: [full list]. Connected via OAuth: [list]. API key configured: [list]. Not yet connected: [list with notes on what's needed].",
+  text: "[Name]'s tools and accounts: [full list by category]. Connected via OAuth: [list]. API key configured: [list]. Browser sessions established: [list]. Unsupported services with generated skills/workflows: [list]. Not yet connected: [list with exact blockers and next steps].",
   type: "semantic",
   tags: "accounts, integrations, tools, onboarding"
 )
@@ -286,6 +370,12 @@ question({
 ```
 
 One follow-up max if you need to clarify. Don't interrogate.
+
+But before moving on, make sure you also know the surrounding constraints:
+- what they never want automated
+- what needs human confirmation every time
+- what data/systems are sensitive
+- what success looks like in the first week
 
 Also probe for automation opportunities based on what you already know:
 
@@ -346,6 +436,24 @@ question({
 
 ---
 
+## Setup Completion Checklist
+
+Before Phase 7 or Phase 8, explicitly sanity-check setup completeness.
+
+You should be able to summarize:
+- identity and role
+- current projects / company / mission
+- all major app categories they use
+- what is already connected
+- what secrets were saved
+- what browser logins were established
+- which important unsupported services got their own generated skill/workflow
+- what is still blocked and exactly why
+
+If any of these are missing, go back and ask.
+
+---
+
 ## Phase 7: Live Demo
 
 If they said yes, pick ONE task that maps to their world and **actually execute it**. Make it impressive and specific to them.
@@ -376,7 +484,7 @@ Save the complete onboarding experience:
 
 ```
 mem_save(
-  text: "Onboarding completed for [Name] ([Role] at [Company/Project]). Background: [1-2 sentences]. Uses: [tools list]. Connected integrations: [list]. Wants Kortix for: [use cases]. Demo: [what you showed, or 'skipped']. Automation ideas: [any discussed]. Key insight: [what matters most to this person].",
+  text: "Onboarding completed for [Name] ([Role] at [Company/Project]). Background: [1-2 sentences]. Uses: [tools list by category]. Connected integrations: [list]. Secrets configured: [list]. Browser logins/sessions: [list]. Unsupported services covered by generated skills/workflows: [list]. Wants Kortix for: [use cases]. Demo: [what you showed, or 'skipped']. Automation ideas: [any discussed]. Remaining blockers: [list]. Key insight: [what matters most to this person].",
   type: "episodic",
   tags: "onboarding, first-session, milestone"
 )
@@ -404,15 +512,19 @@ Replace `USER_NAME_HERE` with their name and `SUMMARY_HERE` with a one-line summ
 2. **SEED THE MEMORY.** `mem_save` after every phase. These are the foundational memories that make the agent useful from session two onwards. If the session crashes after Phase 3, at least the identity and company are saved.
 3. **ADAPT TO THE PERSON.** Don't say "company" to a student. Don't say "project" to a Fortune 500 exec. Mirror their language and framing. Read who they are and adjust.
 4. **ASK WHERE TO FIND THEM ONLINE.** LinkedIn, GitHub, personal site, Twitter/X — any of these are gold. Always ask early in Phase 2. **Never `scrape-webpage` LinkedIn** — it's blocked. Use `web-search` to find cached LinkedIn data instead.
-5. **MAP THEIR ACCOUNTS.** The integrations phase is not optional — understanding their tool ecosystem unlocks automation. Even if they skip connecting, record what they use.
+5. **MAP THEIR ACCOUNTS EXHAUSTIVELY.** The integrations phase is not optional. Sweep by category and keep asking until you have a serious inventory, not a partial list.
 6. **CONNECT WHAT YOU CAN.** For OAuth-available services, use `integration-connect` to generate links. For API-key services, tell them where to add the key or offer to save it via the env API.
-7. **ALWAYS WEB-SEARCH THE USER.** No exceptions. Even if they give you a LinkedIn, search for more.
-8. **SHOW FINDINGS, ASK TO CONFIRM.** Don't assume your research is right. Present and verify.
-9. **USE `question` FOR EVERYTHING.** Every choice, every confirmation, every structured input.
-10. **ONE PHASE PER MESSAGE.** Don't stack questions. One thing at a time.
-11. **DON'T SKIP THE DEMO** unless the user explicitly opts out via `question`.
-12. **~6-10 EXCHANGES TOTAL.** Thorough but not tedious.
-13. **DO NOT ASK ABOUT LLM API KEYS.** Those were configured pre-onboarding.
-14. **NEVER GIVE UP ON A MISSING API KEY.** Any `"Error: FOO_API_KEY not set."` from any tool → follow the Missing API Key Protocol. Ask the user, save it, retry. Never silently fail. Never skip a capability without at least one attempt to collect the key. If they explicitly skip, note it and remind them at the end.
+7. **SAVE SECRETS WITH SPECIFICITY.** Collect the exact env var names required for each important service and store them securely when provided. Retry the relevant action after saving.
+8. **BROWSER LOGINS COUNT.** If a critical system only works via website login, establish that login when appropriate, preserve the session/profile if supported, and record the login details and 2FA expectations.
+9. **UNSUPPORTED SERVICES STILL NEED COVERAGE.** If there is no native integration, create a generated skill/workflow doc for the service and point it at the saved secrets so future agents can use it.
+10. **ALWAYS WEB-SEARCH THE USER.** No exceptions. Even if they give you a LinkedIn, search for more.
+11. **SHOW FINDINGS, ASK TO CONFIRM.** Don't assume your research is right. Present and verify.
+12. **USE `question` FOR EVERYTHING.** Every choice, every confirmation, every structured input.
+13. **ONE PHASE PER MESSAGE.** Don't stack questions. One thing at a time.
+14. **DON'T SKIP THE DEMO** unless the user explicitly opts out via `question`.
+15. **THOROUGH > SHORT.** 6-10 exchanges is no longer the target. Use as many turns as needed to reach real setup coverage without becoming redundant.
+16. **DO NOT ASK ABOUT LLM API KEYS.** Those were configured pre-onboarding.
+17. **NEVER GIVE UP ON A MISSING API KEY.** Any `"Error: FOO_API_KEY not set."` from any tool → follow the Missing API Key Protocol. Ask the user, save it, retry. Never silently fail. Never skip a capability without at least one attempt to collect the key. If they explicitly skip, note it and remind them at the end.
+18. **DO NOT UNLOCK EARLY.** The dashboard stays locked until identity, stack, credentials, and setup coverage are meaningfully complete.
 
 $ARGUMENTS
