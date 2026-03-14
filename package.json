@@ -11,7 +11,8 @@
     "ship": "node scripts/release/ship.cjs",
     "check": "node scripts/release/ship.cjs --check",
     "nuke": "bash scripts/nuke-local.sh",
-    "nuke:start": "bash scripts/nuke-local.sh --start"
+    "nuke:start": "bash scripts/nuke-local.sh --start",
+    "snapshot": "bash scripts/build-hetzner-snapshot.sh"
   },
   "devDependencies": {
     "agent-tunnel": "workspace:@kortix/agent-tunnel@*"
