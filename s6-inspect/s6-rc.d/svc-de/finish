@@ -1,0 +1,9 @@
+#!/bin/bash
+PID_FILE="/de-pid"
+if [ ! -r "$PID_FILE" ]; then exit 0; fi
+PARENT_PID=$(cat "$PID_FILE")
+if [ -z "$PARENT_PID" ]; then rm -f "$PID_FILE"; exit 0; fi
+PIDS=$(pstree -p "$PARENT_PID" 2>/dev/null | grep -o "([0-9]\+)" | grep -o "[0-9]\+" | grep -v "^${PARENT_PID}$")
+[ -n "$PIDS" ] && echo "$PIDS" | xargs kill -TERM -- 2>/dev/null && sleep 1
+rm -f "$PID_FILE"
+exit 0

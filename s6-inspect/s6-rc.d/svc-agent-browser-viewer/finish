@@ -1,0 +1,4 @@
+#!/bin/bash
+# Kill any stale bun process holding port 9224 before restart
+fuser -k 9224/tcp 2>/dev/null || true
+sleep 2

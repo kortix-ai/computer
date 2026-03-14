@@ -1,0 +1,12 @@
+#!/usr/bin/with-contenv bash
+# Presentation Viewer on port 3210
+
+echo "[presentation-viewer] Starting persistent viewer on port 3210"
+
+mkdir -p /workspace/presentations
+if [ "$(id -u)" -eq 0 ]; then
+  chown -R abc:users /workspace/presentations >/dev/null 2>&1 || true
+  exec s6-setuidgid abc bun run /opt/services/presentation-viewer.js
+fi
+
+exec bun run /opt/services/presentation-viewer.js

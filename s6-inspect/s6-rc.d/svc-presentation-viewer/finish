@@ -1,0 +1,4 @@
+#!/bin/bash
+# Kill any stale bun process holding port 3210 before restart
+fuser -k 3210/tcp 2>/dev/null || true
+sleep 2

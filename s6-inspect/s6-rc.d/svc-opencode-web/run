@@ -1,0 +1,18 @@
+#!/usr/bin/with-contenv bash
+# OpenCode Web UI on port 3111
+
+export HOME=/workspace
+export XDG_DATA_HOME=/workspace/.local/share
+export OPENCODE_CONFIG_DIR=/opt/opencode
+export PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+[ -z "$ANTHROPIC_BASE_URL" ] && unset ANTHROPIC_BASE_URL
+[ -z "$OPENAI_BASE_URL" ] && unset OPENAI_BASE_URL
+
+cd /workspace
+
+if [ "$(id -u)" -eq 0 ]; then
+  exec s6-setuidgid abc /usr/local/bin/opencode web --port 3111 --hostname 0.0.0.0
+fi
+
+exec /usr/local/bin/opencode web --port 3111 --hostname 0.0.0.0

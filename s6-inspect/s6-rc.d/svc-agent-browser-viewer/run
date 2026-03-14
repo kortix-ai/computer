@@ -1,0 +1,20 @@
+#!/usr/bin/with-contenv bash
+# Agent Browser Viewer on port 9224
+
+echo "[agent-browser-viewer] Starting viewer on port 9224"
+
+SOCKET_DIR="/tmp/agent-browser"
+mkdir -p "$SOCKET_DIR" /workspace
+if [ "$(id -u)" -eq 0 ]; then
+  chown -R abc:users "$SOCKET_DIR" /workspace >/dev/null 2>&1 || true
+fi
+rm -rf "$SOCKET_DIR"/* >/dev/null 2>&1 || true
+pkill -f "dist/daemon.js" >/dev/null 2>&1 || true
+
+if [ "$(id -u)" -eq 0 ]; then
+  exec env HOME=/workspace AGENT_BROWSER_SOCKET_DIR="$SOCKET_DIR" AGENT_BROWSER_STREAM_PORT=9223 AGENT_BROWSER_HEADED=1 \
+    s6-setuidgid abc bun run /opt/services/agent-browser-viewer.js
+fi
+
+exec env HOME=/workspace AGENT_BROWSER_SOCKET_DIR="$SOCKET_DIR" AGENT_BROWSER_STREAM_PORT=9223 AGENT_BROWSER_HEADED=1 \
+  bun run /opt/services/agent-browser-viewer.js

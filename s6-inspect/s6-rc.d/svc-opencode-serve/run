@@ -1,0 +1,22 @@
+#!/usr/bin/with-contenv bash
+# OpenCode API server on port 4096 (proxied by kortix-master)
+# with-contenv loads all s6 env vars (API keys, KORTIX_TOKEN, etc.) automatically.
+
+export HOME=/workspace
+export XDG_DATA_HOME=/workspace/.local/share
+export OPENCODE_CONFIG_DIR=/opt/opencode
+export OPENCODE_FILE_ROOT=/
+export BUN_PTY_LIB=/opt/bun-pty-musl/librust_pty.so
+export PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# Drop empty *_BASE_URL vars — empty string causes @ai-sdk to fetch("") → ERR_INVALID_URL
+[ -z "$ANTHROPIC_BASE_URL" ] && unset ANTHROPIC_BASE_URL
+[ -z "$OPENAI_BASE_URL" ] && unset OPENAI_BASE_URL
+
+cd /workspace
+
+if [ "$(id -u)" -eq 0 ]; then
+  exec s6-setuidgid abc /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0
+fi
+
+exec /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0

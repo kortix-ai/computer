@@ -35,6 +35,7 @@ interface ManagedProc {
 }
 
 const CORE_SPEC_PATH = '/opt/kortix/core/service-spec.json'
+
 const LEGACY_S6_SERVICES = [
   'svc-opencode-serve',
   'svc-opencode-web',
