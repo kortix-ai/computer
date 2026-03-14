@@ -1,4 +1,0 @@
-#!/bin/bash
-# Kill any stale bun process holding port 3211 before restart
-fuser -k 3211/tcp 2>/dev/null || true
-sleep 2

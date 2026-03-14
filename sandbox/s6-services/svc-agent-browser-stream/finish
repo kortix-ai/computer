@@ -1,3 +1,0 @@
-#!/usr/bin/with-contenv bash
-echo "[agent-browser-stream] agent-browser exited (code $1) — s6 will restart"
-sleep 3
