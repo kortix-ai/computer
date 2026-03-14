@@ -48,19 +48,13 @@ function SessionListItem({
   isActive: boolean;
   onPress: (s: Session) => void;
 }) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const status = useSyncStore((s) => s.sessionStatus[item.id]);
   const isSessionBusy = status?.type === 'busy';
-  const dateStr = new Date(item.time.updated).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
 
   return (
     <TouchableOpacity
       onPress={() => onPress(item)}
-      className={`rounded-lg px-3 py-3 mb-1 ${isActive ? 'bg-accent' : ''}`}
+      className={`rounded-lg px-3 py-2.5 mb-0.5 ${isActive ? 'bg-accent' : ''}`}
       activeOpacity={0.6}
     >
       <View className="flex-row items-center">
@@ -69,14 +63,11 @@ function SessionListItem({
         )}
         <Text
           className={`flex-1 text-sm ${
-            isActive ? 'text-foreground font-medium' : 'text-muted-foreground'
+            isActive ? 'text-foreground font-semibold' : 'text-foreground'
           }`}
           numberOfLines={1}
         >
-          {item.title || 'Untitled session'}
-        </Text>
-        <Text className="text-xs ml-2 text-muted-foreground/60">
-          {dateStr}
+          {item.title || 'New Session'}
         </Text>
       </View>
     </TouchableOpacity>
@@ -190,33 +181,78 @@ export default function HomeScreen() {
 
   // ── Drawer content ──
 
+  const { user } = useAuthContext();
+  const userEmail = user?.email || '';
+  const userDisplayName = userEmail.split('@')[0] || 'User';
+
   const renderDrawerContent = useCallback(() => {
+    const iconColor = isDark ? '#F8F8F8' : '#121215';
+    const mutedColor = isDark ? '#999999' : '#6e6e6e';
+
     return (
       <View
         className="flex-1 bg-background"
         style={{ paddingTop: insets.top }}
       >
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-4 py-3">
+        {/* Logo + close */}
+        <View className="flex-row items-center justify-between px-4 pt-3 pb-4">
           <Text className="text-lg font-bold text-foreground">
-            Sessions
+            Kortix
           </Text>
           <TouchableOpacity
-            onPress={handleNewSession}
-            className="flex-row items-center rounded-lg px-3 py-2 bg-accent"
-            activeOpacity={0.7}
+            onPress={handleDrawerClose}
+            className="p-1"
+            hitSlop={8}
+            activeOpacity={0.6}
           >
-            <Ionicons name="add" size={18} color={isDark ? '#F8F8F8' : '#121215'} />
-            <Text className="text-sm font-medium ml-1 text-foreground">
-              New
-            </Text>
+            <Ionicons name="chevron-back" size={20} color={mutedColor} />
           </TouchableOpacity>
+        </View>
+
+        {/* Nav items */}
+        <View className="px-2 pb-2">
+          {/* New session */}
+          <TouchableOpacity
+            onPress={handleNewSession}
+            className="flex-row items-center rounded-lg px-3 py-2.5 mb-0.5"
+            activeOpacity={0.6}
+          >
+            <Ionicons name="create-outline" size={20} color={iconColor} />
+            <Text className="text-sm ml-3 text-foreground">New session</Text>
+          </TouchableOpacity>
+
+          {/* Search */}
+          <TouchableOpacity
+            className="flex-row items-center rounded-lg px-3 py-2.5 mb-0.5"
+            activeOpacity={0.6}
+          >
+            <Ionicons name="search-outline" size={20} color={iconColor} />
+            <Text className="text-sm ml-3 text-foreground">Search</Text>
+          </TouchableOpacity>
+
+          {/* Marketplace */}
+          <TouchableOpacity
+            className="flex-row items-center rounded-lg px-3 py-2.5 mb-0.5"
+            activeOpacity={0.6}
+          >
+            <Ionicons name="sparkles-outline" size={20} color={iconColor} />
+            <Text className="text-sm ml-3 text-foreground">Marketplace</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Sessions header */}
+        <View className="flex-row items-center justify-between px-5 pt-2 pb-1">
+          <View className="flex-row items-center">
+            <Ionicons name="list-outline" size={18} color={iconColor} />
+            <Text className="text-sm font-medium ml-2 text-foreground">Sessions</Text>
+          </View>
+          <Ionicons name="chevron-down" size={16} color={mutedColor} />
         </View>
 
         {/* Session list */}
         {sessionsLoading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="small" color={isDark ? '#999999' : '#6e6e6e'} />
+            <ActivityIndicator size="small" color={mutedColor} />
           </View>
         ) : (
           <FlatList
@@ -240,25 +276,25 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* Settings */}
+        {/* Bottom: user info */}
         <View
           className="border-t border-border px-4 py-3"
           style={{ paddingBottom: insets.bottom + 8 }}
         >
-          <TouchableOpacity
-            onPress={handleGoToSettings}
-            className="flex-row items-center"
-            activeOpacity={0.6}
-          >
-            <Ionicons
-              name="settings-outline"
-              size={20}
-              color={isDark ? '#999999' : '#6e6e6e'}
-            />
-            <Text className="text-sm ml-2 text-muted-foreground">
-              Settings
-            </Text>
-          </TouchableOpacity>
+          <View className="flex-row items-center">
+            {/* Avatar initial */}
+            <View className="h-8 w-8 rounded-full bg-muted items-center justify-center mr-3">
+              <Text className="text-xs font-semibold text-muted-foreground uppercase">
+                {userDisplayName.charAt(0)}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm text-foreground" numberOfLines={1}>
+                {userDisplayName}
+              </Text>
+              <Text className="text-xs text-muted-foreground">Self-Hosted</Text>
+            </View>
+          </View>
         </View>
       </View>
     );
@@ -268,9 +304,10 @@ export default function HomeScreen() {
     sessions,
     sessionsLoading,
     activeSessionId,
+    userDisplayName,
     handleNewSession,
     handleSessionPress,
-    handleGoToSettings,
+    handleDrawerClose,
   ]);
 
   // ── Render ──
