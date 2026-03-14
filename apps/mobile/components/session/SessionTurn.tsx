@@ -16,6 +16,7 @@ import type {
   TextPart,
   ToolPart,
   ReasoningPart,
+  QuestionRequest,
 } from '@/lib/opencode/types';
 import {
   collectTurnParts,
@@ -37,6 +38,7 @@ interface SessionTurnProps {
   allMessages: MessageWithParts[];
   sessionStatus?: SessionStatus;
   isBusy: boolean;
+  pendingQuestions?: QuestionRequest[];
 }
 
 export function SessionTurn({
@@ -44,6 +46,7 @@ export function SessionTurn({
   allMessages,
   sessionStatus,
   isBusy,
+  pendingQuestions = [],
 }: SessionTurnProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -85,12 +88,22 @@ export function SessionTurn({
     return lastText?.text ?? '';
   }, [working, turn.assistantMessages, allParts]);
 
-  // Get tool parts
+  // Get tool parts — hide question tool when there's a pending question for it
   const toolParts = useMemo(() => {
+    const pendingCallIDs = new Set(
+      pendingQuestions.filter((q) => q.tool).map((q) => q.tool!.callID),
+    );
     return allParts
-      .filter(({ part }) => isToolPart(part) && shouldShowToolPart(part as ToolPart))
+      .filter(({ part }) => {
+        if (!isToolPart(part)) return false;
+        const tp = part as ToolPart;
+        if (!shouldShowToolPart(tp)) return false;
+        // Hide question tool parts that have a pending question
+        if (tp.tool === 'question' && pendingCallIDs.has(tp.callID)) return false;
+        return true;
+      })
       .map(({ part }) => part as ToolPart);
-  }, [allParts]);
+  }, [allParts, pendingQuestions]);
 
   // Get reasoning
   const reasoningText = useMemo(() => {

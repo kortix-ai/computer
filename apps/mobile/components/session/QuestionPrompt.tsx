@@ -1,12 +1,8 @@
 /**
- * QuestionPrompt — mobile-native question UI for OpenCode sessions.
+ * QuestionPrompt — compact mobile-native question UI for OpenCode sessions.
  *
- * Mirrors the frontend's question-prompt.tsx with native mobile UX:
- * - Scrollable tab pills for multi-question flows
- * - Checkbox/radio option rows with haptic feedback
- * - Custom text input with keyboard-aware layout
- * - Confirm tab with review + submit
- * - Single-question immediate submit on pick
+ * Renders inside the chat input card area, replacing the text input.
+ * Compact sizing to match the frontend's inline chip style.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,8 +11,8 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Animated,
   Keyboard,
+  Text as RNText,
 } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { useColorScheme } from 'nativewind';
@@ -63,17 +59,6 @@ export function QuestionPrompt({
   const [replying, setReplying] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  // Slide-in animation
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 65,
-      friction: 11,
-    }).start();
-  }, [slideAnim]);
-
   const isConfirm = tab === questions.length;
   const currentQuestion = questions[tab] as QuestionInfo | undefined;
   const isMulti = currentQuestion?.multiple ?? false;
@@ -110,7 +95,6 @@ export function QuestionPrompt({
         return;
       }
 
-      // Advance to next tab
       setTab(tab + 1);
       setEditing(false);
     },
@@ -192,10 +176,6 @@ export function QuestionPrompt({
     onReject(request.id);
   }, [request.id, onReject]);
 
-  // -----------------------------------------------------------------------
-  // Once replied, hide
-  // -----------------------------------------------------------------------
-
   if (replying) return null;
 
   // -----------------------------------------------------------------------
@@ -219,482 +199,415 @@ export function QuestionPrompt({
   // Colors
   // -----------------------------------------------------------------------
 
-  const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-  const bgColor = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+  const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
   const mutedColor = isDark ? '#888' : '#777';
   const fgColor = isDark ? '#F8F8F8' : '#121215';
   const pillActiveBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
   const pillActiveBorder = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)';
   const selectedBg = isDark ? 'rgba(248,248,248,0.06)' : 'rgba(18,18,21,0.04)';
-  const selectedBorder = isDark ? 'rgba(248,248,248,0.15)' : 'rgba(18,18,21,0.15)';
-  const checkColor = fgColor;
+  const selectedBorder = isDark ? 'rgba(248,248,248,0.15)' : 'rgba(18,18,21,0.12)';
 
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
 
   return (
-    <Animated.View
+    <View
       style={{
-        opacity: slideAnim,
-        transform: [
-          {
-            translateY: slideAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [20, 0],
-            }),
-          },
-        ],
+        borderWidth: 1,
+        borderColor,
+        borderRadius: 14,
+        overflow: 'hidden',
+        marginHorizontal: 16,
+        marginBottom: 6,
+        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.7)',
       }}
     >
+      {/* ── Header ── */}
       <View
         style={{
-          borderWidth: 1,
-          borderColor,
-          backgroundColor: bgColor,
-          borderRadius: 16,
-          overflow: 'hidden',
-          marginHorizontal: 16,
-          marginBottom: 8,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 10,
+          paddingVertical: 6,
         }}
       >
-        {/* ── Header ── */}
-        <View className="flex-row items-center px-3 py-2">
-          <Ionicons
-            name="chatbubble-ellipses-outline"
-            size={14}
-            color={mutedColor}
-          />
-          <Text
-            className="flex-1 text-xs ml-2 text-muted-foreground"
-            numberOfLines={1}
-          >
-            {!isSingle && `${questions.length} questions \u00B7 `}
-            <Text className="text-foreground/80 font-roobert-medium text-xs">
-              {headerSummary}
-            </Text>
-          </Text>
-          <TouchableOpacity
-            onPress={reject}
-            hitSlop={8}
-            className="h-6 w-6 items-center justify-center rounded-md"
-            activeOpacity={0.6}
-          >
-            <Ionicons name="close" size={14} color={mutedColor} />
-          </TouchableOpacity>
-        </View>
+        <Ionicons
+          name="chatbubble-ellipses-outline"
+          size={12}
+          color={mutedColor}
+        />
+        <RNText
+          style={{ flex: 1, fontSize: 11, marginLeft: 6, color: mutedColor, fontFamily: 'Roobert' }}
+          numberOfLines={1}
+        >
+          {!isSingle && `${questions.length} questions \u00B7 `}
+          <RNText style={{ color: isDark ? '#ccc' : '#444', fontFamily: 'Roobert-Medium', fontSize: 11 }}>
+            {headerSummary}
+          </RNText>
+        </RNText>
+        <TouchableOpacity
+          onPress={reject}
+          hitSlop={10}
+          style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="close" size={13} color={mutedColor} />
+        </TouchableOpacity>
+      </View>
 
-        {/* ── Body ── */}
-        <View style={{ borderTopWidth: 1, borderTopColor: borderColor }}>
-          {/* Tab pills (multi-question only) */}
-          {!isSingle && (
-            <View
-              style={{
-                borderBottomWidth: 1,
-                borderBottomColor: borderColor,
+      {/* ── Body ── */}
+      <View style={{ borderTopWidth: 1, borderTopColor: borderColor }}>
+        {/* Tab pills (multi-question only) */}
+        {!isSingle && (
+          <View style={{ borderBottomWidth: 1, borderBottomColor: borderColor }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 6,
+                paddingVertical: 4,
+                gap: 3,
               }}
             >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  gap: 4,
-                }}
-              >
-                {questions.map((q, i) => {
-                  const isAnswered = (answers[i]?.length ?? 0) > 0;
-                  const isActive = tab === i;
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      onPress={() => {
-                        setTab(i);
-                        setEditing(false);
-                      }}
-                      activeOpacity={0.7}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingHorizontal: 10,
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: isActive ? pillActiveBorder : 'transparent',
-                        backgroundColor: isActive ? pillActiveBg : 'transparent',
-                        gap: 5,
-                      }}
-                    >
-                      {/* Checkbox indicator */}
-                      <View
-                        style={{
-                          width: 14,
-                          height: 14,
-                          borderRadius: 3,
-                          borderWidth: 1.5,
-                          borderColor: isAnswered
-                            ? checkColor
-                            : isActive
-                              ? mutedColor
-                              : isDark
-                                ? 'rgba(255,255,255,0.15)'
-                                : 'rgba(0,0,0,0.15)',
-                          backgroundColor: isAnswered
-                            ? (isDark ? 'rgba(248,248,248,0.1)' : 'rgba(18,18,21,0.06)')
-                            : 'transparent',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {isAnswered && (
-                          <Ionicons name="checkmark" size={10} color={checkColor} />
-                        )}
-                        {!isAnswered && isActive && (
-                          <View
-                            style={{
-                              width: 3,
-                              height: 3,
-                              borderRadius: 1.5,
-                              backgroundColor: fgColor,
-                            }}
-                          />
-                        )}
-                      </View>
-                      <Text
-                        className={`text-sm ${
-                          isActive
-                            ? 'font-roobert-medium text-foreground'
-                            : 'text-muted-foreground'
-                        }`}
-                      >
-                        {q.header || `Q${i + 1}`}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {/* Confirm tab */}
-                <TouchableOpacity
-                  onPress={() => {
-                    setTab(questions.length);
-                    setEditing(false);
-                  }}
-                  activeOpacity={0.7}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: isConfirm ? pillActiveBorder : 'transparent',
-                    backgroundColor: isConfirm ? pillActiveBg : 'transparent',
-                  }}
-                >
-                  <Text
-                    className={`text-sm ${
-                      isConfirm
-                        ? 'font-roobert-medium text-foreground'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    Confirm
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Content area */}
-          <View className="px-3 py-2.5">
-            {isConfirm ? (
-              /* ── Confirm / review tab ── */
-              <View>
-                {questions.map((q, i) => {
-                  const ans = answers[i] ?? [];
-                  const done = ans.length > 0;
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      onPress={() => setTab(i)}
-                      activeOpacity={0.6}
-                      className="flex-row items-center py-1.5"
-                      style={{ opacity: done ? 1 : 0.4 }}
-                    >
-                      {/* Checkbox */}
-                      <View
-                        style={{
-                          width: 14,
-                          height: 14,
-                          borderRadius: 3,
-                          borderWidth: 1.5,
-                          borderColor: done ? checkColor : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'),
-                          backgroundColor: done ? (isDark ? 'rgba(248,248,248,0.1)' : 'rgba(18,18,21,0.06)') : 'transparent',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginRight: 8,
-                        }}
-                      >
-                        {done && (
-                          <Ionicons name="checkmark" size={10} color={checkColor} />
-                        )}
-                      </View>
-                      <Text
-                        className="flex-1 text-sm text-foreground"
-                        numberOfLines={1}
-                      >
-                        {q.header || q.question}
-                      </Text>
-                      <Text
-                        className="text-sm text-muted-foreground ml-2"
-                        numberOfLines={1}
-                        style={{ maxWidth: '40%' }}
-                      >
-                        {ans.length > 0 ? ans.join(', ') : '\u2014'}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {/* Submit button */}
-                <View className="flex-row justify-end mt-3">
+              {questions.map((q, i) => {
+                const isAnswered = (answers[i]?.length ?? 0) > 0;
+                const isActive = tab === i;
+                return (
                   <TouchableOpacity
-                    onPress={submit}
-                    activeOpacity={0.8}
-                    style={{
-                      backgroundColor: fgColor,
-                      paddingHorizontal: 20,
-                      paddingVertical: 10,
-                      borderRadius: 10,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: isDark ? '#121215' : '#F8F8F8',
-                        fontSize: 14,
-                        fontFamily: 'Roobert-Medium',
-                      }}
-                    >
-                      Submit
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : currentQuestion ? (
-              /* ── Question content ── */
-              <View>
-                {/* Question text */}
-                <Text className="text-sm font-roobert-medium text-foreground leading-relaxed mb-2">
-                  {currentQuestion.question}
-                  {isMulti && (
-                    <Text className="text-sm text-muted-foreground italic">
-                      {' '}(select multiple)
-                    </Text>
-                  )}
-                </Text>
-
-                {/* Options */}
-                {options.map((opt, i) => {
-                  const isPicked = currentAnswers.includes(opt.label);
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      onPress={() => selectOption(i)}
-                      activeOpacity={0.7}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingHorizontal: 10,
-                        paddingVertical: 10,
-                        borderRadius: 10,
-                        borderWidth: 1,
-                        borderColor: isPicked ? selectedBorder : 'transparent',
-                        backgroundColor: isPicked ? selectedBg : 'transparent',
-                        marginBottom: 2,
-                        gap: 10,
-                      }}
-                    >
-                      {/* Checkbox / radio indicator */}
-                      <View
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: isMulti ? 4 : 9,
-                          borderWidth: 1.5,
-                          borderColor: isPicked
-                            ? fgColor
-                            : isDark
-                              ? 'rgba(255,255,255,0.2)'
-                              : 'rgba(0,0,0,0.15)',
-                          backgroundColor: isPicked
-                            ? (isDark ? 'rgba(248,248,248,0.1)' : 'rgba(18,18,21,0.06)')
-                            : 'transparent',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {isPicked && (
-                          <Ionicons
-                            name="checkmark"
-                            size={12}
-                            color={fgColor}
-                          />
-                        )}
-                      </View>
-
-                      {/* Label + description */}
-                      <View className="flex-1">
-                        <Text className="text-sm">
-                          <Text
-                            className={`font-roobert-semibold ${
-                              isPicked ? 'text-foreground' : 'text-foreground/80'
-                            }`}
-                          >
-                            {opt.label}
-                          </Text>
-                          {opt.description && (
-                            <Text className="text-muted-foreground">
-                              {' '}{opt.description}
-                            </Text>
-                          )}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {/* Type your own answer */}
-                {showCustom && !editing && (
-                  <TouchableOpacity
-                    onPress={() => selectOption(options.length)}
+                    key={i}
+                    onPress={() => { setTab(i); setEditing(false); }}
                     activeOpacity={0.7}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
-                      paddingHorizontal: 10,
-                      paddingVertical: 10,
-                      borderRadius: 10,
-                      gap: 10,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: isActive ? pillActiveBorder : 'transparent',
+                      backgroundColor: isActive ? pillActiveBg : 'transparent',
+                      gap: 4,
                     }}
                   >
-                    <Ionicons
-                      name="pencil-outline"
-                      size={16}
-                      color={isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)'}
-                    />
-                    <Text className="text-sm text-muted-foreground">
-                      Type your own answer
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* Custom input */}
-                {editing && (
-                  <View className="flex-row items-center mt-1 gap-2">
-                    <TextInput
-                      ref={inputRef}
-                      placeholder="Type your answer..."
-                      placeholderTextColor={mutedColor}
-                      defaultValue={customInputs[tab]}
-                      onSubmitEditing={(e) =>
-                        handleCustomSubmit(e.nativeEvent.text)
-                      }
-                      returnKeyType={isMulti ? 'done' : 'go'}
+                    <View
                       style={{
-                        flex: 1,
-                        height: 36,
-                        paddingHorizontal: 12,
-                        fontSize: 14,
-                        color: fgColor,
-                        backgroundColor: isDark
-                          ? 'rgba(255,255,255,0.05)'
-                          : 'rgba(0,0,0,0.03)',
-                        borderWidth: 1,
-                        borderColor: isDark
-                          ? 'rgba(255,255,255,0.1)'
-                          : 'rgba(0,0,0,0.08)',
-                        borderRadius: 8,
-                      }}
-                    />
-                    <TouchableOpacity
-                      onPress={() => {
-                        const val = inputRef.current
-                          ? (inputRef.current as any)._lastNativeText ||
-                            customInputs[tab]
-                          : customInputs[tab];
-                        handleCustomSubmit(val || '');
-                      }}
-                      activeOpacity={0.8}
-                      style={{
-                        height: 36,
-                        paddingHorizontal: 12,
-                        backgroundColor: fgColor,
-                        borderRadius: 8,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 2.5,
+                        borderWidth: 1.5,
+                        borderColor: isAnswered ? fgColor : (isActive ? mutedColor : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)')),
+                        backgroundColor: isAnswered ? (isDark ? 'rgba(248,248,248,0.1)' : 'rgba(18,18,21,0.06)') : 'transparent',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
-                      <Text
-                        style={{
-                          color: isDark ? '#121215' : '#F8F8F8',
-                          fontSize: 13,
-                          fontFamily: 'Roobert-Medium',
-                        }}
-                      >
-                        {isMulti ? 'Add' : 'Go'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setEditing(false);
-                        Keyboard.dismiss();
-                      }}
-                      hitSlop={8}
-                      className="h-9 w-9 items-center justify-center rounded-lg"
-                      activeOpacity={0.6}
-                    >
-                      <Ionicons name="close" size={16} color={mutedColor} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Next button for multi-select */}
-                {!isSingle && isMulti && !editing && (
-                  <View className="flex-row justify-end mt-2">
-                    <TouchableOpacity
-                      onPress={() => {
-                        setTab(tab + 1);
-                        setEditing(false);
-                      }}
-                      disabled={currentAnswers.length === 0}
-                      activeOpacity={0.8}
+                      {isAnswered && <Ionicons name="checkmark" size={8} color={fgColor} />}
+                      {!isAnswered && isActive && (
+                        <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: fgColor }} />
+                      )}
+                    </View>
+                    <RNText
                       style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 8,
-                        borderRadius: 8,
-                        backgroundColor:
-                          currentAnswers.length > 0
-                            ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)')
-                            : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
-                        opacity: currentAnswers.length > 0 ? 1 : 0.4,
+                        fontSize: 12,
+                        fontFamily: isActive ? 'Roobert-Medium' : 'Roobert',
+                        color: isActive ? fgColor : mutedColor,
                       }}
                     >
-                      <Text
-                        className={`text-sm font-roobert-medium ${
-                          currentAnswers.length > 0
-                            ? 'text-foreground'
-                            : 'text-muted-foreground'
-                        }`}
-                      >
-                        Next
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            ) : null}
+                      {q.header || `Q${i + 1}`}
+                    </RNText>
+                  </TouchableOpacity>
+                );
+              })}
+
+              <TouchableOpacity
+                onPress={() => { setTab(questions.length); setEditing(false); }}
+                activeOpacity={0.7}
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: isConfirm ? pillActiveBorder : 'transparent',
+                  backgroundColor: isConfirm ? pillActiveBg : 'transparent',
+                }}
+              >
+                <RNText
+                  style={{
+                    fontSize: 12,
+                    fontFamily: isConfirm ? 'Roobert-Medium' : 'Roobert',
+                    color: isConfirm ? fgColor : mutedColor,
+                  }}
+                >
+                  Confirm
+                </RNText>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
+        )}
+
+        {/* Content area */}
+        <View style={{ paddingHorizontal: 8, paddingVertical: 6 }}>
+          {isConfirm ? (
+            /* ── Confirm / review tab ── */
+            <View>
+              {questions.map((q, i) => {
+                const ans = answers[i] ?? [];
+                const done = ans.length > 0;
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => setTab(i)}
+                    activeOpacity={0.6}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 4,
+                      opacity: done ? 1 : 0.4,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 2.5,
+                        borderWidth: 1.5,
+                        borderColor: done ? fgColor : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'),
+                        backgroundColor: done ? (isDark ? 'rgba(248,248,248,0.1)' : 'rgba(18,18,21,0.06)') : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 7,
+                      }}
+                    >
+                      {done && <Ionicons name="checkmark" size={8} color={fgColor} />}
+                    </View>
+                    <RNText
+                      style={{ flex: 1, fontSize: 12, color: fgColor, fontFamily: 'Roobert' }}
+                      numberOfLines={1}
+                    >
+                      {q.header || q.question}
+                    </RNText>
+                    <RNText
+                      style={{ fontSize: 12, color: mutedColor, maxWidth: '40%', marginLeft: 6, fontFamily: 'Roobert' }}
+                      numberOfLines={1}
+                    >
+                      {ans.length > 0 ? ans.join(', ') : '\u2014'}
+                    </RNText>
+                  </TouchableOpacity>
+                );
+              })}
+
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
+                <TouchableOpacity
+                  onPress={submit}
+                  activeOpacity={0.8}
+                  style={{
+                    backgroundColor: fgColor,
+                    paddingHorizontal: 16,
+                    paddingVertical: 7,
+                    borderRadius: 8,
+                  }}
+                >
+                  <RNText
+                    style={{
+                      color: isDark ? '#121215' : '#F8F8F8',
+                      fontSize: 13,
+                      fontFamily: 'Roobert-Medium',
+                    }}
+                  >
+                    Submit
+                  </RNText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : currentQuestion ? (
+            /* ── Question content ── */
+            <View>
+              {/* Question text */}
+              <RNText
+                style={{
+                  fontSize: 12,
+                  fontFamily: 'Roobert-Medium',
+                  color: fgColor,
+                  lineHeight: 16,
+                  marginBottom: 2,
+                }}
+              >
+                {currentQuestion.question}
+                {isMulti && (
+                  <RNText style={{ fontFamily: 'Roobert', fontStyle: 'italic', color: mutedColor }}>
+                    {' '}(select multiple)
+                  </RNText>
+                )}
+              </RNText>
+
+              {/* Options — compact rows */}
+              {options.map((opt, i) => {
+                const isPicked = currentAnswers.includes(opt.label);
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => selectOption(i)}
+                    activeOpacity={0.7}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 4,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: isPicked ? selectedBorder : 'transparent',
+                      backgroundColor: isPicked ? selectedBg : 'transparent',
+                      gap: 6,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: isMulti ? 2.5 : 6,
+                        borderWidth: 1,
+                        borderColor: isPicked ? fgColor : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'),
+                        backgroundColor: isPicked ? (isDark ? 'rgba(248,248,248,0.1)' : 'rgba(18,18,21,0.06)') : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {isPicked && <Ionicons name="checkmark" size={8} color={fgColor} />}
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <RNText style={{ fontSize: 14, lineHeight: 18, fontFamily: 'Roobert' }}>
+                        <RNText
+                          style={{
+                            fontFamily: 'Roobert-Medium',
+                            color: isPicked ? fgColor : (isDark ? 'rgba(248,248,248,0.8)' : 'rgba(18,18,21,0.8)'),
+                          }}
+                        >
+                          {opt.label}
+                        </RNText>
+                        {opt.description && (
+                          <RNText style={{ color: mutedColor }}>
+                            {' '}{opt.description}
+                          </RNText>
+                        )}
+                      </RNText>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Type your own answer */}
+              {showCustom && !editing && (
+                <TouchableOpacity
+                  onPress={() => selectOption(options.length)}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                    paddingVertical: 3,
+                    gap: 6,
+                  }}
+                >
+                  <Ionicons
+                    name="pencil-outline"
+                    size={10}
+                    color={isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)'}
+                  />
+                  <RNText style={{ fontSize: 14, color: mutedColor, fontFamily: 'Roobert' }}>
+                    Type your own answer
+                  </RNText>
+                </TouchableOpacity>
+              )}
+
+              {/* Custom input */}
+              {editing && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+                  <TextInput
+                    ref={inputRef}
+                    placeholder="Type your answer..."
+                    placeholderTextColor={mutedColor}
+                    defaultValue={customInputs[tab]}
+                    onSubmitEditing={(e) => handleCustomSubmit(e.nativeEvent.text)}
+                    returnKeyType={isMulti ? 'done' : 'go'}
+                    style={{
+                      flex: 1,
+                      height: 32,
+                      paddingHorizontal: 10,
+                      fontSize: 13,
+                      color: fgColor,
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                      borderWidth: 1,
+                      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                      borderRadius: 7,
+                    }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      const val = inputRef.current
+                        ? (inputRef.current as any)._lastNativeText || customInputs[tab]
+                        : customInputs[tab];
+                      handleCustomSubmit(val || '');
+                    }}
+                    activeOpacity={0.8}
+                    style={{
+                      height: 32,
+                      paddingHorizontal: 10,
+                      backgroundColor: fgColor,
+                      borderRadius: 7,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <RNText style={{ color: isDark ? '#121215' : '#F8F8F8', fontSize: 12, fontFamily: 'Roobert-Medium' }}>
+                      {isMulti ? 'Add' : 'Go'}
+                    </RNText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => { setEditing(false); Keyboard.dismiss(); }}
+                    hitSlop={8}
+                    style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+                    activeOpacity={0.6}
+                  >
+                    <Ionicons name="close" size={14} color={mutedColor} />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Next button for multi-select */}
+              {!isSingle && isMulti && !editing && (
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 6 }}>
+                  <TouchableOpacity
+                    onPress={() => { setTab(tab + 1); setEditing(false); }}
+                    disabled={currentAnswers.length === 0}
+                    activeOpacity={0.8}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 6,
+                      borderRadius: 7,
+                      backgroundColor: currentAnswers.length > 0
+                        ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)')
+                        : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
+                      opacity: currentAnswers.length > 0 ? 1 : 0.4,
+                    }}
+                  >
+                    <RNText
+                      style={{
+                        fontSize: 12,
+                        fontFamily: 'Roobert-Medium',
+                        color: currentAnswers.length > 0 ? fgColor : mutedColor,
+                      }}
+                    >
+                      Next
+                    </RNText>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          ) : null}
         </View>
       </View>
-    </Animated.View>
+    </View>
   );
 }

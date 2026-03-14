@@ -13,6 +13,7 @@ import {
   FlatList,
   TouchableOpacity,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/components/ui/text';
@@ -69,6 +70,18 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
 
   // The first pending question for this session (if any)
   const activeQuestion: QuestionRequest | undefined = pendingQuestions[0];
+  const hasQuestion = !!activeQuestion;
+
+  // Animate crossfade between chat input and question prompt
+  // 0 = show input, 1 = show question
+  const questionAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(questionAnim, {
+      toValue: hasQuestion ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [hasQuestion, questionAnim]);
 
   // Agent/model/variant config
   const { data: agents = [] } = useOpenCodeAgents(sandboxUrl);
@@ -231,10 +244,11 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
           allMessages={safeMessages}
           sessionStatus={sessionStatus}
           isBusy={isBusy}
+          pendingQuestions={pendingQuestions}
         />
       </View>
     ),
-    [safeMessages, sessionStatus, isBusy, turns.length],
+    [safeMessages, sessionStatus, isBusy, turns.length, pendingQuestions],
   );
 
   const title = session?.title || 'New Session';
@@ -308,17 +322,42 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
         pointerEvents="none"
       />
 
-      {/* Pending question prompt */}
-      {activeQuestion && (
-        <QuestionPrompt
-          request={activeQuestion}
-          onReply={handleQuestionReply}
-          onReject={handleQuestionReject}
-        />
-      )}
+      {/* Question prompt — slides in, replaces chat input */}
+      <Animated.View
+        style={{
+          opacity: questionAnim,
+          maxHeight: questionAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 400],
+          }),
+          overflow: 'hidden',
+        }}
+        pointerEvents={hasQuestion ? 'auto' : 'none'}
+      >
+        {activeQuestion && (
+          <QuestionPrompt
+            request={activeQuestion}
+            onReply={handleQuestionReply}
+            onReject={handleQuestionReject}
+          />
+        )}
+      </Animated.View>
 
-      {/* Chat input with toolbar */}
-      <View>
+      {/* Chat input — slides out when question is shown */}
+      <Animated.View
+        style={{
+          opacity: questionAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 0],
+          }),
+          maxHeight: questionAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [200, 0],
+          }),
+          overflow: 'hidden',
+        }}
+        pointerEvents={hasQuestion ? 'none' : 'auto'}
+      >
         <SessionChatInput
           onSend={handleSend}
           onStop={handleStop}
@@ -334,7 +373,7 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
           onModelChange={resolved.setModel}
           onVariantCycle={resolved.cycleVariant}
         />
-      </View>
+      </Animated.View>
     </View>
   );
 }
