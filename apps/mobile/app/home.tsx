@@ -41,6 +41,7 @@ import {
   useOpenCodeConfig,
 } from '@/lib/opencode/hooks/use-opencode-data';
 import { useResolvedConfig } from '@/lib/opencode/hooks/use-local-config';
+import { useTabStore } from '@/stores/tab-store';
 import { log } from '@/lib/logger';
 
 // ─── Animated collapsible wrapper ────────────────────────────────────────────
@@ -204,60 +205,28 @@ export default function HomeScreen() {
 
   // State
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [showTabsOverview, setShowTabsOverview] = useState(false);
 
-  // Open tabs — sessions the user has visited (like browser tabs)
-  const [openTabIds, setOpenTabIds] = useState<string[]>([]);
-
-  // Session navigation history (for back/forward)
-  const [sessionHistory, setSessionHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-
-  const navigateToSession = useCallback((sessionId: string | null) => {
-    setActiveSessionId(sessionId);
-    setShowTabsOverview(false);
-    if (sessionId) {
-      // Add to open tabs if not already there
-      setOpenTabIds((prev) =>
-        prev.includes(sessionId) ? prev : [...prev, sessionId],
-      );
-      setSessionHistory((prev) => {
-        const trimmed = prev.slice(0, historyIndex + 1);
-        return [...trimmed, sessionId];
-      });
-      setHistoryIndex((prev) => prev + 1);
-    }
-  }, [historyIndex]);
-
-  const closeTab = useCallback((sessionId: string) => {
-    setOpenTabIds((prev) => prev.filter((id) => id !== sessionId));
-    if (activeSessionId === sessionId) {
-      setActiveSessionId(null);
-    }
-  }, [activeSessionId]);
-
-  const closeAllTabs = useCallback(() => {
-    setOpenTabIds([]);
-    setActiveSessionId(null);
-  }, []);
+  // Persisted tab state (survives app restarts)
+  const activeSessionId = useTabStore((s) => s.activeSessionId);
+  const showTabsOverview = useTabStore((s) => s.showTabsOverview);
+  const openTabIds = useTabStore((s) => s.openTabIds);
+  const sessionHistory = useTabStore((s) => s.sessionHistory);
+  const historyIndex = useTabStore((s) => s.historyIndex);
+  const navigateToSession = useTabStore((s) => s.navigateToSession);
+  const closeTab = useTabStore((s) => s.closeTab);
+  const closeAllTabs = useTabStore((s) => s.closeAllTabs);
+  const setShowTabsOverview = useTabStore((s) => s.setShowTabsOverview);
 
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < sessionHistory.length - 1;
 
   const handleHistoryBack = useCallback(() => {
-    if (!canGoBack) return;
-    const newIndex = historyIndex - 1;
-    setHistoryIndex(newIndex);
-    setActiveSessionId(sessionHistory[newIndex]);
-  }, [canGoBack, historyIndex, sessionHistory]);
+    useTabStore.getState().goBack();
+  }, []);
 
   const handleHistoryForward = useCallback(() => {
-    if (!canGoForward) return;
-    const newIndex = historyIndex + 1;
-    setHistoryIndex(newIndex);
-    setActiveSessionId(sessionHistory[newIndex]);
-  }, [canGoForward, historyIndex, sessionHistory]);
+    useTabStore.getState().goForward();
+  }, []);
 
   // Data
   const { data: sessions = [], isLoading: sessionsLoading } =
@@ -313,7 +282,7 @@ export default function HomeScreen() {
     setDrawerOpen(false);
   }, [navigateToSession]);
 
-  const handleBack = useCallback(() => setActiveSessionId(null), []);
+  const handleBack = useCallback(() => navigateToSession(null), [navigateToSession]);
 
   const handleArchive = useCallback((sessionId: string) => {
     Alert.alert('Archive Session', 'Move this session to archived?', [
@@ -321,12 +290,14 @@ export default function HomeScreen() {
       {
         text: 'Archive',
         onPress: () => {
-          if (activeSessionId === sessionId) setActiveSessionId(null);
+          if (useTabStore.getState().activeSessionId === sessionId) {
+            navigateToSession(null);
+          }
           archiveSession.mutate(sessionId);
         },
       },
     ]);
-  }, [archiveSession, activeSessionId]);
+  }, [archiveSession, navigateToSession]);
 
   const handleUnarchive = useCallback((sessionId: string) => {
     unarchiveSession.mutate(sessionId);
@@ -339,12 +310,14 @@ export default function HomeScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          if (activeSessionId === sessionId) setActiveSessionId(null);
+          if (useTabStore.getState().activeSessionId === sessionId) {
+            navigateToSession(null);
+          }
           deleteSession.mutate(sessionId);
         },
       },
     ]);
-  }, [deleteSession, activeSessionId]);
+  }, [deleteSession, navigateToSession]);
 
   const handleDashboardSend = useCallback(
     async (text: string, options: PromptOptions) => {
@@ -390,7 +363,7 @@ export default function HomeScreen() {
         log.error('❌ [Home] Dashboard send failed:', err?.message || err);
       }
     },
-    [sandboxUrl, createSession],
+    [sandboxUrl, createSession, navigateToSession],
   );
 
   const handleGoToSettings = useCallback(() => {

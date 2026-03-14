@@ -216,23 +216,24 @@ export interface QuestionRequest {
   id: string;
   sessionID: string;
   tool?: { messageID: string; callID: string };
-  question: QuestionInfo;
+  questions: QuestionInfo[];
 }
 
 export interface QuestionInfo {
-  type: string;
-  message: string;
+  question: string;
+  header?: string;
   options?: QuestionOption[];
+  multiple?: boolean;
+  custom?: boolean;
 }
 
 export interface QuestionOption {
   label: string;
-  value: string;
+  description?: string;
 }
 
-export interface QuestionAnswer {
-  answer: string;
-}
+/** Each element is an array of selected labels for that question index. */
+export type QuestionAnswer = string[];
 
 // ---------------------------------------------------------------------------
 // Agents, Models, Providers

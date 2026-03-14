@@ -13,6 +13,7 @@ import {
   FlatList,
   TouchableOpacity,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/components/ui/text';
@@ -23,8 +24,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSyncStore } from '@/lib/opencode/sync-store';
 import { useSessionSync } from '@/lib/opencode/session-sync';
 import { groupMessagesIntoTurns } from '@/lib/opencode/turns';
-import type { Turn } from '@/lib/opencode/types';
-import { useSession } from '@/lib/platform/hooks';
+import type { Turn, QuestionRequest } from '@/lib/opencode/types';
+import { useSession, replyToQuestion, rejectQuestion } from '@/lib/platform/hooks';
 import { useSandboxContext } from '@/contexts/SandboxContext';
 import {
   useOpenCodeAgents,
@@ -37,6 +38,7 @@ import { log } from '@/lib/logger';
 
 import { SessionChatInput, type PromptOptions } from './SessionChatInput';
 import { SessionTurn } from './SessionTurn';
+import { QuestionPrompt } from './QuestionPrompt';
 
 interface SessionPageProps {
   sessionId: string;
@@ -61,9 +63,62 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
   // Read messages from sync store
   const messages = useSyncStore((s) => s.messages[sessionId]);
   const sessionStatus = useSyncStore((s) => s.sessionStatus[sessionId]);
+  const pendingQuestions = useSyncStore((s) => s.questions[sessionId]) ?? [];
   const safeMessages = useMemo(() => messages ?? [], [messages]);
 
   const isBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
+
+  // The first pending question for this session (if any)
+  const activeQuestion: QuestionRequest | undefined = pendingQuestions[0];
+  const hasQuestion = !!activeQuestion;
+
+  // Keep the last question around so we can still render it during exit animation
+  const lastQuestionRef = useRef<QuestionRequest | undefined>(undefined);
+  const [showQuestionOverlay, setShowQuestionOverlay] = useState(false);
+  if (activeQuestion) {
+    lastQuestionRef.current = activeQuestion;
+  }
+
+  // Animate crossfade between chat input and question prompt
+  // inputAnim: 1 = visible, 0 = hidden (faded down)
+  // questionAnim: 1 = visible, 0 = hidden (faded down)
+  const inputAnim = useRef(new Animated.Value(1)).current;
+  const questionAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (hasQuestion) {
+      setShowQuestionOverlay(true);
+      // Textarea fades out downward, then question fades in from bottom
+      Animated.sequence([
+        Animated.timing(inputAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(questionAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Question fades out downward, then textarea fades in from bottom
+      Animated.sequence([
+        Animated.timing(questionAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(inputAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Only unmount question overlay after animation completes
+        setShowQuestionOverlay(false);
+      });
+    }
+  }, [hasQuestion, inputAnim, questionAnim]);
 
   // Agent/model/variant config
   const { data: agents = [] } = useOpenCodeAgents(sandboxUrl);
@@ -174,6 +229,37 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
     }
   }, [sandboxUrl, sessionId]);
 
+  // Question reply/reject handlers
+  const handleQuestionReply = useCallback(
+    async (requestId: string, answers: string[][]) => {
+      if (!sandboxUrl) return;
+      // Optimistically remove from store
+      useSyncStore.getState().removeQuestion(sessionId, requestId);
+      try {
+        await replyToQuestion(sandboxUrl, requestId, answers);
+      } catch (err: any) {
+        log.error('Failed to reply to question:', err?.message || err);
+      }
+    },
+    [sandboxUrl, sessionId],
+  );
+
+  const handleQuestionReject = useCallback(
+    async (requestId: string) => {
+      if (!sandboxUrl) return;
+      // Optimistically remove from store
+      useSyncStore.getState().removeQuestion(sessionId, requestId);
+      try {
+        await rejectQuestion(sandboxUrl, requestId);
+      } catch (err: any) {
+        log.error('Failed to reject question:', err?.message || err);
+      }
+      // Also abort the session (matches frontend behavior)
+      handleStop();
+    },
+    [sandboxUrl, sessionId, handleStop],
+  );
+
   // Track last turn height for footer sizing
   const turnHeights = useRef<Record<string, number>>({});
   const [lastTurnHeight, setLastTurnHeight] = useState(80);
@@ -195,10 +281,11 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
           allMessages={safeMessages}
           sessionStatus={sessionStatus}
           isBusy={isBusy}
+          pendingQuestions={pendingQuestions}
         />
       </View>
     ),
-    [safeMessages, sessionStatus, isBusy, turns.length],
+    [safeMessages, sessionStatus, isBusy, turns.length, pendingQuestions],
   );
 
   const title = session?.title || 'New Session';
@@ -265,30 +352,78 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
         }}
       />
 
-      {/* Fade gradient above input — overlaps bottom of FlatList */}
-      <LinearGradient
-        colors={isDark ? ['rgba(18,18,21,0)', 'rgba(18,18,21,1)'] : ['rgba(245,245,245,0)', 'rgba(245,245,245,1)']}
-        style={{ height: 40, marginTop: -40, zIndex: 1 }}
-        pointerEvents="none"
-      />
-
-      {/* Chat input with toolbar */}
-      <View>
-        <SessionChatInput
-          onSend={handleSend}
-          onStop={handleStop}
-          isBusy={isBusy}
-          agent={resolved.agent}
-          agents={resolved.agents}
-          model={resolved.model}
-          models={visibleModels}
-          modelKey={resolved.modelKey}
-          variant={resolved.variant}
-          variants={resolved.variants}
-          onAgentChange={resolved.setAgent}
-          onModelChange={resolved.setModel}
-          onVariantCycle={resolved.cycleVariant}
+      {/* Fade gradient above input — only when textarea is shown */}
+      {!hasQuestion && (
+        <LinearGradient
+          colors={isDark ? ['rgba(18,18,21,0)', 'rgba(18,18,21,1)'] : ['rgba(245,245,245,0)', 'rgba(245,245,245,1)']}
+          style={{ height: 40, marginTop: -40, zIndex: 1 }}
+          pointerEvents="none"
         />
+      )}
+
+      {/* Bottom area — question prompt and chat input share the same slot */}
+      <View>
+        {/* Chat input — fades out downward when question appears */}
+        <Animated.View
+          style={{
+            opacity: inputAnim,
+            transform: [{
+              translateY: inputAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [30, 0],
+              }),
+            }],
+          }}
+          pointerEvents={hasQuestion ? 'none' : 'auto'}
+        >
+          <SessionChatInput
+            onSend={handleSend}
+            onStop={handleStop}
+            isBusy={isBusy}
+            agent={resolved.agent}
+            agents={resolved.agents}
+            model={resolved.model}
+            models={visibleModels}
+            modelKey={resolved.modelKey}
+            variant={resolved.variant}
+            variants={resolved.variants}
+            onAgentChange={resolved.setAgent}
+            onModelChange={resolved.setModel}
+            onVariantCycle={resolved.cycleVariant}
+          />
+        </Animated.View>
+
+        {/* Question prompt — overlays on top of input, fades in from bottom */}
+        {showQuestionOverlay && lastQuestionRef.current && (
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: isDark ? '#121215' : '#f5f5f5',
+            }}
+          >
+            <Animated.View
+              style={{
+                opacity: questionAnim,
+                transform: [{
+                  translateY: questionAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30, 0],
+                  }),
+                }],
+              }}
+              pointerEvents={hasQuestion ? 'auto' : 'none'}
+            >
+              <QuestionPrompt
+                request={lastQuestionRef.current}
+                onReply={handleQuestionReply}
+                onReject={handleQuestionReject}
+              />
+            </Animated.View>
+          </View>
+        )}
       </View>
     </View>
   );
