@@ -46,6 +46,7 @@ command -v pnpm >/dev/null 2>&1 || { echo "pnpm is required" >&2; exit 1; }
 printf "[build-local-images] Building frontend standalone output...\n"
 (
   cd "$REPO_ROOT/apps/frontend"
+  rm -rf .next
   NEXT_PUBLIC_ENV_MODE=local \
   NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1 \
   NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
