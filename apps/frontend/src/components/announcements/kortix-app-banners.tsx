@@ -9,6 +9,7 @@ import { featureFlags } from '@/lib/feature-flags';
 import { AppDownloadQR, APP_DOWNLOAD_URL } from '@/components/common/app-download-qr';
 import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported } from '@/lib/web-notifications';
+import { useModalOpen } from '@/hooks/use-modal-open';
 
 const MOBILE_STORAGE_KEY = 'kortix-mobile-banner-dismissed';
 const DESKTOP_STORAGE_KEY = 'kortix-desktop-banner-dismissed';
@@ -96,6 +97,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
   // Desktop banner state
   const [desktopVisible, setDesktopVisible] = useState(true);
   const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform>('mac');
+  const isModalOpen = useModalOpen();
 
   // Notification prompt state
   const notifEnabled = useWebNotificationStore((s) => s.preferences.enabled);
@@ -171,7 +173,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
 
   const desktopPlatformLabel = desktopPlatform === 'windows' ? 'Windows' : 'Mac (M series)';
 
-  if (!mounted || !isVisible) return null;
+  if (!mounted || !isVisible || isModalOpen) return null;
   if (!mobileVisible && !desktopVisible && !showNotifPrompt) return null;
 
   const showBothBanners = mobileVisible && desktopVisible;
@@ -438,4 +440,3 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
     </motion.div>
   );
 }
-

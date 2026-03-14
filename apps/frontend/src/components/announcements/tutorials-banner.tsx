@@ -6,6 +6,7 @@ import { X, BookOpen, Play, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
+import { useModalOpen } from '@/hooks/use-modal-open';
 
 const STORAGE_KEY = 'kortix-tutorials-banner-dismissed';
 
@@ -13,6 +14,7 @@ export function TutorialsBanner() {
   const [isVisible, setIsVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
+  const isModalOpen = useModalOpen();
 
   useEffect(() => {
     setMounted(true);
@@ -38,7 +40,7 @@ export function TutorialsBanner() {
     localStorage.setItem(STORAGE_KEY, 'true');
   };
 
-  if (!mounted || !isVisible || !user) return null;
+  if (!mounted || !isVisible || !user || isModalOpen) return null;
 
   return (
     <AnimatePresence>
