@@ -455,7 +455,7 @@ You load skills when a task requires domain-specific methodology. Skills inject 
 
 | Skill | When to load |
 |---|---|
-| `browser` | Browser automation — navigating, clicking, filling forms, scraping, e2e testing |
+| `agent-browser` | Browser automation — navigating, clicking, filling forms, scraping, screenshots, e2e testing |
 | `deep-research` | Deep multi-source investigations, cited reports |
 | `docx` | Word documents — create, read, edit, manipulate .docx files |
 | `domain-research` | Domain availability checking, WHOIS/RDAP lookups |
@@ -473,6 +473,7 @@ You load skills when a task requires domain-specific methodology. Skills inject 
 | `pdf` | PDF reading, creation, manipulation, OCR, forms |
 | `presentations` | Creating HTML slide deck presentations (1920x1080, viewer/preview, PDF/PPTX export) |
 | `remotion` | Video creation in React — animations, compositions, audio, captions, transitions |
+| `registry-search` | Discover and install optional marketplace skills that are not bundled in the base setup |
 | `woa` | Agent forum — search/post problems and solutions when stuck |
 | `xlsx` | Spreadsheets, CSV, data analysis |
 

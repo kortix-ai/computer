@@ -48,24 +48,24 @@ Given the user's request, identify the best matching skill(s) from the registry.
 
 | User says | Best match |
 |-----------|-----------|
-| "browse websites", "click", "fill forms", "screenshot" | `skill-agent-browser` |
-| "read/write PDF" | `skill-pdf` |
-| "Word documents", "docx" | `skill-docx` |
-| "spreadsheet", "Excel", "CSV" | `skill-xlsx` |
-| "research topic deeply", "multi-source report" | `skill-deep-research` |
-| "presentation", "slides" | `skill-presentations` |
-| "video", "animation" | `skill-remotion` |
-| "text-to-speech", "voice" | `skill-elevenlabs` |
-| "email", "send mail", "IMAP" | `skill-email` |
-| "domain", "WHOIS", "DNS" | `skill-domain-research` |
-| "legal document", "contract" | `skill-legal-writer` |
-| "logo", "brand design" | `skill-logo-creator` |
-| "academic paper", "citation" | `skill-openalex-paper-search` |
-| "LaTeX paper", "scientific writing" | `skill-paper-creator` |
-| "AI model", "image generation", "Replicate" | `skill-replicate` |
-| "agent forum", "knowledge sharing" | `skill-woa` |
-| "full-stack", "React", "Convex" | `skill-fullstack-vite-convex` |
-| "build AI agent", "agent SDK" | `skill-agent-builder` |
+| "browse websites", "click", "fill forms", "screenshot" | `agent-browser` |
+| "read/write PDF" | `pdf` |
+| "Word documents", "docx" | `docx` |
+| "spreadsheet", "Excel", "CSV" | `xlsx` |
+| "research topic deeply", "multi-source report" | `deep-research` |
+| "presentation", "slides" | `presentations` |
+| "video", "animation" | `remotion` |
+| "text-to-speech", "voice" | `elevenlabs` |
+| "email", "send mail", "IMAP" | `email` |
+| "domain", "WHOIS", "DNS" | `domain-research` |
+| "legal document", "contract" | `legal-writer` |
+| "logo", "brand design" | `logo-creator` |
+| "academic paper", "citation" | `openalex-paper-search` |
+| "LaTeX paper", "scientific writing" | `paper-creator` |
+| "AI model", "image generation", "Replicate" | `replicate` |
+| "agent forum", "knowledge sharing" | `woa` |
+| "full-stack", "React", "Convex" | `fullstack-vite-convex` |
+| "build AI agent", "agent SDK" | `agent-builder` |
 
 ## Step 3 — Preview a Skill Before Installing
 
@@ -100,10 +100,10 @@ After installing, load the skill immediately with the `skill()` tool to start us
 After a successful `ocx add`, always load the newly installed skill:
 
 ```
-skill("<skill-name-without-skill-prefix>")
+skill("<skill-name>")
 ```
 
-Example: after `ocx add kortix/skill-pdf` → load with `skill("pdf")`
+Example: after `ocx add kortix/pdf` → load with `skill("pdf")`
 
 This injects the skill instructions into context so you can immediately use the capability.
 
@@ -121,7 +121,7 @@ for c in json.load(sys.stdin)['components']:
 "
 
 # 2. Install
-ocx add kortix/skill-pdf
+ocx add kortix/pdf
 
 # 3. Load
 # → skill("pdf")
@@ -152,24 +152,20 @@ ls .opencode/skills/ 2>/dev/null || echo "No skills installed yet"
 
 | Skill | Description |
 |-------|-------------|
-| `skill-agent-browser` | Browser automation via Playwright (navigate, click, fill, screenshot) |
-| `skill-agent-builder` | Build AI agents with various SDKs |
-| `skill-deep-research` | Comprehensive multi-source research reports |
-| `skill-docx` | Word document creation and editing |
-| `skill-domain-research` | Domain availability checking and WHOIS |
-| `skill-elevenlabs` | Text-to-speech and voice cloning |
-| `skill-email` | IMAP/SMTP email sending and receiving |
-| `skill-fullstack-vite-convex` | Full-stack React + Convex development |
-| `skill-legal-writer` | Legal document drafting |
-| `skill-logo-creator` | Professional logo and brand design |
-| `skill-openalex-paper-search` | Academic paper search via OpenAlex |
-| `skill-paper-creator` | Scientific paper writing in LaTeX |
-| `skill-pdf` | PDF reading, creation, manipulation, OCR |
-| `skill-presentations` | HTML slide deck presentations |
-| `skill-remotion` | Video creation in React |
-| `skill-replicate` | AI model inference via Replicate API |
-| `skill-woa` | Agent knowledge-sharing forum |
-| `skill-xlsx` | Spreadsheet, CSV, and Excel processing |
+| `deep-research` | Comprehensive multi-source research reports |
+| `docx` | Word document creation and editing |
+| `domain-research` | Domain availability checking and WHOIS |
+| `elevenlabs` | Text-to-speech and voice cloning |
+| `email` | IMAP/SMTP email sending and receiving |
+| `fullstack-vite-convex` | Full-stack React + Convex development |
+| `legal-writer` | Legal document drafting |
+| `logo-creator` | Professional logo and brand design |
+| `openalex-paper-search` | Academic paper search via OpenAlex |
+| `paper-creator` | Scientific paper writing in LaTeX |
+| `pdf` | PDF reading, creation, manipulation, OCR |
+| `remotion` | Video creation in React |
+| `replicate` | AI model inference via Replicate API |
+| `xlsx` | Spreadsheet, CSV, and Excel processing |
 
 ## Decision Logic
 
