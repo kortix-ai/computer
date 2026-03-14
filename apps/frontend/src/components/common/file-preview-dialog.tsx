@@ -72,10 +72,10 @@ export function FilePreviewDialog() {
     closePreview();
   }, [filePath, closePreview]);
 
-  if (!filePath) return null;
+  if (!isOpen || !filePath) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+    <Dialog open={true} onOpenChange={handleOpenChange}>
       <DialogContent
         hideCloseButton
         className={cn(
