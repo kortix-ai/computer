@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
 export type FilesView = 'browser' | 'viewer' | 'history';
+export type ViewMode = 'grid' | 'list';
+export type SortField = 'name' | 'modified' | 'size' | 'type';
+export type SortOrder = 'asc' | 'desc';
 
 /** Clipboard operation type for copy/cut */
 export type ClipboardOperation = 'copy' | 'cut';
@@ -44,6 +47,14 @@ interface FilesStoreState {
   targetLine: number | null;
   /** Whether to show hidden (dot) files and directories */
   showHidden: boolean;
+
+  // ── Google Drive view state ──────────────────────────────────
+  /** Grid or list view mode */
+  viewMode: ViewMode;
+  /** Sort field */
+  sortBy: SortField;
+  /** Sort direction */
+  sortOrder: SortOrder;
 
   // ── Explorer tree state ──────────────────────────────────────
   /** Set of expanded directory paths in the tree sidebar */
@@ -113,6 +124,18 @@ interface FilesStoreActions {
   setSidebarCollapsed: (collapsed: boolean) => void;
   /** Toggle hidden files visibility */
   toggleHidden: () => void;
+
+  // ── Google Drive view actions ────────────────────────────────
+  /** Set the view mode (grid or list) */
+  setViewMode: (mode: ViewMode) => void;
+  /** Toggle between grid and list view */
+  toggleViewMode: () => void;
+  /** Set the sort field */
+  setSortBy: (field: SortField) => void;
+  /** Set the sort order */
+  setSortOrder: (order: SortOrder) => void;
+  /** Toggle sort order between asc and desc */
+  toggleSortOrder: () => void;
 }
 
 type FilesStore = FilesStoreState & FilesStoreActions;
@@ -131,6 +154,9 @@ const initialState: FilesStoreState = {
   clipboard: null,
   targetLine: null,
   showHidden: false,
+  viewMode: (typeof window !== 'undefined' ? localStorage.getItem('files-view-mode') as ViewMode : null) || 'grid',
+  sortBy: (typeof window !== 'undefined' ? localStorage.getItem('files-sort-by') as SortField : null) || 'name',
+  sortOrder: (typeof window !== 'undefined' ? localStorage.getItem('files-sort-order') as SortOrder : null) || 'asc',
   expandedDirs: new Set(['/workspace']),
   isSidebarCollapsed: false,
   panelMode: 'welcome',
@@ -358,5 +384,34 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
 
   toggleHidden: () => {
     set((s) => ({ showHidden: !s.showHidden }));
+  },
+
+  // ── Google Drive view actions ────────────────────────────────
+
+  setViewMode: (mode: ViewMode) => {
+    set({ viewMode: mode });
+    try { localStorage.setItem('files-view-mode', mode); } catch {}
+  },
+
+  toggleViewMode: () => {
+    const next = get().viewMode === 'grid' ? 'list' : 'grid';
+    set({ viewMode: next });
+    try { localStorage.setItem('files-view-mode', next); } catch {}
+  },
+
+  setSortBy: (field: SortField) => {
+    set({ sortBy: field });
+    try { localStorage.setItem('files-sort-by', field); } catch {}
+  },
+
+  setSortOrder: (order: SortOrder) => {
+    set({ sortOrder: order });
+    try { localStorage.setItem('files-sort-order', order); } catch {}
+  },
+
+  toggleSortOrder: () => {
+    const next = get().sortOrder === 'asc' ? 'desc' : 'asc';
+    set({ sortOrder: next });
+    try { localStorage.setItem('files-sort-order', next); } catch {}
   },
 }));

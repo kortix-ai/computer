@@ -183,7 +183,7 @@ export function FileContentRenderer({
   const fileCategory = getFileCategory(fileName, fileContent?.mimeType);
   const isMarkdownFile = language === 'markdown';
   const isJsonFile = language === 'json';
-  const [isMarkdownPreview, setIsMarkdownPreview] = useState(isMarkdownFile);
+  const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
   const [isJsonTreeView, setIsJsonTreeView] = useState(false);
 
   // LSP diagnostics for this file from the global diagnostics store
@@ -215,13 +215,13 @@ export function FileContentRenderer({
     }
   }, [fileContent?.content]);
 
-  // Reset state when file changes
+  // Reset state when file changes — default to edit mode for markdown
   useEffect(() => {
-    setIsMarkdownPreview(isMarkdownFile);
+    setIsMarkdownPreview(false);
     setIsJsonTreeView(false);
     setHasUnsavedChanges(false);
     latestContentRef.current = '';
-  }, [filePath, isMarkdownFile]);
+  }, [filePath]);
 
   // Notify parent of unsaved state changes
   useEffect(() => {

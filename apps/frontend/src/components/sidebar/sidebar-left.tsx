@@ -20,6 +20,7 @@ import {
   History,
   ArrowRightLeft,
   CheckCircle2,
+  FolderOpen,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -809,6 +810,18 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             }}
           />
           <CollapsedIconButton
+            icon={<FolderOpen className="h-4 w-4" />}
+            label="Files"
+            onClick={() => {
+              openTabAndNavigate({
+                id: 'page:/files',
+                title: 'Files',
+                type: 'page',
+                href: '/files',
+              });
+            }}
+          />
+          <CollapsedIconButton
             icon={<ListTree className="h-4 w-4" />}
             label="Sessions"
             flyoutContent={<SessionsFlyout />}
@@ -880,6 +893,28 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             >
               <Sparkles className="h-4 w-4 flex-shrink-0" />
               <span className="flex-1 text-left">Marketplace</span>
+            </button>
+
+            {/* Files */}
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/files',
+                  title: 'Files',
+                  type: 'page',
+                  href: '/files',
+                });
+              }}
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] cursor-pointer',
+                'transition-colors duration-150',
+                pathname === '/files'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+              )}
+            >
+              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              <span className="flex-1 text-left">Files</span>
             </button>
 
             {/* Sessions — expandable, default open */}

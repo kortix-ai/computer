@@ -7,9 +7,14 @@ export { FileSearch } from './file-search';
 export { FileBreadcrumbs } from './file-breadcrumbs';
 export { FileTreeItem } from './file-tree-item';
 export { FileHistoryPanel } from './file-history-panel';
+export { FileHistoryPopoverContent } from './file-history-popover';
 export { getFileIcon } from './file-icon';
 export { FileTree } from './file-tree';
 export { FileExplorerPage } from './file-explorer-page';
 export { FileExplorerToolbar } from './file-explorer-toolbar';
 export { FileExplorerStatusBar } from './file-explorer-status-bar';
-
+export { DriveToolbar } from './drive-toolbar';
+export { DriveGridView } from './drive-grid-view';
+export { DriveListView } from './drive-list-view';
+export { FilePreviewModal } from './file-preview-modal';
+export { FileThumbnail } from './file-thumbnail';

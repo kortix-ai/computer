@@ -1,5 +1,6 @@
 import {
   Folder,
+  FolderOpen,
   FileText,
   FileCode,
   FileCode2,
@@ -21,20 +22,194 @@ import {
   File as FileIcon,
 } from 'lucide-react';
 
+export type FileIconVariant = 'monochrome' | 'colored';
+
 /**
- * Returns a colored Lucide icon element for a given filename.
- * Matches the same logic used in the sidebar file explorer.
+ * Returns an icon element for a given filename.
+ *
+ * variant='monochrome' (default): Clean Google Drive-style grey icons
+ * variant='colored': Legacy colored icons for contexts that need them
  *
  * @param fileName  The file or directory name (e.g. "index.tsx")
- * @param className Override the default icon size class (default "h-4 w-4 shrink-0")
- * @param isDirectory Whether the node is a directory
+ * @param options   className, isDirectory, isOpen (for open folders), variant
  */
 export function getFileIcon(
   fileName: string,
-  { className, isDirectory }: { className?: string; isDirectory?: boolean } = {},
+  {
+    className,
+    isDirectory,
+    isOpen,
+    variant = 'monochrome',
+  }: {
+    className?: string;
+    isDirectory?: boolean;
+    isOpen?: boolean;
+    variant?: FileIconVariant;
+  } = {},
 ) {
   const ic = className ?? 'h-4 w-4 shrink-0';
 
+  if (variant === 'colored') {
+    return getColoredIcon(fileName, ic, isDirectory);
+  }
+
+  return getMonochromeIcon(fileName, ic, isDirectory, isOpen);
+}
+
+/**
+ * Monochrome Google Drive-style icons.
+ * All icons use text-muted-foreground for a clean, uniform look.
+ * Folders get a slightly different treatment.
+ */
+function getMonochromeIcon(fileName: string, ic: string, isDirectory?: boolean, isOpen?: boolean) {
+  const mono = `${ic} text-muted-foreground`;
+
+  if (isDirectory) {
+    return isOpen
+      ? <FolderOpen className={`${ic} text-muted-foreground`} />
+      : <Folder className={`${ic} text-muted-foreground`} />;
+  }
+
+  const name = fileName.toLowerCase();
+  const ext = name.split('.').pop() || '';
+
+  // ── Special filenames ──────────────────────────────────────────
+  if (name === 'dockerfile' || name.startsWith('docker-compose')) {
+    return <FileBox className={mono} />;
+  }
+  if (name === '.env' || name.startsWith('.env.')) {
+    return <FileKey className={mono} />;
+  }
+  if (['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lockb'].includes(name)) {
+    return <FileBox className={mono} />;
+  }
+  if (['license', 'license.md', 'license.txt'].includes(name)) {
+    return <FileBadge className={mono} />;
+  }
+  if (['.gitignore', '.gitattributes', '.gitmodules'].includes(name)) {
+    return <FileCog className={mono} />;
+  }
+  if (['makefile', 'cmakelists.txt'].includes(name)) {
+    return <FileTerminal className={mono} />;
+  }
+
+  // ── By extension ───────────────────────────────────────────────
+
+  // Code files
+  if (['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'vue', 'svelte'].includes(ext)) {
+    return <FileCode2 className={mono} />;
+  }
+  if (['py', 'pyi', 'pyx', 'pyw', 'rs', 'go', 'rb', 'erb', 'gemspec', 'java', 'kt', 'kts',
+    'c', 'cpp', 'cc', 'cxx', 'h', 'hpp', 'hxx', 'm', 'mm', 'cs', 'swift', 'php',
+    'html', 'htm', 'css', 'scss', 'sass', 'less', 'styl'].includes(ext)) {
+    return <FileCode className={mono} />;
+  }
+
+  // Data / config
+  if (['json', 'jsonc', 'json5'].includes(ext)) {
+    return <FileJson className={mono} />;
+  }
+  if (['yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'properties', 'editorconfig'].includes(ext)) {
+    return <FileCog className={mono} />;
+  }
+  if (['xml', 'xsl', 'xslt', 'wsdl'].includes(ext)) {
+    return <FileCode className={mono} />;
+  }
+
+  // Shell
+  if (['sh', 'bash', 'zsh', 'fish', 'bat', 'cmd', 'ps1'].includes(ext)) {
+    return <FileTerminal className={mono} />;
+  }
+
+  // Text / docs
+  if (['md', 'mdx', 'txt', 'rst', 'rtf'].includes(ext)) {
+    return <FileText className={mono} />;
+  }
+
+  // Images
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif', 'tiff', 'tif'].includes(ext)) {
+    return <FileImage className={mono} />;
+  }
+
+  // Video
+  if (['mp4', 'webm', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'ogv'].includes(ext)) {
+    return <FileVideo className={mono} />;
+  }
+
+  // Audio
+  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'opus'].includes(ext)) {
+    return <FileAudio className={mono} />;
+  }
+  if (['mid', 'midi'].includes(ext)) {
+    return <FileMusic className={mono} />;
+  }
+
+  // Spreadsheets
+  if (['xlsx', 'xls', 'csv', 'tsv', 'ods'].includes(ext)) {
+    return <FileSpreadsheet className={mono} />;
+  }
+
+  // PDF / Documents
+  if (ext === 'pdf') {
+    return <FileType className={mono} />;
+  }
+  if (['doc', 'docx', 'odt'].includes(ext)) {
+    return <FileType className={mono} />;
+  }
+  if (['ppt', 'pptx', 'odp'].includes(ext)) {
+    return <FileType className={mono} />;
+  }
+
+  // Archives
+  if (['zip', 'tar', 'gz', 'bz2', 'xz', 'rar', '7z', 'tgz', 'zst'].includes(ext)) {
+    return <FileArchive className={mono} />;
+  }
+
+  // Lock / security
+  if (['lock', 'pem', 'crt', 'cer', 'key'].includes(ext)) {
+    return <FileLock className={mono} />;
+  }
+
+  // Database / SQL
+  if (['sql', 'sqlite', 'db', 'sqlite3'].includes(ext)) {
+    return <FileChartLine className={mono} />;
+  }
+
+  // Protobuf / GraphQL
+  if (['proto', 'graphql', 'gql'].includes(ext)) {
+    return <FileCode2 className={mono} />;
+  }
+
+  // WASM
+  if (['wasm', 'wat'].includes(ext)) {
+    return <FileBox className={mono} />;
+  }
+
+  // Log files
+  if (ext === 'log') {
+    return <FileText className={mono} />;
+  }
+
+  // RC / config dotfiles
+  if (name.startsWith('.') && (name.endsWith('rc') || name.endsWith('rc.js') || name.endsWith('rc.json') || name.endsWith('rc.yml'))) {
+    return <FileCog className={mono} />;
+  }
+  if (name.includes('eslint') || name.includes('prettier') || name.includes('babel')) {
+    return <FileCog className={mono} />;
+  }
+  if (name.startsWith('tsconfig') || name.startsWith('jsconfig')) {
+    return <FileCog className={mono} />;
+  }
+
+  // Fallback
+  return <FileIcon className={mono} />;
+}
+
+/**
+ * Colored icons (legacy) - kept for backward compatibility with contexts
+ * that still want colored file type indicators.
+ */
+function getColoredIcon(fileName: string, ic: string, isDirectory?: boolean) {
   if (isDirectory) {
     return <Folder className={`${ic} text-blue-400`} />;
   }
@@ -42,189 +217,79 @@ export function getFileIcon(
   const name = fileName.toLowerCase();
   const ext = name.split('.').pop() || '';
 
-  // ── Special filenames ──────────────────────────────────────────
-  if (name === 'dockerfile' || name === 'docker-compose.yml' || name === 'docker-compose.yaml') {
-    return <FileBox className={`${ic} text-sky-400`} />;
-  }
-  if (name === '.env' || name.startsWith('.env.')) {
-    return <FileKey className={`${ic} text-yellow-500`} />;
-  }
-  if (name === 'package.json' || name === 'package-lock.json' || name === 'pnpm-lock.yaml' || name === 'yarn.lock' || name === 'bun.lockb') {
-    return <FileBox className={`${ic} text-green-400`} />;
-  }
-  if (name === 'license' || name === 'license.md' || name === 'license.txt') {
-    return <FileBadge className={`${ic} text-amber-400`} />;
-  }
-  if (name === '.gitignore' || name === '.gitattributes' || name === '.gitmodules') {
-    return <FileCog className={`${ic} text-orange-400`} />;
-  }
-  if (name === 'makefile' || name === 'cmakelists.txt') {
-    return <FileTerminal className={`${ic} text-amber-500`} />;
-  }
+  // Special filenames
+  if (name === 'dockerfile' || name.startsWith('docker-compose')) return <FileBox className={`${ic} text-sky-400`} />;
+  if (name === '.env' || name.startsWith('.env.')) return <FileKey className={`${ic} text-yellow-500`} />;
+  if (['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lockb'].includes(name)) return <FileBox className={`${ic} text-green-400`} />;
+  if (['license', 'license.md', 'license.txt'].includes(name)) return <FileBadge className={`${ic} text-amber-400`} />;
+  if (['.gitignore', '.gitattributes', '.gitmodules'].includes(name)) return <FileCog className={`${ic} text-orange-400`} />;
+  if (['makefile', 'cmakelists.txt'].includes(name)) return <FileTerminal className={`${ic} text-amber-500`} />;
 
-  // ── By extension ───────────────────────────────────────────────
+  // TypeScript / JavaScript
+  if (['ts', 'tsx'].includes(ext)) return <FileCode2 className={`${ic} text-blue-400`} />;
+  if (['js', 'jsx', 'mjs', 'cjs'].includes(ext)) return <FileCode2 className={`${ic} text-yellow-400`} />;
 
-  // TypeScript
-  if (ext === 'ts' || ext === 'tsx') {
-    return <FileCode2 className={`${ic} text-blue-400`} />;
-  }
-  // JavaScript
-  if (ext === 'js' || ext === 'jsx' || ext === 'mjs' || ext === 'cjs') {
-    return <FileCode2 className={`${ic} text-yellow-400`} />;
-  }
   // Python
-  if (ext === 'py' || ext === 'pyi' || ext === 'pyx' || ext === 'pyw') {
-    return <FileCode className={`${ic} text-sky-400`} />;
-  }
-  // Rust
-  if (ext === 'rs') {
-    return <FileCode className={`${ic} text-orange-400`} />;
-  }
-  // Go
-  if (ext === 'go') {
-    return <FileCode className={`${ic} text-cyan-400`} />;
-  }
-  // Ruby
-  if (ext === 'rb' || ext === 'erb' || ext === 'gemspec') {
-    return <FileCode className={`${ic} text-red-400`} />;
-  }
-  // Java / Kotlin
-  if (ext === 'java' || ext === 'kt' || ext === 'kts') {
-    return <FileCode className={`${ic} text-orange-500`} />;
-  }
-  // C / C++ / Objective-C
-  if (ext === 'c' || ext === 'cpp' || ext === 'cc' || ext === 'cxx' || ext === 'h' || ext === 'hpp' || ext === 'hxx' || ext === 'm' || ext === 'mm') {
-    return <FileCode className={`${ic} text-blue-500`} />;
-  }
-  // C#
-  if (ext === 'cs') {
-    return <FileCode className={`${ic} text-violet-400`} />;
-  }
-  // Swift
-  if (ext === 'swift') {
-    return <FileCode className={`${ic} text-orange-400`} />;
-  }
-  // PHP
-  if (ext === 'php') {
-    return <FileCode className={`${ic} text-indigo-400`} />;
-  }
-  // Vue / Svelte
-  if (ext === 'vue') {
-    return <FileCode2 className={`${ic} text-emerald-400`} />;
-  }
-  if (ext === 'svelte') {
-    return <FileCode2 className={`${ic} text-orange-500`} />;
-  }
-  // HTML
-  if (ext === 'html' || ext === 'htm') {
-    return <FileCode className={`${ic} text-orange-400`} />;
-  }
-  // CSS / SCSS / LESS
-  if (ext === 'css' || ext === 'scss' || ext === 'sass' || ext === 'less' || ext === 'styl') {
-    return <FileCode className={`${ic} text-pink-400`} />;
-  }
+  if (['py', 'pyi', 'pyx', 'pyw'].includes(ext)) return <FileCode className={`${ic} text-sky-400`} />;
 
-  // JSON
-  if (ext === 'json' || ext === 'jsonc' || ext === 'json5') {
-    return <FileJson className={`${ic} text-yellow-500`} />;
-  }
-  // YAML / TOML
-  if (ext === 'yaml' || ext === 'yml' || ext === 'toml') {
-    return <FileCog className={`${ic} text-purple-400`} />;
-  }
-  // XML
-  if (ext === 'xml' || ext === 'xsl' || ext === 'xslt' || ext === 'wsdl') {
-    return <FileCode className={`${ic} text-amber-500`} />;
-  }
+  // Other langs
+  if (ext === 'rs') return <FileCode className={`${ic} text-orange-400`} />;
+  if (ext === 'go') return <FileCode className={`${ic} text-cyan-400`} />;
+  if (['rb', 'erb', 'gemspec'].includes(ext)) return <FileCode className={`${ic} text-red-400`} />;
+  if (['java', 'kt', 'kts'].includes(ext)) return <FileCode className={`${ic} text-orange-500`} />;
+  if (['c', 'cpp', 'cc', 'cxx', 'h', 'hpp', 'hxx', 'm', 'mm'].includes(ext)) return <FileCode className={`${ic} text-blue-500`} />;
+  if (ext === 'cs') return <FileCode className={`${ic} text-violet-400`} />;
+  if (ext === 'swift') return <FileCode className={`${ic} text-orange-400`} />;
+  if (ext === 'php') return <FileCode className={`${ic} text-indigo-400`} />;
+  if (ext === 'vue') return <FileCode2 className={`${ic} text-emerald-400`} />;
+  if (ext === 'svelte') return <FileCode2 className={`${ic} text-orange-500`} />;
+  if (['html', 'htm'].includes(ext)) return <FileCode className={`${ic} text-orange-400`} />;
+  if (['css', 'scss', 'sass', 'less', 'styl'].includes(ext)) return <FileCode className={`${ic} text-pink-400`} />;
 
-  // Shell / Terminal
-  if (ext === 'sh' || ext === 'bash' || ext === 'zsh' || ext === 'fish' || ext === 'bat' || ext === 'cmd' || ext === 'ps1') {
-    return <FileTerminal className={`${ic} text-green-400`} />;
-  }
+  // Data formats
+  if (['json', 'jsonc', 'json5'].includes(ext)) return <FileJson className={`${ic} text-yellow-500`} />;
+  if (['yaml', 'yml', 'toml'].includes(ext)) return <FileCog className={`${ic} text-purple-400`} />;
+  if (['xml', 'xsl', 'xslt', 'wsdl'].includes(ext)) return <FileCode className={`${ic} text-amber-500`} />;
 
-  // Markdown / Text
-  if (ext === 'md' || ext === 'mdx' || ext === 'txt' || ext === 'rst' || ext === 'rtf') {
-    return <FileText className={`${ic} text-muted-foreground`} />;
-  }
+  // Shell
+  if (['sh', 'bash', 'zsh', 'fish', 'bat', 'cmd', 'ps1'].includes(ext)) return <FileTerminal className={`${ic} text-green-400`} />;
 
-  // Images
-  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif', 'tiff', 'tif'].includes(ext)) {
-    return <FileImage className={`${ic} text-purple-400`} />;
-  }
-  // Video
-  if (['mp4', 'webm', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'ogv'].includes(ext)) {
-    return <FileVideo className={`${ic} text-pink-400`} />;
-  }
-  // Audio
-  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'opus'].includes(ext)) {
-    return <FileAudio className={`${ic} text-teal-400`} />;
-  }
-  // Music (midi)
-  if (ext === 'mid' || ext === 'midi') {
-    return <FileMusic className={`${ic} text-teal-400`} />;
-  }
+  // Text / docs
+  if (['md', 'mdx', 'txt', 'rst', 'rtf'].includes(ext)) return <FileText className={`${ic} text-muted-foreground`} />;
+
+  // Media
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif', 'tiff', 'tif'].includes(ext)) return <FileImage className={`${ic} text-purple-400`} />;
+  if (['mp4', 'webm', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'ogv'].includes(ext)) return <FileVideo className={`${ic} text-pink-400`} />;
+  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'opus'].includes(ext)) return <FileAudio className={`${ic} text-teal-400`} />;
+  if (['mid', 'midi'].includes(ext)) return <FileMusic className={`${ic} text-teal-400`} />;
 
   // Spreadsheets
-  if (['xlsx', 'xls', 'csv', 'tsv', 'ods'].includes(ext)) {
-    return <FileSpreadsheet className={`${ic} text-green-400`} />;
-  }
+  if (['xlsx', 'xls', 'csv', 'tsv', 'ods'].includes(ext)) return <FileSpreadsheet className={`${ic} text-green-400`} />;
+
   // PDF / Documents
-  if (ext === 'pdf') {
-    return <FileType className={`${ic} text-red-500`} />;
-  }
-  if (['doc', 'docx', 'odt'].includes(ext)) {
-    return <FileType className={`${ic} text-blue-500`} />;
-  }
-  if (['ppt', 'pptx', 'odp'].includes(ext)) {
-    return <FileType className={`${ic} text-orange-500`} />;
-  }
+  if (ext === 'pdf') return <FileType className={`${ic} text-red-500`} />;
+  if (['doc', 'docx', 'odt'].includes(ext)) return <FileType className={`${ic} text-blue-500`} />;
+  if (['ppt', 'pptx', 'odp'].includes(ext)) return <FileType className={`${ic} text-orange-500`} />;
 
   // Archives
-  if (['zip', 'tar', 'gz', 'bz2', 'xz', 'rar', '7z', 'tgz', 'zst'].includes(ext)) {
-    return <FileArchive className={`${ic} text-amber-500`} />;
-  }
+  if (['zip', 'tar', 'gz', 'bz2', 'xz', 'rar', '7z', 'tgz', 'zst'].includes(ext)) return <FileArchive className={`${ic} text-amber-500`} />;
 
-  // Config files
-  if (['ini', 'cfg', 'conf', 'properties', 'editorconfig'].includes(ext)) {
-    return <FileCog className={`${ic} text-gray-400`} />;
-  }
-  // Dotfiles / RC files
-  if (name.startsWith('.') && (name.endsWith('rc') || name.endsWith('rc.js') || name.endsWith('rc.json') || name.endsWith('rc.yml'))) {
-    return <FileCog className={`${ic} text-gray-400`} />;
-  }
-  if (ext === 'eslintrc' || name.includes('eslint') || name.includes('prettier') || name.includes('babel')) {
-    return <FileCog className={`${ic} text-purple-400`} />;
-  }
-  // tsconfig, etc
-  if (name.startsWith('tsconfig') || name.startsWith('jsconfig')) {
-    return <FileCog className={`${ic} text-blue-400`} />;
-  }
+  // Config
+  if (['ini', 'cfg', 'conf', 'properties', 'editorconfig'].includes(ext)) return <FileCog className={`${ic} text-gray-400`} />;
+  if (name.startsWith('.') && (name.endsWith('rc') || name.endsWith('rc.js') || name.endsWith('rc.json') || name.endsWith('rc.yml'))) return <FileCog className={`${ic} text-gray-400`} />;
+  if (name.includes('eslint') || name.includes('prettier') || name.includes('babel')) return <FileCog className={`${ic} text-purple-400`} />;
+  if (name.startsWith('tsconfig') || name.startsWith('jsconfig')) return <FileCog className={`${ic} text-blue-400`} />;
 
-  // Lock files / security
-  if (ext === 'lock' || ext === 'pem' || ext === 'crt' || ext === 'cer' || ext === 'key') {
-    return <FileLock className={`${ic} text-yellow-500`} />;
-  }
+  // Lock / security
+  if (['lock', 'pem', 'crt', 'cer', 'key'].includes(ext)) return <FileLock className={`${ic} text-yellow-500`} />;
 
-  // Database / SQL
-  if (ext === 'sql' || ext === 'sqlite' || ext === 'db' || ext === 'sqlite3') {
-    return <FileChartLine className={`${ic} text-blue-400`} />;
-  }
+  // Database
+  if (['sql', 'sqlite', 'db', 'sqlite3'].includes(ext)) return <FileChartLine className={`${ic} text-blue-400`} />;
 
-  // Protobuf / GraphQL
-  if (ext === 'proto' || ext === 'graphql' || ext === 'gql') {
-    return <FileCode2 className={`${ic} text-pink-500`} />;
-  }
+  // Other
+  if (['proto', 'graphql', 'gql'].includes(ext)) return <FileCode2 className={`${ic} text-pink-500`} />;
+  if (['wasm', 'wat'].includes(ext)) return <FileBox className={`${ic} text-violet-500`} />;
+  if (ext === 'log') return <FileText className={`${ic} text-gray-400`} />;
 
-  // WASM
-  if (ext === 'wasm' || ext === 'wat') {
-    return <FileBox className={`${ic} text-violet-500`} />;
-  }
-
-  // Log files
-  if (ext === 'log') {
-    return <FileText className={`${ic} text-gray-400`} />;
-  }
-
-  // Fallback
   return <FileIcon className={`${ic} text-muted-foreground`} />;
 }
