@@ -30,6 +30,7 @@ export interface Trigger {
   isActive: boolean;
   enabled?: boolean;
   editable: boolean;
+  agentFilePath?: string | null;
   maxRetries: number;
   timeoutMs: number;
   metadata: Record<string, unknown>;
@@ -166,7 +167,7 @@ const fetchTriggers = async (): Promise<Trigger[]> => {
     timeoutMs: 300000,
     metadata: {},
     ...trigger,
-    isActive: trigger.type === 'cron' ? trigger.isActive : trigger.enabled ?? true,
+    isActive: trigger.isActive ?? trigger.enabled ?? true,
   }));
   return normalized;
 };

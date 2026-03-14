@@ -50,6 +50,8 @@ import { useSandbox } from '@/hooks/platform/use-sandbox';
 import { useServerStore } from '@/stores/server-store';
 import { ensureSandbox } from '@/lib/platform-client';
 import { ScheduledTaskAgentSelector } from './agent-selector';
+import { useFilePreviewStore } from '@/stores/file-preview-store';
+import { FileText } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -138,6 +140,8 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
   const [agentName, setAgentName] = useState(trigger.agentName || '');
   const [isDirty, setIsDirty] = useState(false);
 
+  const openFilePreview = useFilePreviewStore((s) => s.openPreview);
+
   const updateMutation = useUpdateTrigger();
   const deleteMutation = useDeleteTrigger();
   const toggleMutation = useToggleTrigger();
@@ -213,10 +217,7 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
   const handleToggle = async () => {
     if (!trigger.triggerId) return;
     try {
-      await toggleMutation.mutateAsync({
-        id: trigger.triggerId,
-        isActive: !trigger.isActive,
-      });
+      await toggleMutation.mutateAsync({ id: trigger.triggerId, isActive: !trigger.isActive });
       toast.success(trigger.isActive ? 'Task paused' : 'Task resumed');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to toggle');
@@ -311,6 +312,7 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
                 id="edit-name"
                 value={name}
                 onChange={(e) => { setName(e.target.value); markDirty(); }}
+                disabled={!trigger.editable}
               />
             </div>
 
@@ -322,12 +324,13 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
                     value={cronExpr}
                     onChange={(v) => { setCronExpr(v); markDirty(); }}
                     compact
+                    disabled={!trigger.editable}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Timezone</Label>
-                  <Select value={timezone} onValueChange={(v) => { setTimezone(v); markDirty(); }}>
+                  <Select value={timezone} onValueChange={(v) => { setTimezone(v); markDirty(); }} disabled={!trigger.editable}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -362,6 +365,7 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
                 onChange={(e) => { setPrompt(e.target.value); markDirty(); }}
                 placeholder="The instruction sent to your agent..."
                 rows={4}
+                disabled={!trigger.editable}
               />
             </div>
 
@@ -371,6 +375,7 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
               <Select
                 value={sessionMode}
                 onValueChange={(v) => { setSessionMode(v as SessionMode); markDirty(); }}
+                disabled={!trigger.editable}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -390,7 +395,7 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
                   <Loader2 className="h-3 w-3 animate-spin" />
                   Loading agents...
                 </div>
-              ) : (
+              ) : trigger.editable ? (
                 <ScheduledTaskAgentSelector
                   agents={agents}
                   selectedAgent={agentName}
@@ -399,6 +404,10 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
                     markDirty();
                   }}
                 />
+              ) : (
+                <div className="h-9 px-3 flex items-center rounded-md border border-input bg-muted/50 text-sm text-muted-foreground">
+                  {trigger.agentName || 'Default'}
+                </div>
               )}
             </div>
 
@@ -438,6 +447,21 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
                 <span className="text-muted-foreground">Created</span>
                 <span className="font-medium">{new Date(trigger.createdAt).toLocaleDateString()}</span>
               </div>
+              {trigger.sourceType === 'agent' && trigger.agentFilePath && (
+                <div className="flex flex-col gap-1.5 pt-2 border-t border-border/50">
+                  <span className="text-muted-foreground text-xs font-medium">Defined in agent file</span>
+                  <button
+                    type="button"
+                    onClick={() => openFilePreview(trigger.agentFilePath!)}
+                    className="flex items-center gap-2 w-full rounded-md border border-border bg-background px-2.5 py-2 text-left hover:bg-muted/50 transition-colors group"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <code className="text-xs font-mono text-foreground/80 break-all flex-1 leading-relaxed">{trigger.agentFilePath}</code>
+                    <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  </button>
+                  <p className="text-xs text-muted-foreground">Click to open. Set <code className="font-mono text-xs">enabled: false</code> to disable this trigger.</p>
+                </div>
+              )}
             </div>
 
             {/* Actions */}

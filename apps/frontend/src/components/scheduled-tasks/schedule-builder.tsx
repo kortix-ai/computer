@@ -29,6 +29,7 @@ interface ScheduleBuilderProps {
   value: string;
   onChange: (cronExpr: string) => void;
   compact?: boolean;
+  disabled?: boolean;
 }
 
 // ─── Cron ↔ State ───────────────────────────────────────────────────────────
@@ -158,7 +159,7 @@ const MINUTE_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
+export function ScheduleBuilder({ value, onChange, disabled }: ScheduleBuilderProps) {
   const [state, setState] = useState<ScheduleState>(() => cronToState(value) ?? DEFAULT_STATE);
   const [showCron, setShowCron] = useState(false);
   const [rawCron, setRawCron] = useState(value);
@@ -210,6 +211,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
           onChange={(e) => onRawCronEdit(e.target.value)}
           className="font-mono text-sm h-9"
           placeholder="0 0 9 * * *"
+          disabled={disabled}
         />
         <p className="text-[11px] text-muted-foreground">
           6-field: second minute hour day month weekday
@@ -217,7 +219,8 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
         <button
           type="button"
           onClick={() => update({ frequency: 'daily' })}
-          className="text-xs text-primary hover:underline"
+          className="text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+          disabled={disabled}
         >
           Switch to visual editor
         </button>
@@ -228,7 +231,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
   // ── Visual editor ──
 
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", disabled && "opacity-60 pointer-events-none select-none")}>
       {/* Frequency tabs */}
       <div className="flex gap-1">
         {FREQUENCY_TABS.map(({ value: freq, label }) => (
@@ -236,8 +239,10 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
             key={freq}
             type="button"
             onClick={() => update({ frequency: freq })}
+            disabled={disabled}
             className={cn(
-              "flex-1 px-1 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+              "flex-1 px-1 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              disabled ? "cursor-not-allowed" : "cursor-pointer",
               state.frequency === freq
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -257,6 +262,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
             <Select
               value={String(state.interval)}
               onValueChange={(v) => update({ interval: Number(v) })}
+              disabled={disabled}
             >
               <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                 <SelectValue />
@@ -283,6 +289,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
             <Select
               value={String(state.monthDay)}
               onValueChange={(v) => update({ monthDay: Number(v) })}
+              disabled={disabled}
             >
               <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                 <SelectValue />
@@ -305,8 +312,10 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                 key={`${day}-${idx}`}
                 type="button"
                 onClick={() => toggleWeekday(day)}
+                disabled={disabled}
                 className={cn(
-                  "flex-1 h-8 rounded-lg text-xs font-medium transition-all cursor-pointer",
+                  "flex-1 h-8 rounded-lg text-xs font-medium transition-all",
+                  disabled ? "cursor-not-allowed" : "cursor-pointer",
                   state.weekdays.includes(day)
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "bg-background text-muted-foreground border border-border hover:border-foreground/30 hover:text-foreground"
@@ -328,6 +337,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                 <Select
                   value={String(state.minute)}
                   onValueChange={(v) => update({ minute: Number(v) })}
+                  disabled={disabled}
                 >
                   <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
@@ -347,6 +357,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                 <Select
                   value={String(state.hour)}
                   onValueChange={(v) => update({ hour: Number(v) })}
+                  disabled={disabled}
                 >
                   <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
@@ -363,6 +374,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                 <Select
                   value={String(state.minute)}
                   onValueChange={(v) => update({ minute: Number(v) })}
+                  disabled={disabled}
                 >
                   <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
@@ -391,7 +403,8 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
         <button
           type="button"
           onClick={() => setShowCron(!showCron)}
-          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          disabled={disabled}
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:pointer-events-none"
         >
           <ChevronDown className={cn("h-3 w-3 transition-transform", showCron && "rotate-180")} />
           {showCron ? 'Hide' : 'Edit'} cron expression
@@ -403,6 +416,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
               onChange={(e) => onRawCronEdit(e.target.value)}
               className="font-mono text-xs h-8"
               placeholder="0 0 9 * * *"
+              disabled={disabled}
             />
             <p className="text-[11px] text-muted-foreground">
               6-field: sec min hour day month weekday
