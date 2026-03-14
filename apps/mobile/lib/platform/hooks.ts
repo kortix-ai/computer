@@ -332,7 +332,7 @@ export function useAbortSession(sandboxUrl: string | undefined) {
 
 /**
  * Reply to a pending question.
- * POST {sandboxUrl}/question/reply
+ * POST {sandboxUrl}/question/{requestID}/reply
  */
 export async function replyToQuestion(
   sandboxUrl: string,
@@ -340,23 +340,22 @@ export async function replyToQuestion(
   answers: string[][],
 ): Promise<void> {
   log.log('💬 [replyToQuestion] Replying to:', requestId);
-  await opencodeFetch<void>(sandboxUrl, '/question/reply', {
+  await opencodeFetch<void>(sandboxUrl, `/question/${requestId}/reply`, {
     method: 'POST',
-    body: JSON.stringify({ requestID: requestId, answers }),
+    body: JSON.stringify({ answers }),
   });
 }
 
 /**
  * Reject (dismiss) a pending question.
- * POST {sandboxUrl}/question/reject
+ * POST {sandboxUrl}/question/{requestID}/reject
  */
 export async function rejectQuestion(
   sandboxUrl: string,
   requestId: string,
 ): Promise<void> {
   log.log('❌ [rejectQuestion] Rejecting:', requestId);
-  await opencodeFetch<void>(sandboxUrl, '/question/reject', {
+  await opencodeFetch<void>(sandboxUrl, `/question/${requestId}/reject`, {
     method: 'POST',
-    body: JSON.stringify({ requestID: requestId }),
   });
 }

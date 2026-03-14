@@ -58,6 +58,8 @@ export function QuestionPrompt({
   const [editing, setEditing] = useState(false);
   const [replying, setReplying] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const tabScrollRef = useRef<ScrollView>(null);
+  const tabLayouts = useRef<Record<number, { x: number; width: number }>>({});
 
   const isConfirm = tab === questions.length;
   const currentQuestion = questions[tab] as QuestionInfo | undefined;
@@ -65,6 +67,16 @@ export function QuestionPrompt({
   const options = currentQuestion?.options ?? [];
   const currentAnswers = answers[tab] ?? [];
   const showCustom = currentQuestion?.custom !== false;
+
+  // Auto-scroll tab pills to keep active tab visible
+  useEffect(() => {
+    const layout = tabLayouts.current[tab];
+    if (layout && tabScrollRef.current) {
+      // Scroll so the active pill is roughly centered
+      const scrollTo = Math.max(0, layout.x - 60);
+      tabScrollRef.current.scrollTo({ x: scrollTo, animated: true });
+    }
+  }, [tab]);
 
   // Auto-focus input when editing
   useEffect(() => {
@@ -262,6 +274,7 @@ export function QuestionPrompt({
         {!isSingle && (
           <View style={{ borderBottomWidth: 1, borderBottomColor: borderColor }}>
             <ScrollView
+              ref={tabScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{
@@ -277,6 +290,12 @@ export function QuestionPrompt({
                   <TouchableOpacity
                     key={i}
                     onPress={() => { setTab(i); setEditing(false); }}
+                    onLayout={(e) => {
+                      tabLayouts.current[i] = {
+                        x: e.nativeEvent.layout.x,
+                        width: e.nativeEvent.layout.width,
+                      };
+                    }}
                     activeOpacity={0.7}
                     style={{
                       flexDirection: 'row',
@@ -322,6 +341,12 @@ export function QuestionPrompt({
 
               <TouchableOpacity
                 onPress={() => { setTab(questions.length); setEditing(false); }}
+                onLayout={(e) => {
+                  tabLayouts.current[questions.length] = {
+                    x: e.nativeEvent.layout.x,
+                    width: e.nativeEvent.layout.width,
+                  };
+                }}
                 activeOpacity={0.7}
                 style={{
                   paddingHorizontal: 8,

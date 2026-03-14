@@ -72,6 +72,13 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
   const activeQuestion: QuestionRequest | undefined = pendingQuestions[0];
   const hasQuestion = !!activeQuestion;
 
+  // Keep the last question around so we can still render it during exit animation
+  const lastQuestionRef = useRef<QuestionRequest | undefined>(undefined);
+  const [showQuestionOverlay, setShowQuestionOverlay] = useState(false);
+  if (activeQuestion) {
+    lastQuestionRef.current = activeQuestion;
+  }
+
   // Animate crossfade between chat input and question prompt
   // inputAnim: 1 = visible, 0 = hidden (faded down)
   // questionAnim: 1 = visible, 0 = hidden (faded down)
@@ -79,6 +86,7 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
   const questionAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (hasQuestion) {
+      setShowQuestionOverlay(true);
       // Textarea fades out downward, then question fades in from bottom
       Animated.sequence([
         Animated.timing(inputAnim, {
@@ -105,7 +113,10 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
           duration: 300,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        // Only unmount question overlay after animation completes
+        setShowQuestionOverlay(false);
+      });
     }
   }, [hasQuestion, inputAnim, questionAnim]);
 
@@ -383,7 +394,7 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
         </Animated.View>
 
         {/* Question prompt — overlays on top of input, fades in from bottom */}
-        {activeQuestion && (
+        {showQuestionOverlay && lastQuestionRef.current && (
           <View
             style={{
               position: 'absolute',
@@ -406,7 +417,7 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
               pointerEvents={hasQuestion ? 'auto' : 'none'}
             >
               <QuestionPrompt
-                request={activeQuestion}
+                request={lastQuestionRef.current}
                 onReply={handleQuestionReply}
                 onReject={handleQuestionReject}
               />
