@@ -6,8 +6,8 @@ set -euo pipefail
 # Creates a Hetzner snapshot named kortix-computer-v{version} by:
 #   1. Spinning up a cx23 (cheapest 40GB x86) server with Ubuntu 24.04
 #   2. Cloud-init: installs Docker, pulls kortix/computer:{version} image
-#   3. Waits for cloud-init to complete
-#   4. Powers off the server
+#   3. Cloud-init powers the server off after the image is fully pulled
+#   4. Waits for the server to reach status=off
 #   5. Creates a snapshot with description kortix-computer-v{version}
 #   6. Deletes the temporary server
 #
@@ -107,9 +107,10 @@ docker pull ${DOCKER_IMAGE}
 # Tag as latest for convenience
 docker tag ${DOCKER_IMAGE} kortix/computer:latest
 
-# Pre-pull done — signal completion
+# Pre-pull done — power off so the outer script can snapshot safely without SSH
 touch /tmp/kortix-snapshot-ready
 echo "SNAPSHOT_READY" > /tmp/kortix-snapshot-ready
+shutdown -h now
 CLOUDINIT
 )
 
@@ -125,12 +126,10 @@ SERVER_RESP=$(hcloud -X POST "$API/servers" -d "{
 }")
 
 SERVER_ID=$(echo "$SERVER_RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['server']['id'])")
-SERVER_IP=$(echo "$SERVER_RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['server']['public_net']['ipv4']['ip'])")
-
-ok "Server created: id=$SERVER_ID ip=$SERVER_IP"
+ok "Server created: id=$SERVER_ID"
 
 # ── Wait for cloud-init to complete ──────────────────────────────────────────
-info "Waiting for Docker pull to complete (this takes ~10-15 mins)..."
+info "Waiting for Docker pull to complete and server to power off (this takes ~10-15 mins)..."
 ELAPSED=0
 TIMEOUT=1200  # 20 min max
 while true; do
@@ -139,10 +138,8 @@ while true; do
 
   STATUS=$(hcloud "$API/servers/$SERVER_ID" | python3 -c "import json,sys; print(json.load(sys.stdin)['server']['status'])" 2>/dev/null || echo "unknown")
 
-  # Check via SSH if ready
-  if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes \
-       root@"$SERVER_IP" "test -f /tmp/kortix-snapshot-ready" 2>/dev/null; then
-    ok "Docker pull complete (${ELAPSED}s)"
+  if [[ "$STATUS" == "off" ]]; then
+    ok "Build complete, server powered off (${ELAPSED}s)"
     break
   fi
 
@@ -152,18 +149,6 @@ while true; do
 
   echo -n "  ... ${ELAPSED}s (status: $STATUS)"$'\r'
 done
-
-# ── Power off server ──────────────────────────────────────────────────────────
-info "Powering off server..."
-hcloud -X POST "$API/servers/$SERVER_ID/actions/poweroff" > /dev/null
-
-# Wait for poweroff
-for i in $(seq 1 30); do
-  STATUS=$(hcloud "$API/servers/$SERVER_ID" | python3 -c "import json,sys; print(json.load(sys.stdin)['server']['status'])")
-  [[ "$STATUS" == "off" ]] && break
-  sleep 5
-done
-ok "Server powered off"
 
 # ── Create snapshot ───────────────────────────────────────────────────────────
 info "Creating snapshot '$SNAPSHOT_DESC'..."
