@@ -2,7 +2,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  Kortix — One-Click Install                                               ║
 # ║                                                                            ║
-# ║  curl -fsSL https://get.kortix.ai/install | bash                           ║
+# ║  curl -fsSL https://kortix.com/install | bash                              ║
 # ║                                                                            ║
 # ║  Supports two modes (identical stack, different networking):                ║
 # ║    1. Local (laptop/desktop) — HTTP, ports on localhost                     ║
@@ -34,8 +34,17 @@ KORTIX_LOCAL_IMAGES="${KORTIX_LOCAL_IMAGES:-0}"
 KORTIX_LOCAL_TAG="${KORTIX_LOCAL_TAG:-latest}"
 KORTIX_BUILD_LOCAL_IMAGES="${KORTIX_BUILD_LOCAL_IMAGES:-0}"
 KORTIX_PULL_PARALLELISM="${KORTIX_PULL_PARALLELISM:-4}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TTY_AVAILABLE="0"
+if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+  TTY_AVAILABLE="1"
+fi
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
+SCRIPT_DIR=""
+REPO_ROOT=""
+if [ -n "$SCRIPT_SOURCE" ] && [ "$SCRIPT_SOURCE" != "bash" ] && [ -f "$SCRIPT_SOURCE" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+  REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 KORTIX_LOCAL_REPO_ROOT="${KORTIX_LOCAL_REPO_ROOT:-$REPO_ROOT}"
 
 resolve_node_bin() {
@@ -224,6 +233,28 @@ open_browser() {
   if command -v open &>/dev/null; then open "$url" 2>/dev/null || true
   elif command -v xdg-open &>/dev/null; then xdg-open "$url" 2>/dev/null || true
   elif command -v wslview &>/dev/null; then wslview "$url" 2>/dev/null || true
+  fi
+}
+
+prompt_read() {
+  local __var_name="$1"
+  if [ "$TTY_AVAILABLE" = "1" ]; then
+    IFS= read -r "$__var_name" </dev/tty
+  else
+    IFS= read -r "$__var_name"
+  fi
+}
+
+prompt_read_secret() {
+  local __var_name="$1"
+  if [ "$TTY_AVAILABLE" = "1" ]; then
+    stty -echo </dev/tty
+    IFS= read -r "$__var_name" </dev/tty
+    stty echo </dev/tty
+  else
+    if [ -t 0 ]; then stty -echo; fi
+    IFS= read -r "$__var_name"
+    if [ -t 0 ]; then stty echo; fi
   fi
 }
 
@@ -476,7 +507,7 @@ prompt_mode() {
   echo "    ${CYAN}2${NC}) VPS / Server  ${DIM}(Hetzner, EC2, DO — HTTPS via Caddy)${NC}"
   echo ""
   printf "  Choice [1]: "
-  read -r mode_choice
+  prompt_read mode_choice
 
   case "${mode_choice:-1}" in
     2) DEPLOY_MODE="vps" ;;
@@ -494,7 +525,7 @@ prompt_database() {
   echo "    ${CYAN}2${NC}) External ${DIM}(provide Supabase project URL or database URL)${NC}"
   echo ""
   printf "  Choice [1]: "
-  read -r db_choice
+  prompt_read db_choice
 
   case "${db_choice:-1}" in
     2)
@@ -504,17 +535,17 @@ prompt_database() {
       echo "  ${DIM}From your Supabase project: Settings → API${NC}"
       echo ""
       printf "    Supabase URL ${DIM}(e.g. https://xxx.supabase.co)${NC}: "
-      read -r SUPABASE_URL
+      prompt_read SUPABASE_URL
       printf "    Anon Key: "
-      read -r SUPABASE_ANON_KEY
+      prompt_read SUPABASE_ANON_KEY
       printf "    Service Role Key: "
-      read -r SUPABASE_SERVICE_ROLE_KEY
+      prompt_read SUPABASE_SERVICE_ROLE_KEY
       printf "    JWT Secret: "
-      read -r SUPABASE_JWT_SECRET
+      prompt_read SUPABASE_JWT_SECRET
       echo ""
       echo "  ${DIM}From: Settings → Database → Connection string (URI)${NC}"
       printf "    Database URL ${DIM}(postgresql://...)${NC}: "
-      read -r DATABASE_URL
+      prompt_read DATABASE_URL
       echo ""
 
       if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$DATABASE_URL" ]; then
@@ -540,7 +571,7 @@ prompt_domain() {
   echo "    ${CYAN}2${NC}) Just use IP address  ${DIM}(self-signed cert, browser warning)${NC}"
   echo ""
   printf "  Choice [1]: "
-  read -r domain_choice
+  prompt_read domain_choice
 
   case "${domain_choice:-1}" in
     2)
@@ -552,12 +583,12 @@ prompt_domain() {
         DOMAIN="$server_ip"
       else
         printf "  Enter server IP: "
-        read -r DOMAIN
+        prompt_read DOMAIN
       fi
       ;;
     *)
       printf "  Enter domain: "
-      read -r DOMAIN
+      prompt_read DOMAIN
       [ -z "$DOMAIN" ] && fatal "Domain name is required."
 
       info "Verifying DNS for ${BOLD}${DOMAIN}${NC}..."
@@ -571,7 +602,7 @@ prompt_domain() {
         else
           warn "DNS resolves to ${resolved_ip} but this server is ${server_ip}"
           printf "  Continue anyway? [y/N]: "
-          read -r dns_continue
+          prompt_read dns_continue
           echo "${dns_continue:-n}" | grep -qi '^y' || fatal "Fix DNS first."
         fi
       fi
@@ -591,7 +622,7 @@ prompt_security() {
 
   if command -v ufw &>/dev/null; then
     printf "  Firewall (UFW: allow SSH, HTTP, HTTPS only) ${DIM}[${NC}${GREEN}Y${NC}${DIM}/n]${NC}: "
-    read -r fw_choice
+    prompt_read fw_choice
     case "${fw_choice:-y}" in
       [nN]*) ENABLE_FIREWALL="no" ;;
       *) ENABLE_FIREWALL="yes" ;;
@@ -609,19 +640,19 @@ prompt_integrations() {
   echo "  ${DIM}Connect to 3,000+ apps via Pipedream Connect${NC}"
   echo ""
   printf "  Configure integrations? ${DIM}[y/${NC}${GREEN}N${NC}${DIM}]${NC}: "
-  read -r integ_choice
+  prompt_read integ_choice
 
   case "${integ_choice:-n}" in
     [yY]*)
       echo ""
       printf "    Pipedream Client ID: "
-      read -r PIPEDREAM_CLIENT_ID
+      prompt_read PIPEDREAM_CLIENT_ID
       printf "    Pipedream Client Secret: "
-      read -r PIPEDREAM_CLIENT_SECRET
+      prompt_read PIPEDREAM_CLIENT_SECRET
       printf "    Pipedream Project ID ${DIM}(e.g. proj_xxx)${NC}: "
-      read -r PIPEDREAM_PROJECT_ID
+      prompt_read PIPEDREAM_PROJECT_ID
       printf "    Pipedream Environment ${DIM}[production]${NC}: "
-      read -r pd_env
+      prompt_read pd_env
       PIPEDREAM_ENVIRONMENT="${pd_env:-production}"
 
       if [ -n "$PIPEDREAM_CLIENT_ID" ] && [ -n "$PIPEDREAM_CLIENT_SECRET" ] && [ -n "$PIPEDREAM_PROJECT_ID" ]; then
@@ -649,20 +680,16 @@ prompt_owner_account() {
 
   if [ -z "$OWNER_EMAIL" ]; then
     printf "    Owner email: "
-    read -r OWNER_EMAIL
+    prompt_read OWNER_EMAIL
   fi
 
   if [ -z "$OWNER_PASSWORD" ]; then
     while true; do
       printf "    Owner password: "
-      if [ -t 0 ]; then stty -echo; fi
-      read -r OWNER_PASSWORD
-      if [ -t 0 ]; then stty echo; fi
+      prompt_read_secret OWNER_PASSWORD
       echo ""
       printf "    Confirm password: "
-      if [ -t 0 ]; then stty -echo; fi
-      read -r owner_password_confirm
-      if [ -t 0 ]; then stty echo; fi
+      prompt_read_secret owner_password_confirm
       echo ""
       if [ "$OWNER_PASSWORD" = "$owner_password_confirm" ]; then
         break
@@ -1600,7 +1627,7 @@ case "${1:-help}" in
     echo "  ${C}Stopping services...${N}"
     docker compose --profile vps down 2>/dev/null || docker compose down 2>/dev/null || true
     printf "  Delete all data (Docker volumes)? [y/N]: "
-    read -r del_volumes
+    prompt_read del_volumes
     echo "$del_volumes" | grep -qi '^y' && {
       docker compose --profile vps down -v 2>/dev/null || docker compose down -v 2>/dev/null || true
       docker rm -f kortix-sandbox 2>/dev/null || true
@@ -1797,7 +1824,7 @@ main() {
   if [ -f "$INSTALL_DIR/docker-compose.yml" ]; then
     warn "Existing installation found at $INSTALL_DIR"
     printf "  Reinstall? [y/N]: "
-    read -r answer
+    prompt_read answer
     if [ -z "$answer" ] || ! echo "$answer" | grep -qi '^y'; then
       info "Starting existing installation..."
       cd "$INSTALL_DIR"

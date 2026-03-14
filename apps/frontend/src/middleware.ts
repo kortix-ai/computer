@@ -34,6 +34,8 @@ const PUBLIC_ROUTES = [
   '/milano', // Milano page should be public
   '/berlin', // Berlin page should be public
   '/app', // App download page should be public,
+  '/install',
+  '/install.sh',
   '/careers',
   '/pricing', // Pricing page should be public
   '/tutorials', // Tutorials page should be public

@@ -14,7 +14,7 @@ import { CtaSection } from '@/components/home/cta-section';
 import { OSSCard } from '@/app/(home)/oss-card';
 import Image from 'next/image';
 
-const INSTALL_CMD = 'curl -fsSL https://get.kortix.ai/install | bash';
+const INSTALL_CMD = 'curl -fsSL https://kortix.com/install | bash';
 
 export default function Home() {
   const router = useRouter();

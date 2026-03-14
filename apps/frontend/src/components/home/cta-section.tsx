@@ -5,7 +5,7 @@ import { useState, useCallback } from "react";
 import { Check, Copy } from "lucide-react";
 import { GithubButton } from "./github-button";
 
-const INSTALL_CMD = 'curl -fsSL https://get.kortix.ai/install | bash';
+const INSTALL_CMD = 'curl -fsSL https://kortix.com/install | bash';
 
 export function CtaSection({ onLaunch }: { onLaunch: () => void }) {
   const [copied, setCopied] = useState(false);

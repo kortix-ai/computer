@@ -5,10 +5,22 @@ Self-host your AI Computer.
 ## Quick Start
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/kortix-ai/computer/main/scripts/get-kortix.sh)
+curl -fsSL https://kortix.com/install | bash
 ```
 
 Supports local machine and VPS/server (HTTPS + reverse proxy) setups.
+
+The public installer endpoint is served by the frontend Next.js app at `apps/frontend/src/app/install/route.ts` and streams `scripts/get-kortix.sh` from this repo.
+
+## Local Testing
+
+With the frontend running locally, you can test the same install endpoint at:
+
+```bash
+curl -fsSL http://localhost:3000/install | bash
+```
+
+Or open `http://localhost:3000/install` in the browser to verify the route behavior locally.
 
 ## Layout
 
