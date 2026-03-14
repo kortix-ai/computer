@@ -2,6 +2,10 @@
 # Agent Browser Session — manages the persistent "kortix" daemon.
 # Connects to Chrome via CDP on port 9222. JPEG stream on 9223.
 # Socket in /dev/shm/agent-browser/ (tmpfs).
+#
+# IMPORTANT: This service does NOT kill existing daemons on restart.
+# If a healthy daemon is already running, it adopts it and monitors.
+# Only starts a new daemon if no daemon exists or the existing one is dead.
 
 echo "[agent-browser-session] Starting"
 
@@ -11,20 +15,19 @@ if [ "$(id -u)" -eq 0 ]; then
   chown abc:users "$SOCKET_DIR" 2>/dev/null || true
 fi
 
-# ── Check if a working daemon already exists ──────────────────────────────
-if [ -S "$SOCKET_DIR/kortix.sock" ]; then
-  EXISTING_PID=$(pgrep -n -f "node.*dist/daemon.js" 2>/dev/null)
-  if [ -n "$EXISTING_PID" ] && kill -0 "$EXISTING_PID" 2>/dev/null; then
-    echo "[agent-browser-session] Daemon already running (pid $EXISTING_PID), monitoring..."
-    echo "$EXISTING_PID" > "$SOCKET_DIR/kortix.pid"
-    # Skip to monitoring loop
+# ── Check if a healthy daemon already exists ──────────────────────────────
+EXISTING_PID=$(pgrep -n -f "node.*dist/daemon.js" 2>/dev/null)
+if [ -n "$EXISTING_PID" ] && kill -0 "$EXISTING_PID" 2>/dev/null; then
+  # Daemon running — check if socket exists in kernel
+  if grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
+    echo "[agent-browser-session] Adopting existing daemon (pid $EXISTING_PID)"
+    echo "$EXISTING_PID" > "$SOCKET_DIR/kortix.pid" 2>/dev/null || true
+
+    # Monitor — check socket in kernel
     while true; do
-      if ! kill -0 "$EXISTING_PID" 2>/dev/null; then
-        echo "[agent-browser-session] Daemon died, restarting..."
-        exit 1
-      fi
-      if [ ! -S "$SOCKET_DIR/kortix.sock" ]; then
-        echo "[agent-browser-session] Socket disappeared, restarting..."
+      if ! grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
+        echo "[agent-browser-session] Daemon socket gone"
+        sleep 5
         exit 1
       fi
       sleep 10
@@ -32,21 +35,22 @@ if [ -S "$SOCKET_DIR/kortix.sock" ]; then
   fi
 fi
 
-# ── No existing daemon — clean start ──────────────────────────────────────
+# ── No existing daemon — start fresh ─────────────────────────────────────
+# Kill any zombie/orphan daemons that aren't responding
 pkill -9 -f "node.*dist/daemon.js" 2>/dev/null || true
-sleep 2
-rm -f "$SOCKET_DIR"/*.sock "$SOCKET_DIR"/*.pid "$SOCKET_DIR"/*.stream "$SOCKET_DIR"/*.port 2>/dev/null || true
+sleep 3
 
-# Wait for port 9223 to be free
-for i in $(seq 1 15); do
+# Wait for port 9223 to be free (TCP TIME_WAIT from killed processes)
+for i in $(seq 1 30); do
   if node -e "const s=require('net').createServer();s.listen(9223,'127.0.0.1',()=>{s.close();process.exit(0)});s.on('error',()=>process.exit(1))" 2>/dev/null; then
+    echo "[agent-browser-session] Port 9223 free"
     break
   fi
-  [ "$i" = "15" ] && echo "[agent-browser-session] WARNING: port 9223 still busy after 15s"
+  [ "$i" = "30" ] && echo "[agent-browser-session] WARNING: port 9223 still busy after 30s, trying anyway"
   sleep 1
 done
 
-# ── Wait for Chrome CDP ───────────────────────────────────────────────────
+# Wait for Chrome CDP
 for i in $(seq 1 60); do
   if curl -sf http://127.0.0.1:9222/json/version >/dev/null 2>&1; then
     echo "[agent-browser-session] Chrome CDP ready"
@@ -56,8 +60,8 @@ for i in $(seq 1 60); do
   sleep 1
 done
 
-# ── Start daemon via CLI ──────────────────────────────────────────────────
-echo "[agent-browser-session] Connecting via CDP..."
+# Start daemon
+echo "[agent-browser-session] Starting new daemon via CDP..."
 
 if [ "$(id -u)" -eq 0 ]; then
   s6-setuidgid abc env \
@@ -78,43 +82,36 @@ else
     >> /tmp/agent-browser-session.log 2>&1
 fi
 
-# Wait for socket
+# Wait for socket in kernel (don't rely on filesystem)
 for i in $(seq 1 15); do
-  if [ -S "$SOCKET_DIR/kortix.sock" ]; then
+  if grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
     echo "[agent-browser-session] Socket ready"
     break
   fi
   sleep 1
 done
 
-if [ ! -S "$SOCKET_DIR/kortix.sock" ]; then
+if ! grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
   echo "[agent-browser-session] ERROR: Socket not created"
   cat /tmp/agent-browser-session.log 2>/dev/null | tail -10
-  sleep 5
+  # Wait before retrying to avoid rapid restart loop
+  sleep 10
   exit 1
 fi
 
-# Find actual daemon PID
+# Find and record daemon PID
 DAEMON_PID=$(pgrep -n -f "node.*dist/daemon.js" 2>/dev/null)
 if [ -n "$DAEMON_PID" ]; then
-  echo "$DAEMON_PID" > "$SOCKET_DIR/kortix.pid"
+  echo "$DAEMON_PID" > "$SOCKET_DIR/kortix.pid" 2>/dev/null || true
   echo "[agent-browser-session] Daemon running (pid $DAEMON_PID)"
 fi
 
-# ── Monitor loop ──────────────────────────────────────────────────────────
+# Monitor — check socket existence in kernel (not filesystem)
 while true; do
-  if [ -n "$DAEMON_PID" ] && ! kill -0 "$DAEMON_PID" 2>/dev/null; then
-    NEW_PID=$(pgrep -n -f "node.*dist/daemon.js" 2>/dev/null)
-    if [ -n "$NEW_PID" ] && kill -0 "$NEW_PID" 2>/dev/null; then
-      DAEMON_PID=$NEW_PID
-      echo "$DAEMON_PID" > "$SOCKET_DIR/kortix.pid"
-    else
-      echo "[agent-browser-session] Daemon died"
-      exit 1
-    fi
-  fi
-  if [ ! -S "$SOCKET_DIR/kortix.sock" ]; then
-    echo "[agent-browser-session] Socket gone"
+  if ! grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
+    # Socket gone from kernel — daemon truly dead
+    echo "[agent-browser-session] Daemon socket gone from kernel"
+    sleep 5
     exit 1
   fi
   sleep 10

@@ -9,8 +9,19 @@ const socketDirs = Array.from(new Set([
   "/workspace/.agent-browser",
 ]));
 
+// Known sessions that are configured at the system level.
+// These are always shown if their stream port is responding.
+const KNOWN_SESSIONS = [
+  {
+    name: process.env.AGENT_BROWSER_PRIMARY_SESSION || "kortix",
+    port: parseInt(process.env.AGENT_BROWSER_STREAM_PORT || "9223", 10),
+  },
+];
+
 function getSessions() {
   const sessionsByName = new Map();
+
+  // 1. Try filesystem-based discovery (works on real tmpfs, not Docker overlay)
   for (const socketDir of socketDirs) {
     try {
       const files = fs.readdirSync(socketDir);
@@ -39,6 +50,38 @@ function getSessions() {
       // ignore missing directory
     }
   }
+
+  // 2. Fallback: check known sessions via /proc/net/unix socket discovery.
+  //    On Docker overlay, readdir() can't see socket files even though they exist.
+  //    We parse /proc/net/unix to find sockets matching our dirs, and for the
+  //    stream port we use the known configuration.
+  if (sessionsByName.size === 0) {
+    try {
+      const unixSockets = fs.readFileSync("/proc/net/unix", "utf8");
+      for (const known of KNOWN_SESSIONS) {
+        // Check if the daemon socket exists in the kernel
+        const socketPattern = known.name + ".sock";
+        if (unixSockets.includes(socketPattern)) {
+          // Socket exists in kernel — daemon is running.
+          // Also verify the daemon process is alive via pgrep.
+          let daemonAlive = false;
+          try {
+            const { execSync } = require("child_process");
+            execSync("pgrep -f 'node.*dist/daemon.js'", { stdio: "pipe" });
+            daemonAlive = true;
+          } catch (e) {
+            daemonAlive = false;
+          }
+          if (daemonAlive && known.port > 0) {
+            sessionsByName.set(known.name, { name: known.name, port: known.port });
+          }
+        }
+      }
+    } catch (e) {
+      // /proc/net/unix not available
+    }
+  }
+
   return Array.from(sessionsByName.values());
 }
 
@@ -129,6 +172,11 @@ function getOrCreateBridge(port) {
   return bridge;
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Cache-Control": "no-cache",
+};
+
 Bun.serve({
   port: 9224,
   hostname: "0.0.0.0",
@@ -138,7 +186,7 @@ Bun.serve({
 
     if (pathname === "/sessions") {
       return new Response(JSON.stringify(getSessions()), {
-        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
@@ -179,7 +227,7 @@ Bun.serve({
       return new Response(stream, {
         headers: {
           "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
+          ...corsHeaders,
           "Connection": "keep-alive",
           "X-Accel-Buffering": "no",
         },
@@ -209,7 +257,7 @@ Bun.serve({
 
     // Default: serve the viewer HTML
     return new Response(html, {
-      headers: { "Content-Type": "text/html", "Cache-Control": "no-cache" },
+      headers: { "Content-Type": "text/html", ...corsHeaders },
     });
   },
 });
