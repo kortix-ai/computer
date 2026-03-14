@@ -1,5 +1,29 @@
 [
   {
+    "version": "0.8.3",
+    "date": "2026-03-14",
+    "title": "Launch mobile app and refresh cross-device workspace flows",
+    "description": "Ships the first Kortix mobile app alongside major browser, desktop, and workspace UX upgrades so the latest product surfaces stay in sync across devices.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "New Expo-based Kortix mobile app with native iOS and Android shells, onboarding, chat, tools, files, billing, and settings flows"
+      },
+      {
+        "type": "feature",
+        "text": "Dedicated Browser and Desktop dashboard experiences with improved sandbox proxying, tab routing, and hard-reload handling"
+      },
+      {
+        "type": "feature",
+        "text": "Drive-style workspace refresh with richer grid/list browsing, previews, thumbnails, history, and directory download flows"
+      },
+      {
+        "type": "fix",
+        "text": "File preview and dashboard dialog interactions are cleaner, including fewer overlay flashes and fewer blocked floating promos"
+      }
+    ]
+  },
+  {
     "version": "0.8.2",
     "date": "2026-03-14",
     "title": "Kortix provider + sandbox stability fixes",
