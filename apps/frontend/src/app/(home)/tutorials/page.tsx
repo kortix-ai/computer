@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { 
   BookOpen, 
   Play, 
@@ -313,13 +314,13 @@ export default function TutorialsPage() {
                   Resources
                 </h3>
                 <div className="space-y-2">
-                  <a
+                  <Link
                     href="/support"
                     className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
                   >
                     <ChevronRight className="w-4 h-4" />
                     Support
-                  </a>
+                  </Link>
                   <a
                     href="mailto:support@kortix.com"
                     className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-1"

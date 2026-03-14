@@ -14,6 +14,7 @@ set -euo pipefail
 # Usage:
 #   ./scripts/build-hetzner-snapshot.sh                  # uses version from release.json
 #   ./scripts/build-hetzner-snapshot.sh 0.8.2            # explicit version
+#   ./scripts/build-hetzner-snapshot.sh --yes 0.8.2      # non-interactive recreate
 #
 # Requires:
 #   HETZNER_API_KEY env var (or reads from kortix-api/.env)
@@ -22,7 +23,25 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # ── Args ──────────────────────────────────────────────────────────────────────
-VERSION="${1:-}"
+FORCE_RECREATE="false"
+VERSION=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --yes|--force|-y)
+      FORCE_RECREATE="true"
+      ;;
+    *)
+      if [[ -z "$VERSION" ]]; then
+        VERSION="$arg"
+      else
+        echo "Error: unexpected argument '$arg'"
+        exit 1
+      fi
+      ;;
+  esac
+done
+
 if [[ -z "$VERSION" ]]; then
   VERSION=$(python3 -c "import json; print(json.load(open('$ROOT_DIR/sandbox/release.json'))['version'])")
 fi
@@ -76,10 +95,14 @@ EXISTING=$(hcloud "$API/images?type=snapshot&per_page=50" | \
 
 if [[ -n "$EXISTING" ]]; then
   warn "Snapshot $SNAPSHOT_DESC already exists (id: $EXISTING)"
-  read -r -p "  Delete and recreate? [y/N] " confirm
-  if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-    echo "  Aborted."
-    exit 0
+  if [[ "$FORCE_RECREATE" != "true" ]]; then
+    read -r -p "  Delete and recreate? [y/N] " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+      echo "  Aborted."
+      exit 0
+    fi
+  else
+    info "--yes enabled, recreating snapshot automatically..."
   fi
   info "Deleting existing snapshot $EXISTING..."
   hcloud -X DELETE "$API/images/$EXISTING" > /dev/null

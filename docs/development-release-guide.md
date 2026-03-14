@@ -233,19 +233,19 @@ Before releasing, add an entry to `packages/sandbox/CHANGELOG.json`:
 ### One-liner
 
 ```bash
-pnpm ship 0.8.0              # Full release: OTA tarball + GitHub Release + Docker images
-pnpm ship --no-docker 0.8.0  # Skip Docker image rebuild/push
+pnpm ship 0.8.0                 # Full release: GitHub Release + Docker images + Hetzner snapshot
+pnpm ship --no-docker 0.8.0     # Skip Docker image rebuild/push and snapshot
+pnpm ship --no-hetzner 0.8.0    # Skip only the Hetzner snapshot
 ```
 
 ### What `ship` does step by step
 
 1. **Validate** — checks changelog entry exists and inspects whether the GitHub release already exists
 2. **Bump versions** — updates all 4 version locations (package.json, release.json, startup.sh, get-kortix.sh)
-3. **Vendor sources** — runs `bundle-runtime.cjs` which copies `kortix-opencode`, `opencode-channels`, `opencode-agent-triggers` into `packages/sandbox/vendor/`
-4. **Create OTA tarball** — `sandbox-runtime-{version}.tar.gz` (~5MB, source only, no node_modules)
-5. **GitHub Release** — creates `v{version}` release with changelog as notes, or reuses the existing release and refreshes the OTA tarball
-6. **Docker** — `docker buildx build --platform linux/amd64,linux/arm64 --push` for `kortix/computer`, `kortix/kortix-api`, and `kortix/kortix-frontend` unless you pass `--no-docker`
-7. **Commit** — `git commit -m "release: v{version}"` when there are version-bump changes to record (you still run `git push`)
+3. **GitHub Release** — creates `v{version}` release with changelog as notes, or reuses the existing release
+4. **Docker** — `docker buildx build --platform linux/amd64,linux/arm64 --push` for `kortix/computer`, `kortix/kortix-api`, and `kortix/kortix-frontend` unless you pass `--no-docker`
+5. **Hetzner snapshot** — runs `scripts/build-hetzner-snapshot.sh --yes {version}` after the sandbox image is pushed, unless you pass `--no-docker` or `--no-hetzner`
+6. **Commit** — `git commit -m "release: v{version}"` when there are version-bump changes to record (you still run `git push`)
 
 ### After shipping
 
@@ -419,7 +419,14 @@ git push
 ### Release + new Docker image
 
 ```bash
-pnpm ship --no-docker 0.8.0
+pnpm ship --no-hetzner 0.8.0
+git push
+```
+
+### Build the Hetzner snapshot manually
+
+```bash
+pnpm snapshot 0.8.0
 git push
 ```
 
