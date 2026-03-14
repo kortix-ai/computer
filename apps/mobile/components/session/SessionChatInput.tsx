@@ -170,9 +170,9 @@ export function SessionChatInput({
 
   return (
     <>
-      <View className="bg-background">
+      <View>
         {/* Text input area */}
-        <View className="px-4 pt-2">
+        <View className="px-4 pt-1 pb-2">
           <View className="rounded-2xl px-4 pt-2 pb-1 bg-card border border-border">
             {/* Animated placeholder overlay */}
             {showAnimatedPlaceholder && (
@@ -314,7 +314,7 @@ export function SessionChatInput({
           </View>
         </View>
 
-        <View style={{ height: 4 }} />
+
       </View>
 
       {/* Agent bottom sheet */}

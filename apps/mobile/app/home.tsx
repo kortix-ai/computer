@@ -33,6 +33,7 @@ import { getAuthToken } from '@/api/config';
 import type { Session } from '@/lib/opencode/types';
 import { SessionPage } from '@/components/session/SessionPage';
 import { SessionChatInput, type PromptOptions } from '@/components/session/SessionChatInput';
+import { BottomBar } from '@/components/session/BottomBar';
 import {
   useOpenCodeAgents,
   useOpenCodeModels,
@@ -204,6 +205,38 @@ export default function HomeScreen() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
+  // Session navigation history (for back/forward)
+  const [sessionHistory, setSessionHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  const navigateToSession = useCallback((sessionId: string | null) => {
+    setActiveSessionId(sessionId);
+    if (sessionId) {
+      setSessionHistory((prev) => {
+        const trimmed = prev.slice(0, historyIndex + 1);
+        return [...trimmed, sessionId];
+      });
+      setHistoryIndex((prev) => prev + 1);
+    }
+  }, [historyIndex]);
+
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < sessionHistory.length - 1;
+
+  const handleHistoryBack = useCallback(() => {
+    if (!canGoBack) return;
+    const newIndex = historyIndex - 1;
+    setHistoryIndex(newIndex);
+    setActiveSessionId(sessionHistory[newIndex]);
+  }, [canGoBack, historyIndex, sessionHistory]);
+
+  const handleHistoryForward = useCallback(() => {
+    if (!canGoForward) return;
+    const newIndex = historyIndex + 1;
+    setHistoryIndex(newIndex);
+    setActiveSessionId(sessionHistory[newIndex]);
+  }, [canGoForward, historyIndex, sessionHistory]);
+
   // Data
   const { data: sessions = [], isLoading: sessionsLoading } =
     useSessions(sandboxUrl);
@@ -246,17 +279,17 @@ export default function HomeScreen() {
       log.log('➕ [Home] Creating new session...');
       const session = await createSession.mutateAsync({});
       log.log('✅ [Home] Session created:', session.id);
-      setActiveSessionId(session.id);
+      navigateToSession(session.id);
       setDrawerOpen(false);
     } catch (err: any) {
       log.error('❌ [Home] Failed to create session:', err?.message || err);
     }
-  }, [sandboxUrl, createSession]);
+  }, [sandboxUrl, createSession, navigateToSession]);
 
   const handleSessionPress = useCallback((session: Session) => {
-    setActiveSessionId(session.id);
+    navigateToSession(session.id);
     setDrawerOpen(false);
-  }, []);
+  }, [navigateToSession]);
 
   const handleBack = useCallback(() => setActiveSessionId(null), []);
 
@@ -296,7 +329,7 @@ export default function HomeScreen() {
       if (!sandboxUrl) return;
       try {
         const session = await createSession.mutateAsync({});
-        setActiveSessionId(session.id);
+        navigateToSession(session.id);
 
         const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const partId = `prt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -592,7 +625,7 @@ export default function HomeScreen() {
                 </Text>
               </View>
 
-              <View style={{ paddingBottom: insets.bottom }}>
+              <View>
                 <SessionChatInput
                   onSend={handleDashboardSend}
                   placeholder="Ask anything..."
@@ -611,6 +644,31 @@ export default function HomeScreen() {
               </View>
             </View>
           )}
+
+          {/* Bottom bar */}
+          <View>
+            <BottomBar
+              activeSessionId={activeSessionId}
+              tabCount={activeSessions.length}
+              canGoBack={canGoBack}
+              canGoForward={canGoForward}
+              onBack={handleHistoryBack}
+              onForward={handleHistoryForward}
+              onNewSession={handleNewSession}
+              onOpenTabs={() => setDrawerOpen(true)}
+              onCompactSession={() => {
+                if (activeSessionId) {
+                  Alert.alert('Compact Session', 'Compact this session to reduce context size?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Compact', onPress: () => log.log('TODO: compact session') },
+                  ]);
+                }
+              }}
+              onExportTranscript={() => log.log('TODO: export transcript')}
+              onViewChanges={() => log.log('TODO: view changes')}
+              onDiagnostics={() => log.log('TODO: diagnostics')}
+            />
+          </View>
         </View>
       </Drawer>
     </>

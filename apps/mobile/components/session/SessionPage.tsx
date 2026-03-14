@@ -273,7 +273,7 @@ export function SessionPage({ sessionId, onBack, onOpenDrawer }: SessionPageProp
       />
 
       {/* Chat input with toolbar */}
-      <View style={{ paddingBottom: insets.bottom }}>
+      <View>
         <SessionChatInput
           onSend={handleSend}
           onStop={handleStop}
