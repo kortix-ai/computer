@@ -24,8 +24,8 @@ COPY packages/db ./packages/db
 COPY packages/agent-tunnel ./packages/agent-tunnel
 COPY packages/opencode-channels ./packages/opencode-channels
 COPY packages/kortix-opencode ./packages/kortix-opencode
-COPY packages/sandbox/CHANGELOG.json ./packages/sandbox/CHANGELOG.json
-COPY packages/sandbox/package.json ./packages/sandbox/package.json
+COPY sandbox/CHANGELOG.json ./packages/sandbox/CHANGELOG.json
+COPY sandbox/package.json ./packages/sandbox/package.json
 
 # Install pnpm and deps for this app + workspace packages it depends on.
 # --shamefully-hoist flattens node_modules (no symlinks) so COPY works on all Docker versions.
@@ -49,11 +49,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssh-client 
 COPY LICENSE /LICENSE
 
 # Changelog (read by version endpoint — avoids GitHub raw fetch for private repos)
-COPY packages/sandbox/CHANGELOG.json /app/CHANGELOG.json
-COPY packages/sandbox/release.json /app/release.json
+COPY sandbox/CHANGELOG.json /app/CHANGELOG.json
+COPY sandbox/release.json /app/release.json
 
 # Sandbox package.json — single source of truth for SANDBOX_VERSION
-COPY packages/sandbox/package.json /app/packages/sandbox/package.json
+COPY sandbox/package.json /app/packages/sandbox/package.json
 
 # Copy installed node_modules and source from deps stage.
 # Root node_modules contains all hoisted deps (--shamefully-hoist).
