@@ -26,7 +26,9 @@ cd /workspace
 # old process exits and the kernel releases its file descriptors.
 DB_PATH="/workspace/.local/share/opencode/opencode.db"
 for i in $(seq 1 10); do
-  if ! fuser "${DB_PATH}" "${DB_PATH}-wal" "${DB_PATH}-shm" >/dev/null 2>&1; then
+  # Only check WAL/SHM — these only exist (and stay locked) during or after a crash.
+  # The main .db file is held by the running instance which is fine to ignore here.
+  if ! fuser "${DB_PATH}-wal" "${DB_PATH}-shm" >/dev/null 2>&1; then
     break
   fi
   echo "[opencode-serve] DB still locked by previous process, waiting (${i}/10)..."
