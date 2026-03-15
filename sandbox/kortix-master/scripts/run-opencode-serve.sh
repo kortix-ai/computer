@@ -21,9 +21,16 @@ export PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 cd /workspace
 
-# Clean up stale SQLite WAL/SHM lock files from a previous crashed instance.
-# Without this, opencode crashes immediately on restart with "unable to open database file".
+# Wait for any previous opencode instance to fully release the SQLite database.
+# Rapid restarts leave the DB locked ("unable to open database file") until the
+# old process exits and the kernel releases its file descriptors.
 DB_PATH="/workspace/.local/share/opencode/opencode.db"
-rm -f "${DB_PATH}-wal" "${DB_PATH}-shm" 2>/dev/null || true
+for i in $(seq 1 10); do
+  if ! fuser "${DB_PATH}" "${DB_PATH}-wal" "${DB_PATH}-shm" >/dev/null 2>&1; then
+    break
+  fi
+  echo "[opencode-serve] DB still locked by previous process, waiting (${i}/10)..."
+  sleep 1
+done
 
 exec /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0
