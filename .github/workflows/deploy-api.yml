@@ -34,7 +34,7 @@ jobs:
             git -c fetch.recurseSubmodules=false fetch origin main
             git reset --hard origin/main
             git submodule sync --recursive
-            git submodule update --init --recursive --force
+            git submodule update --init --recursive --remote
 
             # Stop and remove old containers first to avoid name conflicts
             docker compose --project-directory . -f scripts/compose/docker-compose.yml --profile backend down --remove-orphans || true
