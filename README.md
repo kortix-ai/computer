@@ -6,35 +6,11 @@ Self-host your AI Computer.
 
 ```bash
 curl -fsSL https://kortix.com/install | bash
-```
-
-Supports local machine and VPS/server (HTTPS + reverse proxy) setups.
-
-The public installer endpoint is served by the frontend Next.js app at `apps/frontend/src/app/install/route.ts` and streams `scripts/get-kortix.sh` from this repo.
-
-## Local Testing
-
-With the frontend running locally, you can test the same install endpoint at:
-
-```bash
 curl -fsSL http://localhost:3000/install | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/kortix-ai/computer/main/scripts/get-kortix.sh)
 ```
 
-Or open `http://localhost:3000/install` in the browser to verify the route behavior locally.
-
-## Layout
-
-- `apps/frontend/` — Next.js dashboard
-- `kortix-api/` — Bun/Hono backend
-- `sandbox/` — sandbox Docker image (Dockerfile, startup, runtime)
-- `packages/kortix-opencode/` — OpenCode config directory (agents, tools, skills, plugins)
-- `packages/opencode-agent-triggers/` — cron + webhook trigger system
-- `packages/lss/` — local semantic search
-- `infra/` — Supabase, production IaC
-- `scripts/` — installer, release, and dev helpers
-- `docs/` — architecture and operational docs
-
-## Commands
+## DEV Commands
 
 - `pnpm dev` — start frontend + API in dev mode
 - `pnpm dev:frontend` — start frontend only

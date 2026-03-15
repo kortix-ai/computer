@@ -97,11 +97,13 @@ const OrphanToolFixerPlugin: Plugin = async (_ctx) => {
 				}
 			}
 
-			if (totalFixed > 0) {
-				console.error(
-					`[orphan-tool-fixer] Patched ${totalFixed} aborted tool call(s) with synthetic result`,
-				)
-			}
+			// Intentionally silent: this repair is expected during resumed sessions and
+			// the log line is noisy in normal OpenCode usage.
+			// if (totalFixed > 0) {
+			// 	console.error(
+			// 		`[orphan-tool-fixer] Patched ${totalFixed} aborted tool call(s) with synthetic result`,
+			// 	)
+			// }
 		},
 	}
 }
