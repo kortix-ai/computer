@@ -20,4 +20,10 @@ export PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
   export KORTIX_API_URL="$(cat /run/s6/container_environment/KORTIX_API_URL)"
 
 cd /workspace
+
+# Clean up stale SQLite WAL/SHM lock files from a previous crashed instance.
+# Without this, opencode crashes immediately on restart with "unable to open database file".
+DB_PATH="/workspace/.local/share/opencode/opencode.db"
+rm -f "${DB_PATH}-wal" "${DB_PATH}-shm" 2>/dev/null || true
+
 exec /usr/local/bin/opencode serve --port 4096 --hostname 0.0.0.0

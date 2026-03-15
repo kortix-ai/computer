@@ -8,7 +8,7 @@
       "deps": [],
       "autoStart": true,
       "restart": "always",
-      "restartDelayMs": 1500,
+      "restartDelayMs": 3000,
       "port": 4096
     }
   ]
