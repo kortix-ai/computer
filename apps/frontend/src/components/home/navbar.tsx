@@ -3,7 +3,7 @@
 import { ThemeToggle } from '@/components/home/theme-toggle';
 import { siteConfig } from '@/lib/site-config';
 import { cn } from '@/lib/utils';
-import { X, Menu } from 'lucide-react';
+import { X, Menu, Power, PowerCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -291,19 +291,16 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
               Dashboard
             </Link>
           ) : (
-            <button
+            <Button
               onClick={() => {
                 trackCtaSignup();
-                // If on homepage, trigger launch modal? 
-                // Since this component doesn't know about launch modal state, we'll just link to auth for now
-                // or replicate the launch modal trigger logic if we lift state up.
-                // For simplicity/robustness, linking to /auth or respecting the ctaLink logic:
                 router.push(ctaLink);
               }}
-              className="inline-flex items-center justify-center h-9 px-5 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-full hover:opacity-90 transition-opacity shadow-sm"
+              variant='outline'
+              className='rounded-full'
             >
-              Launch Kortix
-            </button>
+              <PowerCircle/>
+            </Button>
           )}
 
           {/* Mobile Menu Button */}
