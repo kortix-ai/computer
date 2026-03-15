@@ -291,6 +291,7 @@ ENV AGENT_BROWSER_SOCKET_DIR=/dev/shm/agent-browser
 ENV AGENT_BROWSER_ARGS="--no-sandbox,--disable-gpu,--disable-dev-shm-usage,--disable-infobars,--disable-blink-features=AutomationControlled,--disable-features=VizDisplayCompositor"
 ENV AGENT_BROWSER_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 ENV AGENT_BROWSER_IDLE_TIMEOUT_MS=0
+ENV AGENT_BROWSER_STREAM_PORT=9223
 ENV OPENCODE_CONFIG_DIR=/opt/opencode
 ENV SANDBOX_VERSION=${SANDBOX_VERSION}
 

@@ -545,7 +545,9 @@
           return;
         }
 
-        setEmptyState('Connecting…', `Switching to session ${activeSession || sessions[0].name}`, false);
+        if (!connected) {
+          setEmptyState('Connecting…', `Switching to session ${activeSession || sessions[0].name}`, false);
+        }
 
         // Respect explicit selection first (URL/click).
         const wanted = requestedSession || getUrlSession();

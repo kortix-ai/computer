@@ -1,118 +1,91 @@
 #!/usr/bin/with-contenv bash
-# Agent Browser Session — manages the persistent "kortix" daemon.
-# Connects to Chrome via CDP on port 9222. JPEG stream on 9223.
-# Socket in /dev/shm/agent-browser/ (tmpfs).
+# Agent Browser Session — monitor-only service.
 #
-# IMPORTANT: This service does NOT kill existing daemons on restart.
-# If a healthy daemon is already running, it adopts it and monitors.
-# Only starts a new daemon if no daemon exists or the existing one is dead.
+# Does NOT start its own daemon. Instead:
+# 1. Patches stream-server.js (screencast watchdog)
+# 2. Waits for the agent to start a daemon (via agent-browser CLI)
+# 3. Ensures the .stream file exists so the viewer can discover it
+# 4. Monitors the daemon — restarts the service if it dies
+#
+# The agent's daemon is the primary one. It launches its own Playwright
+# browser and serves the stream on port 9223.
 
-echo "[agent-browser-session] Starting"
+echo "[agent-browser-session] Starting (monitor mode)"
 
 SOCKET_DIR="${AGENT_BROWSER_SOCKET_DIR:-/dev/shm/agent-browser}"
+STREAM_PORT="${AGENT_BROWSER_STREAM_PORT:-9223}"
 mkdir -p "$SOCKET_DIR"
 if [ "$(id -u)" -eq 0 ]; then
   chown abc:users "$SOCKET_DIR" 2>/dev/null || true
 fi
 
-# ── Check if a healthy daemon already exists ──────────────────────────────
-EXISTING_PID=$(pgrep -n -f "node.*dist/daemon.js" 2>/dev/null)
-if [ -n "$EXISTING_PID" ] && kill -0 "$EXISTING_PID" 2>/dev/null; then
-  # Daemon running — check if socket exists in kernel
-  if grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
-    echo "[agent-browser-session] Adopting existing daemon (pid $EXISTING_PID)"
-    echo "$EXISTING_PID" > "$SOCKET_DIR/kortix.pid" 2>/dev/null || true
-
-    # Monitor — check socket in kernel
-    while true; do
-      if ! grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
-        echo "[agent-browser-session] Daemon socket gone"
-        sleep 5
-        exit 1
-      fi
-      sleep 10
-    done
-  fi
+# ── Patch stream-server.js if not already patched ────────────────────────
+# Fixes screencast dying silently on page/tab switch.
+STREAM_SERVER="/usr/local/lib/node_modules/agent-browser/dist/stream-server.js"
+if [ -f "$STREAM_SERVER" ] && ! grep -q '_lastFrameAt' "$STREAM_SERVER" 2>/dev/null; then
+  echo "[agent-browser-session] Patching stream-server.js (screencast watchdog)"
+  node -e "
+    const fs = require('fs');
+    let c = fs.readFileSync('$STREAM_SERVER', 'utf8');
+    c = c.replace('broadcastFrame(frame) {', 'broadcastFrame(frame) { this._lastFrameAt = Date.now();');
+    c = c.replace('if (this.clients.size === 1 && !this.isScreencasting)', 'if (!this.isScreencasting)');
+    c = c.replace(
+      '                    resolve();\n                });',
+      [
+        '                    resolve();',
+        '                    this._lastFrameAt = 0;',
+        '                    setInterval(() => {',
+        '                        if (this.clients.size === 0) return;',
+        '                        if (!this.isScreencasting) {',
+        '                            this.startScreencast().then(() => {',
+        '                                try { this.browser.getPage().evaluate(\"window.scrollBy(0,0)\").catch(()=>{}); } catch {}',
+        '                            }).catch(() => {});',
+        '                            return;',
+        '                        }',
+        '                        const staleMs = this._lastFrameAt ? Date.now() - this._lastFrameAt : 0;',
+        '                        const bActive = typeof this.browser.isScreencasting === \"function\" ? this.browser.isScreencasting() : true;',
+        '                        if (!bActive || (this._lastFrameAt > 0 && staleMs > 4000)) {',
+        '                            this.isScreencasting = false; this._lastFrameAt = 0;',
+        '                            this.startScreencast().then(() => {',
+        '                                try { this.browser.getPage().evaluate(\"window.scrollBy(0,0)\").catch(()=>{}); } catch {}',
+        '                            }).catch(() => {});',
+        '                        }',
+        '                    }, 2000);',
+        '                });',
+      ].join('\n')
+    );
+    // 4. EADDRINUSE: don't crash if another daemon already has the stream port.
+    //    Just skip the stream server and let the existing one handle streaming.
+    c = c.replace(
+      \"this.wss.on('error', (error) => {\\n                    console.error('[StreamServer] WebSocket error:', error);\\n                    reject(error);\\n                });\",
+      \"this.wss.on('error', (error) => {\\n                    if (error.code === 'EADDRINUSE') {\\n                        console.log('[StreamServer] Port ' + this.port + ' in use, reusing existing stream server');\\n                        this.wss = null;\\n                        resolve();\\n                        return;\\n                    }\\n                    console.error('[StreamServer] WebSocket error:', error);\\n                    reject(error);\\n                });\"
+    );
+    fs.writeFileSync('$STREAM_SERVER', c);
+    console.log('[patch] stream-server.js patched');
+  " 2>&1 || echo "[agent-browser-session] WARNING: patch failed"
 fi
 
-# ── No existing daemon — start fresh ─────────────────────────────────────
-# Kill any zombie/orphan daemons that aren't responding
-pkill -9 -f "node.*dist/daemon.js" 2>/dev/null || true
-sleep 3
+# ── Monitor loop ─────────────────────────────────────────────────────────
+# Wait for a daemon to appear, then keep .stream file alive and monitor.
+echo "[agent-browser-session] Waiting for agent daemon..."
 
-# Wait for port 9223 to be free (TCP TIME_WAIT from killed processes)
-for i in $(seq 1 30); do
-  if node -e "const s=require('net').createServer();s.listen(9223,'127.0.0.1',()=>{s.close();process.exit(0)});s.on('error',()=>process.exit(1))" 2>/dev/null; then
-    echo "[agent-browser-session] Port 9223 free"
-    break
-  fi
-  [ "$i" = "30" ] && echo "[agent-browser-session] WARNING: port 9223 still busy after 30s, trying anyway"
-  sleep 1
-done
-
-# Wait for Chrome CDP
-for i in $(seq 1 60); do
-  if curl -sf http://127.0.0.1:9222/json/version >/dev/null 2>&1; then
-    echo "[agent-browser-session] Chrome CDP ready"
-    break
-  fi
-  [ "$i" = "60" ] && { echo "[agent-browser-session] ERROR: Chrome CDP not ready"; exit 1; }
-  sleep 1
-done
-
-# Start daemon
-echo "[agent-browser-session] Starting new daemon via CDP..."
-
-if [ "$(id -u)" -eq 0 ]; then
-  s6-setuidgid abc env \
-    HOME=/workspace DISPLAY=:1 \
-    AGENT_BROWSER_SOCKET_DIR="$SOCKET_DIR" \
-    AGENT_BROWSER_STREAM_PORT=9223 \
-    AGENT_BROWSER_IDLE_TIMEOUT_MS=0 \
-    AGENT_BROWSER_SESSION=kortix \
-    agent-browser --cdp 9222 --session kortix open about:blank \
-    >> /tmp/agent-browser-session.log 2>&1
-else
-  env HOME=/workspace DISPLAY=:1 \
-    AGENT_BROWSER_SOCKET_DIR="$SOCKET_DIR" \
-    AGENT_BROWSER_STREAM_PORT=9223 \
-    AGENT_BROWSER_IDLE_TIMEOUT_MS=0 \
-    AGENT_BROWSER_SESSION=kortix \
-    agent-browser --cdp 9222 --session kortix open about:blank \
-    >> /tmp/agent-browser-session.log 2>&1
-fi
-
-# Wait for socket in kernel (don't rely on filesystem)
-for i in $(seq 1 15); do
-  if grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
-    echo "[agent-browser-session] Socket ready"
-    break
-  fi
-  sleep 1
-done
-
-if ! grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
-  echo "[agent-browser-session] ERROR: Socket not created"
-  cat /tmp/agent-browser-session.log 2>/dev/null | tail -10
-  # Wait before retrying to avoid rapid restart loop
-  sleep 10
-  exit 1
-fi
-
-# Find and record daemon PID
-DAEMON_PID=$(pgrep -n -f "node.*dist/daemon.js" 2>/dev/null)
-if [ -n "$DAEMON_PID" ]; then
-  echo "$DAEMON_PID" > "$SOCKET_DIR/kortix.pid" 2>/dev/null || true
-  echo "[agent-browser-session] Daemon running (pid $DAEMON_PID)"
-fi
-
-# Monitor — check socket existence in kernel (not filesystem)
 while true; do
-  if ! grep -q "kortix.sock" /proc/net/unix 2>/dev/null; then
-    # Socket gone from kernel — daemon truly dead
-    echo "[agent-browser-session] Daemon socket gone from kernel"
-    sleep 5
-    exit 1
+  # Look for a running daemon
+  DAEMON_PID=$(pgrep -n -f "node.*dist/daemon.js" 2>/dev/null)
+
+  if [ -n "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
+    # Daemon is running — ensure discovery files exist
+    echo "$DAEMON_PID" > "$SOCKET_DIR/kortix.pid" 2>/dev/null || true
+
+    # Check if stream port is listening
+    if node -e "const s=require('net').createConnection({port:$STREAM_PORT,host:'127.0.0.1'});s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))" 2>/dev/null; then
+      # Stream server is up — write .stream file if missing
+      if [ ! -f "$SOCKET_DIR/kortix.stream" ]; then
+        echo "$STREAM_PORT" > "$SOCKET_DIR/kortix.stream" 2>/dev/null || true
+        echo "[agent-browser-session] Registered stream port $STREAM_PORT for daemon $DAEMON_PID"
+      fi
+    fi
   fi
-  sleep 10
+
+  sleep 5
 done

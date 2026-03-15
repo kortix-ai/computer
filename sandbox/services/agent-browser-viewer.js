@@ -59,11 +59,8 @@ function getSessions() {
     try {
       const unixSockets = fs.readFileSync("/proc/net/unix", "utf8");
       for (const known of KNOWN_SESSIONS) {
-        // Check if the daemon socket exists in the kernel
         const socketPattern = known.name + ".sock";
         if (unixSockets.includes(socketPattern)) {
-          // Socket exists in kernel — daemon is running.
-          // Also verify the daemon process is alive via pgrep.
           let daemonAlive = false;
           try {
             const { execSync } = require("child_process");
@@ -85,20 +82,15 @@ function getSessions() {
   return Array.from(sessionsByName.values());
 }
 
-// Track active SSE-to-WS bridges per port.
-// Each bridge keeps a persistent WS connection to the stream server and caches
-// the last frame so new SSE clients get an immediate image instead of waiting
-// for the next paint event (which may never come on a static page).
+// ── SSE-to-WS Bridge ────────────────────────────────────────────────────────
+// Each bridge keeps a persistent WS connection to the daemon's stream server
+// and caches the last frame so new SSE clients get an immediate image.
 const bridges = new Map();
 
 function removeClient(port, client) {
   const bridge = bridges.get(port);
   if (!bridge) return;
   bridge.clients.delete(client);
-  // Don't tear down the bridge when the last client leaves.
-  // Keep the WS alive so we continue caching the latest frame.
-  // The bridge will be cleaned up if the WS connection itself dies
-  // AND there are no clients.
 }
 
 function scheduleReconnect(port, bridge, delayMs) {
@@ -112,7 +104,6 @@ function scheduleReconnect(port, bridge, delayMs) {
 function connectBridge(port, bridge) {
   if (bridge.connecting || bridge.ws) return;
   bridge.connecting = true;
-
   try {
     const ws = new WebSocket("ws://127.0.0.1:" + port);
 
@@ -132,15 +123,17 @@ function connectBridge(port, bridge) {
     ws.addEventListener("message", (event) => {
       const msg = typeof event.data === "string" ? event.data : event.data.toString();
 
-      // Cache frame messages for replay to new clients
       try {
         const parsed = JSON.parse(msg);
+
+        // Cache frames for replay to new clients
         if (parsed.type === "frame" && parsed.data) {
           bridge.lastFrame = msg;
           bridge.lastFrameTime = Date.now();
         }
       } catch {}
 
+      // Forward all messages to SSE clients
       for (const client of bridge.clients) {
         try { client.enqueue("data: " + msg + "\n\n"); } catch {}
       }
@@ -152,7 +145,6 @@ function connectBridge(port, bridge) {
       for (const client of bridge.clients) {
         try { client.enqueue("event: status\ndata: {\"connected\":false}\n\n"); } catch {}
       }
-      // Always try to reconnect — keep the bridge alive for frame caching
       scheduleReconnect(port, bridge, 900);
     });
 
@@ -180,21 +172,20 @@ function getOrCreateBridge(port) {
     connecting: false,
     retryTimer: null,
     pendingInputs: [],
-    lastFrame: null,      // Cached last frame JSON string
-    lastFrameTime: 0,     // Timestamp of last cached frame
+    lastFrame: null,
+    lastFrameTime: 0,
   };
   bridges.set(port, bridge);
   return bridge;
 }
 
 // Pre-connect known session bridges so we start caching frames immediately.
-// This ensures the first viewer client gets an instant frame.
 setTimeout(() => {
   for (const known of KNOWN_SESSIONS) {
     const bridge = getOrCreateBridge(known.port);
     connectBridge(known.port, bridge);
   }
-}, 2000);
+}, 5000);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -204,6 +195,8 @@ const corsHeaders = {
 Bun.serve({
   port: 9224,
   hostname: "0.0.0.0",
+  idleTimeout: 0, // SSE connections are long-lived
+
   fetch(req) {
     const url = new URL(req.url);
     const pathname = url.pathname;
@@ -231,17 +224,20 @@ Bun.serve({
           };
           const heartbeat = setInterval(() => {
             try { encoder.enqueue(":hb\n\n"); } catch {}
-          }, 10000);
+          }, 5000);
 
           encoder._heartbeat = heartbeat;
           streamClient = encoder;
           bridge.clients.add(encoder);
           controller.enqueue(new TextEncoder().encode(":ok\n\n"));
 
-          // Immediately replay the cached last frame if available (< 30s old).
-          // This gives instant visual feedback instead of waiting for the next
-          // paint event on a potentially static page.
-          if (bridge.lastFrame && (Date.now() - bridge.lastFrameTime) < 30000) {
+          // Immediate bridge status so viewer doesn't sit on "connecting..."
+          if (bridge.ws) {
+            try { encoder.enqueue("data: {\"type\":\"status\",\"connected\":true}\n\n"); } catch {}
+          }
+
+          // Replay cached frame (< 2 min old) for instant visual feedback
+          if (bridge.lastFrame && (Date.now() - bridge.lastFrameTime) < 120000) {
             try { encoder.enqueue("data: " + bridge.lastFrame + "\n\n"); } catch {}
           }
 
