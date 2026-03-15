@@ -21,6 +21,7 @@ import {
   ArrowRightLeft,
   CheckCircle2,
   FolderOpen,
+  FolderKanban,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -73,7 +74,7 @@ import { useDocumentModalStore } from '@/stores/use-document-modal-store';
 import { isBillingEnabled } from '@/lib/config';
 import { useAccountState, accountStateSelectors } from '@/hooks/billing';
 import { getPlanIcon } from '@/components/billing/plan-utils';
-import { useCreateOpenCodeSession, useOpenCodeSessions } from '@/hooks/opencode/use-opencode-sessions';
+import { useCreateOpenCodeSession, useOpenCodeSessions, useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
@@ -246,6 +247,61 @@ function SessionsFlyout() {
 }
 
 // ============================================================================
+// Projects Flyout
+// ============================================================================
+
+function ProjectsFlyout() {
+  const { data: projects } = useOpenCodeProjects();
+
+  const sortedProjects = React.useMemo(() => {
+    if (!projects || !Array.isArray(projects)) return [];
+    return [...projects].sort((a: any, b: any) => {
+      const aIsGlobal = a.id === 'global' || a.worktree === '/';
+      const bIsGlobal = b.id === 'global' || b.worktree === '/';
+      if (aIsGlobal && !bIsGlobal) return -1;
+      if (!aIsGlobal && bIsGlobal) return 1;
+      return (b.time?.updated ?? 0) - (a.time?.updated ?? 0);
+    });
+  }, [projects]);
+
+  const handleClick = (project: any) => {
+    openTabAndNavigate({
+      id: 'page:/workspace',
+      title: 'Workspace',
+      type: 'page',
+      href: '/workspace',
+    });
+  };
+
+  return (
+    <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+      {sortedProjects.length === 0 ? (
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+          No projects yet
+        </div>
+      ) : (
+        sortedProjects.map((project: any) => {
+          const name = project.name || (project.worktree === '/' || project.id === 'global' ? 'Global' : project.worktree.split('/').pop() || project.worktree);
+          return (
+            <button
+              key={project.id}
+              onClick={() => handleClick(project)}
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2 text-sm cursor-pointer',
+                'transition-colors duration-150',
+                'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
+              )}
+            >
+              <span className="flex-1 truncate text-left">{name}</span>
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // User Profile Section
 // ============================================================================
 
@@ -399,7 +455,7 @@ function UserProfileSection({ user }: { user: { name: string; email: string; ava
 }
 
 // ============================================================================
-// Sessions + Legacy Threads Accordion
+// Sessions + Legacy Threads + Projects Accordion
 // ============================================================================
 
 function SidebarSections() {
@@ -408,6 +464,30 @@ function SidebarSections() {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
 
+  // Projects data
+  const { data: projectsData } = useOpenCodeProjects();
+  const sortedProjects = React.useMemo(() => {
+    if (!projectsData || !Array.isArray(projectsData)) return [];
+    return [...projectsData].sort((a: any, b: any) => {
+      const aIsGlobal = a.id === 'global' || a.worktree === '/';
+      const bIsGlobal = b.id === 'global' || b.worktree === '/';
+      if (aIsGlobal && !bIsGlobal) return -1;
+      if (!aIsGlobal && bIsGlobal) return 1;
+      return (b.time?.updated ?? 0) - (a.time?.updated ?? 0);
+    });
+  }, [projectsData]);
+
+  const handleProjectClick = React.useCallback((project: any) => {
+    openTabAndNavigate({
+      id: 'page:/workspace',
+      title: 'Workspace',
+      type: 'page',
+      href: '/workspace',
+    });
+    if (isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
+
+  // Legacy threads
   const migrateAll = useMigrateAllLegacyThreads();
   const [migrateAllStarted, setMigrateAllStarted] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -440,6 +520,47 @@ function SidebarSections() {
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
+      {/* Projects — collapsible list above Sessions, same UX as Sessions */}
+      {sortedProjects.length > 0 && (
+        <Collapsible defaultOpen={false} className="flex flex-col min-h-0">
+          <div className="px-3 flex-shrink-0">
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
+                <FolderKanban className="h-4 w-4 flex-shrink-0" />
+                <span className="flex-1 text-left">Projects</span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+              </button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex flex-col pl-2">
+              <div className="px-2 pb-2">
+                <div className="space-y-0.5">
+                  {sortedProjects.map((project: any) => {
+                    const name = project.name || (project.worktree === '/' || project.id === 'global' ? 'Global' : project.worktree.split('/').pop() || project.worktree);
+                    return (
+                      <div
+                        key={project.id}
+                        onClick={() => handleProjectClick(project)}
+                        className={cn(
+                          'flex items-center gap-2 py-1.5 rounded-lg text-[13px] cursor-pointer',
+                          'transition-colors duration-150',
+                          'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                          'pr-2.5',
+                        )}
+                        style={{ paddingLeft: '14px' }}
+                      >
+                        <span className="flex-1 truncate">{name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {/* Sessions — always visible, takes remaining space */}
       <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
         <div className="px-3 flex-shrink-0">
@@ -826,8 +947,11 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             label="Sessions"
             flyoutContent={<SessionsFlyout />}
           />
-
-
+          <CollapsedIconButton
+            icon={<FolderKanban className="h-4 w-4" />}
+            label="Projects"
+            flyoutContent={<ProjectsFlyout />}
+          />
         </div>
 
         {/* --- Expanded layout --- */}
