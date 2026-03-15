@@ -1,8 +1,15 @@
 /**
- * Kortix Autowork Plugin
+ * Kortix Autowork Plugin — Concurrent Session Support
  *
- * Autonomous work continuation — a single unified "autowork" loop that runs
- * until the agent emits <promise>DONE</promise> + <promise>VERIFIED</promise>.
+ * Autonomous work continuation with full concurrency: every session gets its
+ * own independent autowork loop state, passive continuation state, and config
+ * overrides. No session can stomp another.
+ *
+ * Architecture:
+ *   - All state is stored in Maps keyed by session ID.
+ *   - Persistence is per-session: .kortix/loop-states/{sessionId}.json
+ *   - Stale sessions are cleaned up on session.deleted events and via
+ *     periodic GC (TTL-based eviction for sessions that never got deleted).
  *
  * Activation:
  *   - /autowork slash command (KORTIX_AUTOWORK marker)
@@ -10,32 +17,23 @@
  *
  * Stop:
  *   - /autowork-stop (KORTIX_AUTOWORK_STOP marker) — ONLY way to kill the loop.
- *     This is permanent within the session. A new user message does NOT re-enable.
- *     (Use /autowork again to re-start.)
+ *     Permanent within the session. (Use /autowork again to re-start.)
  *
  * Loop persistence:
  *   - Once active, the loop SURVIVES new user messages.
- *   - Human can add context, ask follow-ups, give corrections mid-loop.
- *   - The agent absorbs the new message and keeps looping.
- *   - messageCountAtStart is NOT reset — the full promise history is preserved.
- *   - If user sends /autowork again while loop is active, taskPrompt is updated
- *     (appended), but the loop continues from its current position — no restart.
+ *   - Human can add context mid-loop; agent absorbs it and keeps going.
+ *   - messageCountAtStart is NOT reset — full promise history preserved.
  *
  * Robustness:
  *   - Exponential backoff on failures: baseCooldown * 2^min(failures, 5)
  *   - 5-minute hard pause after 5 consecutive failures (auto-resets)
- *   - Scans ALL assistant messages since loop start for promises (not just last)
- *   - Abort grace period: skip continuation for 3s after abort events
- *   - Pending question detection: skip if agent is awaiting user answer
- *   - Internal marker on injected prompts prevents keyword re-triggering
- *   - Stop is PERMANENT: only /autowork-stop kills it, /autowork re-starts
+ *   - Scans ALL assistant messages since loop start for promises
+ *   - Abort grace period, pending question detection, internal marker
  *
  * Hooks:
- *   chat.message  — keyword detection + auto-activation, command detection,
- *                   loop persistence on new user messages, variant=max on keywords
- *   event         — session.idle: evaluate active loop or passive continuation,
- *                   inject promptAsync when work should continue
- *                   session.error/aborted: record abort for grace period
+ *   chat.message  — keyword/command detection, loop state management
+ *   event         — session.idle (evaluate + inject), session.error/aborted
+ *                   (grace period), session.deleted (cleanup)
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
@@ -65,7 +63,9 @@ import {
 	enterVerification,
 	checkLoopSafetyGates,
 	loadPersistedLoopState,
+	loadAllPersistedLoopStates,
 	persistLoopState,
+	removePersistedLoopState,
 } from "./src/loop"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -99,9 +99,7 @@ function isInternalMessage(text: string): boolean {
 		text.includes("<!-- KORTIX")
 }
 
-/**
- * Extract all assistant message texts from a messages array since a given index.
- */
+/** Extract all assistant message texts from a messages array since a given index. */
 function extractAssistantTexts(messages: any[], fromIndex: number = 0): string[] {
 	const texts: string[] = []
 	for (let i = fromIndex; i < messages.length; i++) {
@@ -147,7 +145,7 @@ function hasPendingQuestion(messages: any[]): boolean {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const msg = messages[i]
 		const role = msg?.info?.role
-		if (role === "user") return false  // user responded → no pending question
+		if (role === "user") return false
 		if (role === "assistant") {
 			for (const part of (msg.parts ?? [])) {
 				if (part.type === "tool") {
@@ -163,19 +161,101 @@ function hasPendingQuestion(messages: any[]): boolean {
 	return false
 }
 
+// ─── Per-Session State Manager ────────────────────────────────────────────────
+
+/** Max age (ms) before an inactive session's in-memory state is evicted. 2 hours. */
+const SESSION_STATE_TTL_MS = 2 * 60 * 60 * 1000
+
+interface SessionEntry<T> {
+	state: T
+	lastAccessedAt: number
+}
+
+/**
+ * TTL-guarded Map for per-session state. Entries are evicted after SESSION_STATE_TTL_MS
+ * of inactivity to prevent unbounded memory growth.
+ */
+class SessionStateMap<T> {
+	private map = new Map<string, SessionEntry<T>>()
+	private lastGcAt = Date.now()
+	private readonly gcIntervalMs = 10 * 60 * 1000 // run GC at most every 10 min
+
+	constructor(private readonly factory: (sessionId: string) => T) {}
+
+	/** Get or create state for a session, resetting the TTL timer. */
+	get(sessionId: string): T {
+		this.maybeGc()
+		let entry = this.map.get(sessionId)
+		if (!entry) {
+			entry = { state: this.factory(sessionId), lastAccessedAt: Date.now() }
+			this.map.set(sessionId, entry)
+		} else {
+			entry.lastAccessedAt = Date.now()
+		}
+		return entry.state
+	}
+
+	/** Overwrite state for a session. */
+	set(sessionId: string, state: T): void {
+		this.map.set(sessionId, { state, lastAccessedAt: Date.now() })
+	}
+
+	/** Check if a session has state (without creating it). */
+	has(sessionId: string): boolean {
+		return this.map.has(sessionId)
+	}
+
+	/** Peek at state without creating or resetting TTL. */
+	peek(sessionId: string): T | undefined {
+		return this.map.get(sessionId)?.state
+	}
+
+	/** Delete a session's state. */
+	delete(sessionId: string): void {
+		this.map.delete(sessionId)
+	}
+
+	/** Number of tracked sessions. */
+	get size(): number {
+		return this.map.size
+	}
+
+	/** Evict entries that haven't been accessed within the TTL window. */
+	private maybeGc(): void {
+		const now = Date.now()
+		if (now - this.lastGcAt < this.gcIntervalMs) return
+		this.lastGcAt = now
+		const cutoff = now - SESSION_STATE_TTL_MS
+		for (const [key, entry] of this.map) {
+			if (entry.lastAccessedAt < cutoff) {
+				this.map.delete(key)
+			}
+		}
+	}
+}
+
 // ─── Plugin Entry ─────────────────────────────────────────────────────────────
 
 const KortixContinuationPlugin: Plugin = async ({ client }) => {
-	let currentSessionId: string | null = null
-	let continuationConfig: ContinuationConfig = mergeConfig(DEFAULT_CONFIG)
-	const continuationState: ContinuationState = createInitialState()
-	let loopState: LoopState = createInitialLoopState()
+	const config: ContinuationConfig = mergeConfig(DEFAULT_CONFIG)
 
-	// Recover persisted loop state on startup
+	// Per-session state — each session gets independent, TTL-managed state
+	const loopStates = new SessionStateMap<LoopState>(
+		(_sid) => createInitialLoopState(),
+	)
+	const continuationStates = new SessionStateMap<ContinuationState>(
+		(sid) => { const s = createInitialState(); s.sessionId = sid; return s },
+	)
+	// Per-session config overrides (e.g., continuation disabled by /autowork-stop)
+	const sessionConfigOverrides = new Map<string, Partial<ContinuationConfig["features"]>>()
+
+	// Recover persisted loop states on startup
 	try {
-		const persisted = loadPersistedLoopState()
-		if (persisted?.active && !persisted.stopped) {
-			loopState = persisted
+		const persisted = loadAllPersistedLoopStates()
+		for (const [sid, state] of persisted) {
+			if (state.active && !state.stopped) {
+				loopStates.set(sid, state)
+			}
 		}
 	} catch { /* non-fatal */ }
 
@@ -187,47 +267,44 @@ const KortixContinuationPlugin: Plugin = async ({ client }) => {
 		} catch { /* non-fatal */ }
 	}
 
+	/** Short session ID for log readability */
+	const sid = (sessionId: string) => sessionId.length > 16 ? sessionId.slice(-12) : sessionId
+
 	return {
-		// ── HOOK: chat.message ────────────────────────────────────────────────────
-		// OpenCode calls this as chat.message(input, output) — two separate args.
-		// input = { sessionID, agent, model, messageID } (NO parts)
-		// output = { parts: Part[], message: {...} }  (parts live here)
+		// ── HOOK: chat.message ────────────────────────────────────────────────
 		"chat.message": async (input: any, output: any) => {
 			try {
-				// Track session ID
-				const sessionId = input?.sessionID ?? currentSessionId
-				if (sessionId) currentSessionId = sessionId
+				const sessionId = input?.sessionID
+				if (!sessionId) return
 
-				// Text lives in output.parts, not input
 				const messageText = extractMessageText(output)
-				if (!messageText || !currentSessionId) return
+				if (!messageText) return
 
-				// Skip if this is a system-injected message (never act on our own prompts)
+				// Skip system-injected messages (never act on our own prompts)
 				if (isInternalMessage(messageText)) return
 
-				// Reset work cycle timing on new user message (passive continuation only)
-				continuationState.workCycleStartedAt = Date.now()
-				if (currentSessionId && continuationState.sessionId !== currentSessionId) {
-					continuationState.sessionId = currentSessionId
-					continuationState.totalSessionContinuations = 0
-				}
-				// User is back — reset passive circuit breaker and inflight guard
-				continuationState.consecutiveAborts = 0
-				continuationState.inflight = false
+				// Get per-session states
+				let loopState = loopStates.get(sessionId)
+				const contState = continuationStates.get(sessionId)
+
+				// Reset passive continuation state on new user message
+				contState.workCycleStartedAt = Date.now()
+				contState.consecutiveAborts = 0
+				contState.inflight = false
 
 				const cleanText = cleanTextForKeywordDetection(messageText)
 
-				// ── Stop command — ONLY way to kill the loop ──────────────────────
-				// Permanent within the session. Use /autowork to re-start.
+				// ── /autowork-stop — kill the loop, permanent within session ──
 				if (messageText.includes("KORTIX_AUTOWORK_STOP") || /\/autowork-stop\b/.test(messageText)) {
 					if (loopState.active) loopState = stopLoop(loopState)
 					loopState = markStopped(loopState)
-					continuationConfig.features.continuation = false
-					log("info", "[autowork] Permanently stopped via /autowork-stop — use /autowork to restart")
+					loopStates.set(sessionId, loopState)
+					sessionConfigOverrides.set(sessionId, { continuation: false })
+					log("info", `[autowork][${sid(sessionId)}] Permanently stopped — use /autowork to restart`)
 					return
 				}
 
-				// ── Autowork command (slash command) ──────────────────────────────
+				// ── /autowork — start or append to loop ──────────────────────
 				if (messageText.includes("KORTIX_AUTOWORK") || /\/autowork\b/.test(messageText)) {
 					const task = messageText
 						.replace(/^.*?\/autowork\s*/i, "")
@@ -235,115 +312,128 @@ const KortixContinuationPlugin: Plugin = async ({ client }) => {
 						.trim() || "Unspecified task"
 
 					if (loopState.active) {
-						// Loop already running — append new context to taskPrompt, keep looping
+						// Append context to running loop
 						const updatedPrompt = loopState.taskPrompt
 							? `${loopState.taskPrompt}\n\n[User added context at iteration ${loopState.iteration}]: ${task}`
 							: task
 						loopState = { ...loopState, taskPrompt: updatedPrompt }
 						persistLoopState(loopState)
-						log("info", `[autowork] /autowork received mid-loop — context appended, loop continues`)
+						loopStates.set(sessionId, loopState)
+						log("info", `[autowork][${sid(sessionId)}] Context appended mid-loop`)
 					} else {
-						// Fresh start
+						// Fresh start — clear any previous stop
+						sessionConfigOverrides.delete(sessionId)
 						let msgCount = 0
 						try {
-							const r = await client.session.messages({ path: { id: currentSessionId } }).catch(() => ({ data: [] as any[] }))
+							const r = await client.session.messages({ path: { id: sessionId } }).catch(() => ({ data: [] as any[] }))
 							msgCount = (r.data ?? []).length
 						} catch { /* non-fatal */ }
-
-						loopState = startLoop(task, currentSessionId, msgCount)
-						log("info", `[autowork] Activated via /autowork: "${task.slice(0, 80)}"`)
+						loopState = startLoop(task, sessionId, msgCount)
+						loopStates.set(sessionId, loopState)
+						log("info", `[autowork][${sid(sessionId)}] Activated: "${task.slice(0, 80)}"`)
 					}
 
-					// Max-thinking mode on explicit command
 					if (output?.message && typeof output.message === "object") {
 						output.message.variant = "max"
 					}
 					return
 				}
 
-				// ── Keyword auto-activation ───────────────────────────────────────
+				// ── Keyword auto-activation ───────────────────────────────────
 				if (AUTOWORK_KEYWORDS.test(cleanText)) {
 					if (!loopState.active) {
 						const task = cleanText.replace(AUTOWORK_KEYWORDS, "").trim() || messageText.trim()
-
+						sessionConfigOverrides.delete(sessionId)
 						let msgCount = 0
 						try {
-							const r = await client.session.messages({ path: { id: currentSessionId } }).catch(() => ({ data: [] as any[] }))
+							const r = await client.session.messages({ path: { id: sessionId } }).catch(() => ({ data: [] as any[] }))
 							msgCount = (r.data ?? []).length
 						} catch { /* non-fatal */ }
-
-						loopState = startLoop(task, currentSessionId, msgCount)
-						log("info", `[autowork] Auto-activated by keyword: "${task.slice(0, 80)}"`)
-					} else {
-						log("info", "[autowork] Keyword detected — loop already active, continuing")
+						loopState = startLoop(task, sessionId, msgCount)
+						loopStates.set(sessionId, loopState)
+						log("info", `[autowork][${sid(sessionId)}] Keyword-activated: "${task.slice(0, 80)}"`)
 					}
-
-					// Always set variant=max for autowork keywords
 					if (output?.message && typeof output.message === "object") {
 						output.message.variant = "max"
 					}
 					return
 				}
 
-				// ── Loop is active: new user message absorbed into the loop ───────
-				// The user added context, a correction, or a follow-up.
-				// The loop STAYS ALIVE. Do NOT stop or reset it.
-				// On the next session.idle, the loop will continue from where it was.
+				// ── Active loop absorbs user message ─────────────────────────
 				if (loopState.active) {
-					// Append the user's message as additional context to taskPrompt
 					const updatedPrompt = loopState.taskPrompt
 						? `${loopState.taskPrompt}\n\n[User message at iteration ${loopState.iteration}]: ${messageText.slice(0, 500)}`
 						: messageText.slice(0, 500)
 					loopState = { ...loopState, taskPrompt: updatedPrompt }
 					persistLoopState(loopState)
-					log("info", `[autowork] User message absorbed into active loop — loop continues (iteration ${loopState.iteration})`)
+					loopStates.set(sessionId, loopState)
+					log("info", `[autowork][${sid(sessionId)}] User message absorbed (iter ${loopState.iteration})`)
 				}
-
 			} catch { /* non-fatal */ }
 		},
 
-		// ── HOOK: event ───────────────────────────────────────────────────────────
+		// ── HOOK: event ───────────────────────────────────────────────────────
 		event: async ({ event }) => {
 			try {
-				// Track new sessions
-				if (event.type === "session.created") {
-					const sid = (event as any).properties?.info?.id
-					if (sid) currentSessionId = sid
-				}
-
-				// Record abort events for grace period
-				if (event.type === "session.error" || (event.type as string) === "session.aborted") {
-					if (loopState.active) {
-						loopState = recordAbort(loopState)
-						log("info", "[autowork] Abort recorded — grace period active")
+				// ── Session cleanup on delete ────────────────────────────────
+				if (event.type === "session.deleted") {
+					const sessionId = (event as any).properties?.info?.id ?? (event as any).properties?.sessionID
+					if (sessionId) {
+						loopStates.delete(sessionId)
+						continuationStates.delete(sessionId)
+						sessionConfigOverrides.delete(sessionId)
+						removePersistedLoopState(sessionId)
+						log("info", `[autowork][${sid(sessionId)}] Session deleted — state cleaned up`)
 					}
-					// Also track aborts for passive continuation circuit breaker
-					continuationState.lastAbortAt = Date.now()
-					continuationState.consecutiveAborts++
-					continuationState.inflight = false  // clear inflight on abort
-					log("info", `[autowork/passive] Abort recorded — consecutive: ${continuationState.consecutiveAborts}`)
+					return
 				}
 
+				// ── Abort events — record grace period ───────────────────────
+				if (event.type === "session.error" || (event.type as string) === "session.aborted") {
+					const sessionId = (event as any).properties?.sessionID
+					if (!sessionId) return
+
+					// Loop state: record abort for grace period
+					if (loopStates.has(sessionId)) {
+						const ls = loopStates.get(sessionId)
+						if (ls.active) {
+							loopStates.set(sessionId, recordAbort(ls))
+							log("info", `[autowork][${sid(sessionId)}] Abort recorded — grace period active`)
+						}
+					}
+
+					// Continuation state: track for circuit breaker
+					const cs = continuationStates.get(sessionId)
+					cs.lastAbortAt = Date.now()
+					cs.consecutiveAborts++
+					cs.inflight = false
+					return
+				}
+
+				// ── session.idle — main evaluation point ─────────────────────
 				if (event.type !== "session.idle") return
 
-				const sessionId = (event as any).properties?.sessionID ?? currentSessionId
+				const sessionId = (event as any).properties?.sessionID
 				if (!sessionId) return
 
-				// Attempt filesystem recovery if loop is inactive
+				let loopState = loopStates.get(sessionId)
+
+				// Attempt filesystem recovery if no active in-memory loop
 				if (!loopState.active) {
 					try {
-						const persisted = loadPersistedLoopState()
+						const persisted = loadPersistedLoopState(sessionId)
 						if (persisted?.active && !persisted.stopped) {
 							loopState = persisted
-							log("info", "[autowork] Recovered active loop from filesystem")
+							loopStates.set(sessionId, loopState)
+							log("info", `[autowork][${sid(sessionId)}] Recovered loop from filesystem`)
 						}
 					} catch { /* non-fatal */ }
 				}
 
-				// ── Priority 1: Active autowork loop ──────────────────────────────
+				// ── Priority 1: Active autowork loop ─────────────────────────
 				if (loopState.active) {
 					try {
-						const thresholds = continuationConfig.thresholds
+						const thresholds = config.thresholds
 
 						// Safety gates
 						const gateResult = checkLoopSafetyGates(
@@ -356,66 +446,74 @@ const KortixContinuationPlugin: Plugin = async ({ client }) => {
 
 						if (gateResult === "__reset_failures__") {
 							loopState = { ...loopState, consecutiveFailures: 0 }
-							log("info", "[autowork] Failure count reset after recovery window")
+							loopStates.set(sessionId, loopState)
+							log("info", `[autowork][${sid(sessionId)}] Failure count reset after recovery window`)
 						} else if (gateResult) {
-							log("info", `[autowork] Gate: ${gateResult}`)
+							log("info", `[autowork][${sid(sessionId)}] Gate: ${gateResult}`)
 							return
 						}
 
-					// Fetch messages AND todos in parallel — todos needed for DONE enforcement
-					const [messagesRes, loopTodoRes] = await Promise.all([
-						client.session.messages({ path: { id: sessionId } }).catch(() => ({ data: [] as any[] })),
-						client.session.todo({ path: { id: sessionId } }).catch(() => ({ data: [] as Todo[] })),
-					])
-					const messages = (messagesRes.data ?? []) as any[]
-					const loopTodos = (loopTodoRes.data ?? []) as Todo[]
+						// Fetch messages AND todos in parallel
+						const [messagesRes, loopTodoRes] = await Promise.all([
+							client.session.messages({ path: { id: sessionId } }).catch(() => ({ data: [] as any[] })),
+							client.session.todo({ path: { id: sessionId } }).catch(() => ({ data: [] as Todo[] })),
+						])
+						const messages = (messagesRes.data ?? []) as any[]
+						const loopTodos = (loopTodoRes.data ?? []) as Todo[]
 
-					// Skip if agent is waiting for question answer
-					if (hasPendingQuestion(messages)) {
-						log("info", "[autowork] Skipped: pending question")
-						return
-					}
+						// Skip if agent is waiting for question answer
+						if (hasPendingQuestion(messages)) {
+							log("info", `[autowork][${sid(sessionId)}] Skipped: pending question`)
+							return
+						}
 
-					// Extract ALL assistant texts since loop start
-					const allTexts = extractAssistantTexts(messages, loopState.messageCountAtStart)
-					const loopDecision = evaluateLoop(loopState, allTexts, loopTodos)
-						log("info", `[autowork] ${loopDecision.action} — ${loopDecision.reason}`)
+						// Evaluate loop decision
+						const allTexts = extractAssistantTexts(messages, loopState.messageCountAtStart)
+						const decision = evaluateLoop(loopState, allTexts, loopTodos)
+						log("info", `[autowork][${sid(sessionId)}] ${decision.action} — ${decision.reason}`)
 
-						if (loopDecision.action === "verify" && loopDecision.prompt) {
-							loopState = enterVerification(loopState)
-							loopState = advanceIteration(loopState)
+						if (decision.action === "verify" && decision.prompt) {
+							loopState = advanceIteration(enterVerification(loopState))
+							loopStates.set(sessionId, loopState)
 							await client.session.promptAsync({
 								path: { id: sessionId },
-								body: { parts: [{ type: "text" as const, text: loopDecision.prompt }] },
+								body: { parts: [{ type: "text" as const, text: decision.prompt }] },
 							}).catch((err: unknown) => {
-								log("warn", `[autowork] promptAsync failed: ${err}`)
+								log("warn", `[autowork][${sid(sessionId)}] promptAsync failed: ${err}`)
 								loopState = recordFailure(loopState)
+								loopStates.set(sessionId, loopState)
 							})
-
-						} else if (loopDecision.action === "continue" && loopDecision.prompt) {
+						} else if (decision.action === "continue" && decision.prompt) {
 							loopState = advanceIteration(loopState)
+							loopStates.set(sessionId, loopState)
 							await client.session.promptAsync({
 								path: { id: sessionId },
-								body: { parts: [{ type: "text" as const, text: loopDecision.prompt }] },
+								body: { parts: [{ type: "text" as const, text: decision.prompt }] },
 							}).catch((err: unknown) => {
-								log("warn", `[autowork] promptAsync failed: ${err}`)
+								log("warn", `[autowork][${sid(sessionId)}] promptAsync failed: ${err}`)
 								loopState = recordFailure(loopState)
+								loopStates.set(sessionId, loopState)
 							})
-
-						} else if (loopDecision.action === "stop") {
+						} else if (decision.action === "stop") {
 							loopState = stopLoop(loopState)
-							log("info", `[autowork] Complete: ${loopDecision.reason}`)
+							loopStates.set(sessionId, loopState)
+							log("info", `[autowork][${sid(sessionId)}] Complete: ${decision.reason}`)
 						}
 					} catch (err) {
-						log("warn", `[autowork] Evaluation error: ${err}`)
+						log("warn", `[autowork][${sid(sessionId)}] Evaluation error: ${err}`)
 						loopState = recordFailure(loopState)
+						loopStates.set(sessionId, loopState)
 					}
 					return
 				}
 
-				// ── Priority 2: Passive continuation ──────────────────────────────
-				if (!continuationConfig.features.continuation) return
+				// ── Priority 2: Passive continuation ─────────────────────────
+				const overrides = sessionConfigOverrides.get(sessionId)
+				const continuationEnabled = overrides?.continuation ?? config.features.continuation
+				if (!continuationEnabled) return
 				if (loopState.stopped) return
+
+				const contState = continuationStates.get(sessionId)
 
 				try {
 					const [todoRes, messagesRes] = await Promise.all([
@@ -427,7 +525,7 @@ const KortixContinuationPlugin: Plugin = async ({ client }) => {
 					const messages = (messagesRes.data ?? []) as any[]
 
 					if (hasPendingQuestion(messages)) {
-						log("info", "[autowork/passive] Skipped: pending question")
+						log("info", `[autowork/passive][${sid(sessionId)}] Skipped: pending question`)
 						return
 					}
 
@@ -435,34 +533,30 @@ const KortixContinuationPlugin: Plugin = async ({ client }) => {
 
 					// Track empty/aborted responses for circuit breaker
 					if (!text.trim() && !hadToolCalls) {
-						continuationState.consecutiveAborts++
-						log("info", `[autowork/passive] Empty response detected — consecutive aborts: ${continuationState.consecutiveAborts}`)
+						contState.consecutiveAborts++
 					} else {
-						// Got a real response — reset the circuit breaker
-						continuationState.consecutiveAborts = 0
+						contState.consecutiveAborts = 0
 					}
 
-					const decision = evaluate(continuationConfig, continuationState, text, hadToolCalls, todos)
-					log("info", `[autowork/passive] ${decision.action} — ${decision.reason}`)
+					const decision = evaluate(config, contState, text, hadToolCalls, todos)
+					log("info", `[autowork/passive][${sid(sessionId)}] ${decision.action} — ${decision.reason}`)
 
 					if (decision.action === "continue" && decision.prompt) {
-						// Set inflight guard before async call
-						continuationState.inflight = true
-						continuationState.totalSessionContinuations++
-						continuationState.lastContinuationAt = Date.now()
+						contState.inflight = true
+						contState.totalSessionContinuations++
+						contState.lastContinuationAt = Date.now()
 						await client.session.promptAsync({
 							path: { id: sessionId },
 							body: { parts: [{ type: "text" as const, text: decision.prompt }] },
 						}).catch((err: unknown) => {
-							log("warn", `[autowork/passive] promptAsync failed: ${err}`)
+							log("warn", `[autowork/passive][${sid(sessionId)}] promptAsync failed: ${err}`)
 						}).finally(() => {
-							// Clear inflight guard after completion (success or failure)
-							continuationState.inflight = false
+							contState.inflight = false
 						})
 					}
 				} catch (err) {
-					log("warn", `[autowork/passive] Error: ${err}`)
-					continuationState.inflight = false  // ensure inflight clears on error
+					log("warn", `[autowork/passive][${sid(sessionId)}] Error: ${err}`)
+					contState.inflight = false
 				}
 			} catch (err) {
 				log("warn", `[autowork] event hook error: ${err}`)

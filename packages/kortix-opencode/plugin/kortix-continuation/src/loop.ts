@@ -1,8 +1,8 @@
 /**
  * Autowork Loop — State machine for autonomous work continuation
  *
- * Single unified autowork mode: always self-verifies, 500 max iterations.
- * State is persisted to .kortix/loop-state.json for crash recovery.
+ * Supports concurrent sessions: each session's state is persisted independently
+ * to .kortix/loop-states/{sessionId}.json. Always self-verifies, 500 max iterations.
  *
  * Robustness features:
  *   - Exponential backoff: baseCooldown * 2^min(failures, 5)
@@ -33,7 +33,7 @@
 
 import type { LoopState } from "./config"
 import { AUTOWORK_LOOP_CONFIG, INTERNAL_MARKER, createInitialLoopState } from "./config"
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { evaluateTodos, formatRemainingWork } from "./todo-enforcer"
 import type { Todo } from "@opencode-ai/sdk"
@@ -41,31 +41,96 @@ import type { Todo } from "@opencode-ai/sdk"
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const KORTIX_DIR = process.env.KORTIX_DIR || join(process.cwd(), ".kortix")
-const LOOP_STATE_PATH = `${KORTIX_DIR}/loop-state.json`
+const LOOP_STATE_DIR = `${KORTIX_DIR}/loop-states`
+/** @deprecated kept for migration from single-file to per-session persistence */
+const LEGACY_LOOP_STATE_PATH = `${KORTIX_DIR}/loop-state.json`
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
-/** Write loop state to disk for crash recovery */
+/** Get the per-session state file path */
+function loopStatePath(sessionId: string): string {
+	return join(LOOP_STATE_DIR, `${sessionId}.json`)
+}
+
+/** Write loop state to disk for crash recovery (per-session) */
 export function persistLoopState(state: LoopState): void {
 	try {
-		if (!existsSync(KORTIX_DIR)) mkdirSync(KORTIX_DIR, { recursive: true })
-		writeFileSync(LOOP_STATE_PATH, JSON.stringify(state, null, 2), "utf-8")
+		if (!state.sessionId) return
+		if (!existsSync(LOOP_STATE_DIR)) mkdirSync(LOOP_STATE_DIR, { recursive: true })
+		writeFileSync(loopStatePath(state.sessionId), JSON.stringify(state, null, 2), "utf-8")
 	} catch {
 		/* non-fatal — in-memory state is authoritative */
 	}
 }
 
-/** Read persisted loop state from disk (returns null if none or invalid) */
-export function loadPersistedLoopState(): LoopState | null {
+/** Read persisted loop state from disk for a specific session */
+export function loadPersistedLoopState(sessionId?: string): LoopState | null {
 	try {
-		if (!existsSync(LOOP_STATE_PATH)) return null
-		const raw = readFileSync(LOOP_STATE_PATH, "utf-8")
-		const parsed = JSON.parse(raw) as LoopState
-		if (typeof parsed.active !== "boolean") return null
-		return parsed
+		// If sessionId provided, load from per-session file
+		if (sessionId) {
+			const path = loopStatePath(sessionId)
+			if (existsSync(path)) {
+				const raw = readFileSync(path, "utf-8")
+				const parsed = JSON.parse(raw) as LoopState
+				if (typeof parsed.active === "boolean") return parsed
+			}
+		}
+		// Fallback: try legacy single-file (migration path)
+		if (existsSync(LEGACY_LOOP_STATE_PATH)) {
+			const raw = readFileSync(LEGACY_LOOP_STATE_PATH, "utf-8")
+			const parsed = JSON.parse(raw) as LoopState
+			if (typeof parsed.active !== "boolean") return null
+			// Migrate: write to per-session file and delete legacy
+			if (parsed.sessionId) {
+				persistLoopState(parsed)
+				try { unlinkSync(LEGACY_LOOP_STATE_PATH) } catch { /* non-fatal */ }
+			}
+			return parsed
+		}
+		return null
 	} catch {
 		return null
 	}
+}
+
+/** Load all persisted loop states from disk (for startup recovery) */
+export function loadAllPersistedLoopStates(): Map<string, LoopState> {
+	const states = new Map<string, LoopState>()
+	try {
+		if (!existsSync(LOOP_STATE_DIR)) return states
+		const files = readdirSync(LOOP_STATE_DIR).filter(f => f.endsWith(".json"))
+		for (const file of files) {
+			try {
+				const raw = readFileSync(join(LOOP_STATE_DIR, file), "utf-8")
+				const parsed = JSON.parse(raw) as LoopState
+				if (typeof parsed.active === "boolean" && parsed.sessionId) {
+					states.set(parsed.sessionId, parsed)
+				}
+			} catch { /* skip invalid files */ }
+		}
+	} catch { /* non-fatal */ }
+	// Also check legacy single-file
+	try {
+		if (existsSync(LEGACY_LOOP_STATE_PATH)) {
+			const raw = readFileSync(LEGACY_LOOP_STATE_PATH, "utf-8")
+			const parsed = JSON.parse(raw) as LoopState
+			if (typeof parsed.active === "boolean" && parsed.sessionId && !states.has(parsed.sessionId)) {
+				states.set(parsed.sessionId, parsed)
+				// Migrate
+				persistLoopState(parsed)
+				try { unlinkSync(LEGACY_LOOP_STATE_PATH) } catch { /* non-fatal */ }
+			}
+		}
+	} catch { /* non-fatal */ }
+	return states
+}
+
+/** Remove persisted loop state for a session (cleanup after loop ends) */
+export function removePersistedLoopState(sessionId: string): void {
+	try {
+		const path = loopStatePath(sessionId)
+		if (existsSync(path)) unlinkSync(path)
+	} catch { /* non-fatal */ }
 }
 
 // ─── Loop Lifecycle ───────────────────────────────────────────────────────────
