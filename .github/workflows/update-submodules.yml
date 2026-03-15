@@ -1,0 +1,35 @@
+name: Auto-update Submodules
+
+on:
+  schedule:
+    # Run every hour — catches any submodule repo pushes within 60 min
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Bump submodules to latest branch HEAD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Update all submodules to remote branch HEAD
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive --remote
+
+      - name: Commit and push if anything changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet && git diff --cached --quiet && echo "No submodule changes, skipping commit." && exit 0
+          git add packages/lss packages/opencode-channels packages/kortix-ocx-registry
+          git commit -m "chore: auto-update submodules to latest branch HEAD"
+          git push origin main
