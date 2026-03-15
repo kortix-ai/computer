@@ -5093,6 +5093,110 @@ function TaskTool({ part, forceOpen }: ToolProps) {
 ToolRegistry.register("task", TaskTool);
 
 // ============================================================================
+// SessionSpawnTool — Kortix Orchestrator session spawning
+// Mirrors TaskTool UX: inline card, shimmer while running, click → SubSessionModal
+// ============================================================================
+
+function SessionSpawnTool({ part, forceOpen }: ToolProps) {
+	const input = partInput(part);
+	const status = partStatus(part);
+
+	const agentName = (input.agent as string) || "KortixWorker";
+	const promptPreview = ((input.prompt as string) || "").slice(0, 80);
+	const projectName = (input.project as string) || "";
+
+	// Extract child session ID from output text
+	const childSessionId: string | undefined = useMemo(
+		() => getChildSessionId(part),
+		[part],
+	);
+
+	const { data: childMessages } = useOpenCodeMessages(childSessionId ?? "");
+
+	const childToolParts = useMemo(() => {
+		if (!childMessages) return [];
+		return getChildSessionToolParts(childMessages as any);
+	}, [childMessages]);
+
+	const [modalOpen, setModalOpen] = useState(false);
+
+	const isRunning = status === "running" || status === "pending";
+	const isCompleted = status === "completed";
+
+	const lastActivity = useMemo(() => {
+		if (childToolParts.length === 0) return null;
+		const last = childToolParts[childToolParts.length - 1];
+		const info = getToolInfo(last.tool, (last.state.input ?? {}) as Record<string, any>);
+		return info.title + (info.subtitle ? ` · ${info.subtitle}` : "");
+	}, [childToolParts]);
+
+	const running = useContext(ToolRunningContext);
+
+	return (
+		<>
+			<div
+				role="button"
+				tabIndex={0}
+				onClick={() => childSessionId && setModalOpen(true)}
+				onKeyDown={(e) => e.key === "Enter" && childSessionId && setModalOpen(true)}
+				className={cn(
+					"flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg",
+					"bg-muted/20 border border-border/40",
+					"text-xs transition-colors select-none",
+					childSessionId ? "cursor-pointer hover:bg-muted/40" : "cursor-default",
+					"max-w-full group",
+				)}
+			>
+				<SquareKanban className="size-3.5 flex-shrink-0 text-muted-foreground" />
+
+				<div className="flex items-center gap-1.5 min-w-0 flex-1">
+					<span className="font-medium text-xs text-foreground whitespace-nowrap">
+						{agentName}{projectName ? ` · ${projectName}` : ""}
+					</span>
+
+					{isRunning && lastActivity ? (
+						<TextShimmer duration={1} spread={2} className="text-xs truncate font-mono">
+							{lastActivity}
+						</TextShimmer>
+					) : isRunning && promptPreview ? (
+						<TextShimmer duration={1} spread={2} className="text-xs truncate font-mono">
+							{promptPreview}
+						</TextShimmer>
+					) : promptPreview ? (
+						<span className="text-muted-foreground text-xs truncate font-mono">
+							{promptPreview}
+						</span>
+					) : null}
+
+					{isCompleted && childToolParts.length > 0 && (
+						<span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/70 font-mono whitespace-nowrap flex-shrink-0">
+							{childToolParts.length} steps
+						</span>
+					)}
+				</div>
+
+				{running && (
+					<Loader2 className="size-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+				)}
+				{childSessionId && !running && (
+					<ExternalLink className="size-3 flex-shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
+				)}
+			</div>
+
+			{childSessionId && (
+				<SubSessionModal
+					open={modalOpen}
+					onOpenChange={setModalOpen}
+					sessionId={childSessionId}
+					title={`${agentName}${projectName ? ` · ${projectName}` : ""}${promptPreview ? `: ${promptPreview}` : ""}`}
+				/>
+			)}
+		</>
+	);
+}
+ToolRegistry.register("session_spawn", SessionSpawnTool);
+
+// ============================================================================
 // SkillTool — Skill loading
 // ============================================================================
 

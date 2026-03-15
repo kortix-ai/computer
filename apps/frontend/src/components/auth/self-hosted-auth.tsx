@@ -765,13 +765,15 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
 
     const target = returnUrl || '/onboarding';
 
-    if (target.startsWith('/onboarding')) {
-      router.push(target);
-      return;
-    }
-
-    router.push(target);
-  }, [router, returnUrl]);
+    // IMPORTANT: Use window.location.href instead of router.push() to force a
+    // full page navigation. During the wizard, the middleware may have refreshed
+    // the Supabase session (consuming the single-use refresh token) and set an
+    // updated cookie on the response. Client-side navigation via router.push()
+    // may not process Set-Cookie headers from middleware responses, leaving the
+    // browser with a stale (revoked) refresh token. A full navigation ensures
+    // the browser properly receives and stores any updated auth cookies.
+    window.location.href = target;
+  }, [returnUrl]);
 
   // ── Early return: loading state ──
   if (installed === null) {

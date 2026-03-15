@@ -47,6 +47,7 @@ import { OcImageGenToolView } from './OcImageGenToolView';
 import { OcShowUserToolView } from './OcShowUserToolView';
 import { OcApplyPatchToolView } from './OcApplyPatchToolView';
 import { OcTaskToolView } from './OcTaskToolView';
+import { OcSessionSpawnToolView } from './OcSessionSpawnToolView';
 import { OcTodoToolView } from './OcTodoToolView';
 import { OcGenericToolView } from './OcGenericToolView';
 import { OcQuestionToolView } from './OcQuestionToolView';
@@ -130,6 +131,12 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   // Sub-agent delegation
   'oc-task': OcTaskToolView,
   'task': OcTaskToolView,
+
+  // Kortix orchestrator session spawning
+  'oc-session_spawn': OcSessionSpawnToolView,
+  'oc-session-spawn': OcSessionSpawnToolView,
+  'session_spawn': OcSessionSpawnToolView,
+  'session-spawn': OcSessionSpawnToolView,
 
   // Todo / task management
   'oc-todowrite': OcTodoToolView,

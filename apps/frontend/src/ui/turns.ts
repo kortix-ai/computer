@@ -430,6 +430,7 @@ export function computeStatusFromPart(part: Part | undefined): string | undefine
   if (isToolPart(part)) {
     switch (part.tool) {
       case 'task':
+      case 'session_spawn':
         return 'Delegating to agent...';
       case 'todowrite':
       case 'todoread':
@@ -554,10 +555,21 @@ export function formatDuration(ms: number): string {
  * Extract child session ID from a task tool part's metadata.
  */
 export function getChildSessionId(part: ToolPart): string | undefined {
-  if (part.tool !== 'task') return undefined;
-  const status = part.state.status;
-  if (status === 'completed' || status === 'running') {
-    return (part.state.metadata as any)?.sessionId;
+  if (part.tool === 'task') {
+    const status = part.state.status;
+    if (status === 'completed' || status === 'running') {
+      return (part.state.metadata as any)?.sessionId;
+    }
+    return undefined;
+  }
+  // session_spawn: extract session ID from output text (format: "- **Session:** ses_xxx")
+  if (part.tool === 'session_spawn') {
+    const output = (part.state as any)?.output as string | undefined;
+    if (output) {
+      const match = output.match(/\*\*Session:\*\*\s*(ses_[a-zA-Z0-9]+)/);
+      if (match) return match[1];
+    }
+    return undefined;
   }
   return undefined;
 }
@@ -648,6 +660,12 @@ export function getToolInfo(tool: string, input: Record<string, any> = {}): Tool
         icon: 'square-kanban',
         title: `Agent (${input.subagent_type || 'task'})`,
         subtitle: input.description,
+      };
+    case 'session_spawn':
+      return {
+        icon: 'square-kanban',
+        title: `Worker (${input.agent || 'KortixWorker'})`,
+        subtitle: input.prompt?.slice(0, 60),
       };
     case 'bash':
       return { icon: 'terminal', title: 'Shell', subtitle: input.description };

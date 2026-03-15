@@ -871,8 +871,10 @@ function SelfHostedLoginContent() {
     // onboarding or dashboard — don't re-show wizard steps the user finished.
     const setupDone = sessionStorage.getItem('setup_complete') === 'true';
     if (setupDone) {
-      // Always go to /onboarding — layout-content will redirect to /dashboard if ONBOARDING_COMPLETE=true
-      router.push(returnUrl || '/onboarding');
+      // Always go to /onboarding — layout-content will redirect to /dashboard if ONBOARDING_COMPLETE=true.
+      // Use window.location.href for a full navigation to ensure auth cookies from
+      // middleware token refreshes are properly synced (router.push may skip Set-Cookie processing).
+      window.location.href = returnUrl || '/onboarding';
       return;
     }
     // Setup is not complete yet — stay on the auth wizard and let step 2/3 drive

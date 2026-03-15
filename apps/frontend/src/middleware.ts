@@ -233,17 +233,28 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Fetch user ONCE and reuse for both locale detection and auth checks
+  // Fetch user ONCE and reuse for both locale detection and auth checks.
+  // IMPORTANT: Skip getUser() for auth routes — the auth page handles its
+  // own session client-side. Calling getUser() here can trigger a server-side
+  // token refresh that consumes the refresh token (GoTrue refresh tokens are
+  // single-use). The updated cookie is set on the response, but if the browser
+  // does a client-side navigation (router.push) instead of a full page load,
+  // the Set-Cookie header may not be processed, leaving the browser with a
+  // stale (revoked) refresh token → "Refresh Token Not Found" on the next request.
   let user: { id: string; user_metadata?: { locale?: string } } | null = null;
   let authError: Error | null = null;
   
-  try {
-    const { data: { user: fetchedUser }, error: fetchedError } = await supabase.auth.getUser();
-    user = fetchedUser;
-    authError = fetchedError as Error | null;
-  } catch (error) {
-    // User might not be authenticated, continue
-    authError = error as Error;
+  const isAuthRoute = pathname === '/auth' || pathname.startsWith('/auth/');
+  
+  if (!isAuthRoute) {
+    try {
+      const { data: { user: fetchedUser }, error: fetchedError } = await supabase.auth.getUser();
+      user = fetchedUser;
+      authError = fetchedError as Error | null;
+    } catch (error) {
+      // User might not be authenticated, continue
+      authError = error as Error;
+    }
   }
 
   // FAST PATH: Authenticated users hitting the homepage get an instant 302
