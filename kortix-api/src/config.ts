@@ -53,7 +53,7 @@ const envSchema = z.object({
 
   // ── Core (required) ──────────────────────────────────────────────────────
   PORT:                        optInt(8008),
-  ENV_MODE:                    z.enum(['local', 'cloud']).optional().default('local'),
+  ENV_MODE:                    z.enum(['local', 'cloud', 'staging']).optional().default('local').transform(v => v === 'staging' ? 'cloud' : v) as z.ZodType<'local' | 'cloud'>,
 
   // ── Database (REQUIRED) ──────────────────────────────────────────────────
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required — cannot start without a database'),
