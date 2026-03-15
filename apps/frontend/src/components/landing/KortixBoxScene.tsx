@@ -184,9 +184,10 @@ function KortixBoxModel({ progressRef, isOn, setIsOn }: KortixBoxModelProps) {
       }
     }
     
-    const scrollRX = 0.25 + t * 0.25; 
-    const scrollRY = t * 2.0; 
-    const scrollY = -0.2 - t * 0.5;
+    // Start front-on (LED visible), tilt to reveal top (Kortix engraving) on scroll
+    const scrollRX = t * 0.55;
+    const scrollRY = t * 1.8;
+    const scrollY = -t * 0.5;
 
     const mouseX = mouseRef.current.x;
     const mouseY = mouseRef.current.y;
@@ -211,7 +212,7 @@ function KortixBoxModel({ progressRef, isOn, setIsOn }: KortixBoxModelProps) {
   }, [hovered]);
 
   return (
-    <group ref={groupRef} scale={1.2}>
+    <group ref={groupRef} scale={1.2} visible={ready}>
       <group 
         ref={innerRef}
         onPointerOver={() => setHovered(true)}
