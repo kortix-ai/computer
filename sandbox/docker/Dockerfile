@@ -99,7 +99,7 @@ RUN mkdir -p /workspace/.browser-profile \
     /workspace/.npm-global/bin \
     /workspace/.npm-global/lib \
     && chmod 700 /workspace/.secrets \
-    && chown -R 1000:1000 /workspace \
+    && chown -R abc:abc /workspace \
     && rm -rf /config \
     && ln -s /workspace /config \
     && git config --system --add safe.directory '*' \
