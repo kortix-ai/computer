@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.8.6",
+    "date": "2026-03-15",
+    "title": "Fix sandbox boot — workspace ownership",
+    "description": "Fixes critical sandbox boot failure where OpenCode couldn't create its SQLite database because /workspace was owned by the wrong uid.",
+    "changes": [
+      {
+        "type": "fix",
+        "text": "OpenCode no longer fails with 'unable to open database file' on fresh boot — workspace is now correctly owned by the abc user (uid 911) instead of uid 1000"
+      }
+    ]
+  },
+  {
     "version": "0.8.5",
     "date": "2026-03-15",
     "title": "Sandbox reliability, billing flow, and UI polish",
