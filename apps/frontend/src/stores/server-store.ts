@@ -611,11 +611,12 @@ export function isCloudMode(): boolean {
  *
  * Use in non-React contexts: call directly (reads from store snapshot).
  */
-export function getSubdomainOpts(): { sandboxId: string; backendPort: number } | undefined {
+export function getSubdomainOpts(): { sandboxId: string; backendPort: number; apiBaseUrl?: string } | undefined {
   if (isCloudMode()) return undefined;
   return {
     sandboxId: getActiveSandboxId(),
     backendPort: getBackendPort(),
+    apiBaseUrl: getBackendUrl(),
   };
 }
 
@@ -632,7 +633,7 @@ export function getSubdomainOpts(): { sandboxId: string; backendPort: number } |
  */
 export function deriveSubdomainOpts(
   server: ServerEntry | null | undefined,
-): { sandboxId: string; backendPort: number } | undefined {
+): { sandboxId: string; backendPort: number; apiBaseUrl?: string } | undefined {
   // Cloud providers use their own URL scheme — no subdomain proxy.
   if (server?.provider === 'daytona' || server?.provider === 'hetzner') return undefined;
   // For all local/self-hosted modes (local_docker, null server, unknown provider),
@@ -643,6 +644,7 @@ export function deriveSubdomainOpts(
   return {
     sandboxId,
     backendPort: getBackendPort(),
+    apiBaseUrl: getBackendUrl(),
   };
 }
 

@@ -39,12 +39,22 @@ export interface ParsedLocalhostUrl {
   path: string;
 }
 
-/** Options for subdomain URL generation */
+/** Options for proxy URL generation */
 export interface SubdomainUrlOptions {
   /** Sandbox ID (e.g. 'kortix-sandbox' for local, Daytona ID for cloud) */
   sandboxId: string;
   /** Backend port (e.g. 8008) — the port kortix-api listens on */
   backendPort: number;
+  /**
+   * The public-facing API base URL (e.g. 'https://e2e-test.kortix.cloud/v1').
+   * When set and the user is NOT on localhost, path-based proxy URLs are
+   * generated instead of subdomain URLs:
+   *   https://e2e-test.kortix.cloud/v1/p/{sandboxId}/{port}/{path}
+   *
+   * This makes proxy URLs work correctly on VPS/self-hosted deployments
+   * where *.localhost subdomain DNS resolution isn't available.
+   */
+  apiBaseUrl?: string;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -324,10 +334,31 @@ export function hasLocalhostUrls(text: string): boolean {
 }
 
 /**
- * Build a subdomain preview URL.
+ * Detect whether the browser is running on localhost.
+ * Safe to call server-side (returns false).
+ */
+function isBrowserOnLocalhost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+/**
+ * Build a preview proxy URL for a sandbox service port.
  *
- * @example rewriteLocalhostUrl(3210, '/viewer.html', { sandboxId: 'kortix-sandbox', backendPort: 8008 })
- *          → 'http://p3210-kortix-sandbox.localhost:8008/viewer.html'
+ * Two modes:
+ *   - **Subdomain** (local dev): `http://p{port}-{sandboxId}.localhost:{backendPort}/{path}`
+ *     Works because browsers resolve *.localhost to 127.0.0.1.
+ *
+ *   - **Path-based** (VPS/self-hosted): `{apiBaseUrl}/p/{sandboxId}/{port}/{path}`
+ *     Goes through Caddy → API → sandbox. Used when the browser isn't on localhost.
+ *
+ * @example
+ *   // Local: rewriteLocalhostUrl(3210, '/viewer.html', '', opts)
+ *   // → 'http://p3210-kortix-sandbox.localhost:8008/viewer.html'
+ *
+ *   // VPS:   rewriteLocalhostUrl(3210, '/viewer.html', '', opts)
+ *   // → 'https://e2e-test.kortix.cloud/v1/p/kortix-sandbox/3210/viewer.html'
  */
 export function rewriteLocalhostUrl(
   port: number,
@@ -336,11 +367,20 @@ export function rewriteLocalhostUrl(
   subdomainOpts?: SubdomainUrlOptions,
 ): string {
   if (!subdomainOpts) {
-    // No subdomain opts — shouldn't happen in practice, but degrade gracefully
     const safePath = normalizePath(path);
     return `http://localhost:${port}${safePath}`;
   }
+
   const safePath = normalizePath(path);
+
+  // Path-based proxy for VPS/remote deployments
+  if (subdomainOpts.apiBaseUrl && !isBrowserOnLocalhost()) {
+    // apiBaseUrl is like "https://e2e-test.kortix.cloud/v1" — strip trailing /v1 or / to get origin+prefix
+    const base = subdomainOpts.apiBaseUrl.replace(/\/+$/, '');
+    return `${base}/p/${subdomainOpts.sandboxId}/${port}${safePath}`;
+  }
+
+  // Subdomain proxy for localhost (local dev)
   return `http://p${port}-${subdomainOpts.sandboxId}.localhost:${subdomainOpts.backendPort}${safePath}`;
 }
 
@@ -421,10 +461,18 @@ export function toInternalUrl(port: number, path: string = '/'): string {
 }
 
 /**
- * Parse a subdomain preview URL back to its components.
+ * Regex to detect path-based proxy URLs:
+ *   https://domain/v1/p/{sandboxId}/{port}/{path}
+ */
+const PATH_PROXY_URL_REGEX =
+  /^https?:\/\/[^/]+\/v1\/p\/([^/]+)\/(\d+)(\/.*)?$/;
+
+/**
+ * Parse a preview proxy URL back to its components.
+ * Handles both subdomain and path-based formats:
  *
- * @example parseSubdomainUrl('http://p3210-kortix-sandbox.localhost:8008/viewer.html')
- *          → { port: 3210, sandboxId: 'kortix-sandbox', backendPort: 8008, path: '/viewer.html' }
+ * Subdomain: http://p3210-kortix-sandbox.localhost:8008/viewer.html
+ * Path:      https://e2e-test.kortix.cloud/v1/p/kortix-sandbox/3210/viewer.html
  */
 export function parseSubdomainUrl(url: string): {
   port: number;
@@ -432,15 +480,34 @@ export function parseSubdomainUrl(url: string): {
   backendPort: number;
   path: string;
 } | null {
-  const match = url.match(SUBDOMAIN_URL_REGEX);
-  if (!match) return null;
+  // Try subdomain format first
+  const subMatch = url.match(SUBDOMAIN_URL_REGEX);
+  if (subMatch) {
+    return {
+      port: parseInt(subMatch[1], 10),
+      sandboxId: subMatch[2],
+      backendPort: subMatch[3] ? parseInt(subMatch[3], 10) : 80,
+      path: subMatch[4] || '/',
+    };
+  }
 
-  return {
-    port: parseInt(match[1], 10),
-    sandboxId: match[2],
-    backendPort: match[3] ? parseInt(match[3], 10) : 80,
-    path: match[4] || '/',
-  };
+  // Try path-based format: /v1/p/{sandboxId}/{port}/{path}
+  const pathMatch = url.match(PATH_PROXY_URL_REGEX);
+  if (pathMatch) {
+    try {
+      const parsed = new URL(url);
+      return {
+        port: parseInt(pathMatch[2], 10),
+        sandboxId: pathMatch[1],
+        backendPort: parseInt(parsed.port, 10) || (parsed.protocol === 'https:' ? 443 : 80),
+        path: pathMatch[3] || '/',
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -483,11 +550,11 @@ export function proxyUrlToInternal(
 }
 
 /**
- * Check if a URL is already a subdomain preview URL.
+ * Check if a URL is already a preview proxy URL (subdomain or path-based).
  * Use this to prevent double-proxying.
  */
 export function isPreviewUrl(url: string): boolean {
-  return isSubdomainUrl(url);
+  return isSubdomainUrl(url) || PATH_PROXY_URL_REGEX.test(url);
 }
 
 // ── Web Forward Proxy Utilities ─────────────────────────────────────────────
