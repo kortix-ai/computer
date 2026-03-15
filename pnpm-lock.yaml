@@ -1213,8 +1213,8 @@ importers:
         specifier: '*'
         version: 4.13.0
       '@opencode-ai/plugin':
-        specifier: ^1.2.25
-        version: 1.2.25
+        specifier: 1.2.26
+        version: 1.2.26
       '@opencode-ai/sdk':
         specifier: ^1.2.25
         version: 1.2.25
@@ -6605,10 +6605,10 @@ packages:
       zod: 4.1.8
     dev: false
 
-  /@opencode-ai/plugin@1.2.25:
-    resolution: {integrity: sha512-IQnjkcN7cvI/zoiDNx1d2qnGzn5BR/Bu95Kq05/vdd8oX4ARgYkqfaJgKkNSpjUVoNBKHTd8m9q1TtzuKlyGUg==}
+  /@opencode-ai/plugin@1.2.26:
+    resolution: {integrity: sha512-pC71KGAI9T0+S84KpbEq9THp5pT7KOq+GmfdXkvQ7KSH5zi+iASWRhqorir73sKmEj2MQfpbe1BxdcU5qbeOwA==}
     dependencies:
-      '@opencode-ai/sdk': 1.2.25
+      '@opencode-ai/sdk': 1.2.26
       zod: 4.1.8
     dev: false
 
@@ -6622,6 +6622,10 @@ packages:
 
   /@opencode-ai/sdk@1.2.25:
     resolution: {integrity: sha512-ikuGWob48OM7LTgfXFqGOZKVOqh50FEjvtIBhXGhGowJhifmjZ+xuq/ypP8nPjTwUX73pbu1C3X9ZBWVkCN9mA==}
+    dev: false
+
+  /@opencode-ai/sdk@1.2.26:
+    resolution: {integrity: sha512-HPB+0pfvTMPj2KEjNLF3oqgldKW8koTJ7ssqXwzndazqxS+gUynzvdIKIQP4+QIInNcc5nJMG9JtfLcePGgTLQ==}
     dev: false
 
   /@opentelemetry/api-logs@0.207.0:
@@ -22942,7 +22946,7 @@ packages:
     peerDependencies:
       typescript: ^5
     dependencies:
-      '@opencode-ai/plugin': 1.2.25
+      '@opencode-ai/plugin': 1.2.26
       '@opencode-ai/sdk': 1.2.25
       bun-pty: 0.4.8
       moment: 2.30.1
@@ -27705,7 +27709,7 @@ packages:
     resolution: {directory: packages/opencode-agent-triggers, type: directory}
     name: '@kortix/opencode-agent-triggers'
     dependencies:
-      '@opencode-ai/plugin': 1.2.25
+      '@opencode-ai/plugin': 1.2.26
       croner: 8.1.2
       js-yaml: 4.1.0
     dev: false
