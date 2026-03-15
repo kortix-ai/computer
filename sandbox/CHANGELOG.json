@@ -1,5 +1,29 @@
 [
   {
+    "version": "0.8.5",
+    "date": "2026-03-15",
+    "title": "Sandbox reliability, billing flow, and UI polish",
+    "description": "Fixes OpenCode crash-loop on first boot caused by stale SQLite WAL locks, tightens the checkout flow to redirect cleanly on failure, polishes badge tokens, and repairs the promote workflow submodule issue.",
+    "changes": [
+      {
+        "type": "fix",
+        "text": "OpenCode no longer crash-loops on fresh sandbox boot — stale SQLite WAL/SHM locks from a previous crashed instance are waited out before restarting"
+      },
+      {
+        "type": "fix",
+        "text": "Checkout failure now redirects straight to /subscription instead of the dead-end payment_pending page"
+      },
+      {
+        "type": "fix",
+        "text": "Badge component now uses design token colors (primary, muted) instead of hardcoded blue/purple/green"
+      },
+      {
+        "type": "fix",
+        "text": "Promote workflow submodule pointer for kortix-ocx-registry updated to a valid ref, unblocking CI"
+      }
+    ]
+  },
+  {
     "version": "0.8.4",
     "date": "2026-03-15",
     "title": "Polish self-hosted builds, PTY tooling, and release flow",
